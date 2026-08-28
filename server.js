@@ -8,19 +8,18 @@ const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
 
-// সকেট সাইজ ১০০ এমবি পর্যন্ত অ্যালাউ করা
 const io = new Server(server, {
     maxHttpBufferSize: 1e8,
     cors: { origin: "*" }
 });
 
-// Uploads ফোল্ডার নিশ্চিত করা
+const roomsHostMap = {}; // রুমের হোস্টের নাম সেভ রাখার জন্য
+
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
-// ফাইল ও ভিডিও সেভ করার স্টোরেজ
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname))
@@ -30,11 +29,8 @@ const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(uploadDir));
 
-// ফাইল আপলোড সার্ভিস API
 app.post('/upload', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    
-    // ফাইলের ডাউনলোড লিংক ও নাম পাঠানো
     res.json({
         filePath: `/uploads/${req.file.filename}`,
         fileName: req.file.originalname,
@@ -42,30 +38,38 @@ app.post('/upload', upload.single('file'), (req, res) => {
     });
 });
 
-// রিয়েলটাইম সকেট ম্যানেজমেন্ট
 io.on('connection', (socket) => {
 
-    socket.on('join-room', (roomId, userName) => {
+    // রুমে জয়েনিং এবং হোস্ট ট্র্যাক
+    socket.on('join-room', ({ roomId, userName, isHost }) => {
         socket.join(roomId);
         socket.currentRoom = roomId;
-        socket.userName = userName;
+
+        if (isHost) {
+            roomsHostMap[roomId] = userName;
+        }
+
+        const hostName = roomsHostMap[roomId] || "User";
+
+        // জয়েন করার সাথে সাথে নোটিফিকেশন মেসেজ
+        socket.emit('system-message', `You joined ${hostName}'s room`);
     });
 
     socket.on('leave-room', (roomId) => {
         socket.leave(roomId);
     });
 
-    // ১. টেক্সট মেসেজ ব্রডকাস্ট
+    // রিয়েলটাইম মেসেজ হ্যান্ডলার (একদম ইনস্ট্যান্ট ব্রডকাস্ট)
     socket.on('send-message', (data) => {
-        io.in(data.roomId).emit('receive-message', data);
+        io.to(data.roomId).emit('receive-message', data);
     });
 
-    // ২. ছবি/ভিডিও/ফাইল ব্রডকাস্ট
+    // রিয়েলটাইম ফাইল সেন্ড
     socket.on('send-file', (data) => {
-        io.in(data.roomId).emit('receive-file', data);
+        io.to(data.roomId).emit('receive-file', data);
     });
 
-    // ৩. কল রিং দেওয়া (অন্য ফোনে রিং বাজানোর জন্য)
+    // অডিও/ভিডিও কল
     socket.on('call-user', (data) => {
         socket.to(data.roomId).emit('incoming-call', data);
     });
