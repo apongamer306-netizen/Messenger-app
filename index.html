@@ -5,84 +5,102 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yamin Messenger App</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
 </head>
-<body>
+<body class="light-mode">
+
+    <div class="theme-toggle-container">
+        <button id="theme-btn" onclick="toggleTheme()" class="theme-btn">
+            <i class="fa-solid fa-moon"></i>
+        </button>
+    </div>
 
     <div id="site-lock-screen" class="screen">
-        <div class="card">
+        <div class="glass-card">
             <h2>🔒 Access Protection</h2>
-            <p>Master Key দিন (Default: yamin123):</p>
-            <input type="password" id="site-key-input" placeholder="Site Password">
-            <button onclick="unlockSite()">Unlock</button>
+            <p>Master Key প্রবেশ করান:</p>
+            <div class="password-wrapper">
+                <input type="password" id="site-key-input" placeholder="Enter Site Password">
+                <i class="fa-solid fa-eye toggle-pwd" onclick="togglePasswordVisibility('site-key-input', this)"></i>
+            </div>
+            <button class="btn-primary" onclick="unlockSite()">Unlock</button>
+            <footer class="card-footer">DEVELOPED BY EYAMIN</footer>
         </div>
     </div>
 
     <div id="auth-screen" class="screen hidden">
-        <div class="card">
+        <div class="glass-card">
             <h2 id="auth-title">Login</h2>
-            <input type="text" id="auth-phone" placeholder="Phone Number">
-            <input type="password" id="auth-pass" placeholder="Password">
-            <button onclick="handleAuth()" id="auth-btn">Login</button>
+            <input type="text" id="auth-phone" placeholder="Phone Number" class="input-field">
+            <div class="password-wrapper">
+                <input type="password" id="auth-pass" placeholder="Password">
+                <i class="fa-solid fa-eye toggle-pwd" onclick="togglePasswordVisibility('auth-pass', this)"></i>
+            </div>
+            <button onclick="handleAuth()" id="auth-btn" class="btn-primary">Login</button>
             <p onclick="toggleAuthMode()" class="toggle-link" id="auth-toggle">Create New Account</p>
         </div>
     </div>
 
     <div id="dashboard-screen" class="screen hidden">
-        <header>
-            <h1>My Messenger App</h1>
-        </header>
+        <div class="glass-card">
+            <header>
+                <h1>EKT CHATTER</h1>
+            </header>
 
-        <div class="profile-section">
-            <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic"><br>
-            <input type="file" id="profile-upload" accept="image/*" onchange="previewProfilePic(event)">
-            <h3 id="user-display-name">User Name</h3>
-        </div>
-
-        <div class="room-actions">
-            <button onclick="createRoom()">Create Room</button>
-            <div id="created-code-display" class="hidden">
-                <p>Room Code: <strong id="room-code"></strong></p>
+            <div class="profile-section">
+                <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic"><br>
+                <input type="file" id="profile-upload" accept="image/*" onchange="previewProfilePic(event)">
+                <h3 id="user-display-name">User Name</h3>
             </div>
-            <div class="join-box">
-                <input type="text" id="join-code-input" placeholder="Enter Room Code">
-                <button onclick="joinRoom()">Join Room</button>
+
+            <div class="room-actions">
+                <button class="btn-primary" onclick="createRoom()">Create Room</button>
+                <div id="created-code-display" class="hidden">
+                    <p>Room Code: <strong id="room-code"></strong></p>
+                </div>
+                <div class="join-box">
+                    <input type="text" id="join-code-input" placeholder="Enter Room Code" class="input-field">
+                    <button class="btn-primary" onclick="joinRoom()">Join Room</button>
+                </div>
             </div>
+
+            <div class="theme-section">
+                <label>Room Background Theme Image:</label>
+                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)">
+            </div>
+
+            <button onclick="logout()" class="logout-btn">Logout</button>
+
+            <footer class="card-footer">DEVELOPED BY EYAMIN</footer>
         </div>
-
-        <div class="theme-section">
-            <label>Room Background Theme Image:</label>
-            <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)">
-        </div>
-
-        <button onclick="logout()" class="logout-btn">Logout</button>
-
-        <footer>Developed by Yamin</footer>
     </div>
 
     <div id="room-screen" class="screen hidden">
-        <div class="room-header">
-            <h3>Chat Room: <span id="active-room-id"></span></h3>
-            <button onclick="leaveRoom()">Leave Room</button>
-        </div>
+        <div class="glass-card room-card">
+            <div class="room-header">
+                <h3>Chat Room: <span id="active-room-id"></span></h3>
+                <button onclick="leaveRoom()" class="logout-btn">Leave Room</button>
+            </div>
 
-        <div class="video-container">
-            <video id="localVideo" autoplay muted playsinline></video>
-            <video id="remoteVideo" autoplay playsinline></video>
-        </div>
+            <div class="video-container">
+                <video id="localVideo" autoplay muted playsinline></video>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
 
-        <div class="call-controls">
-            <button onclick="startCall(false)">🎤 Audio Call</button>
-            <button onclick="startCall(true)">📹 Video Call</button>
-        </div>
+            <div class="call-controls">
+                <button class="btn-primary" onclick="startCall(false)">🎤 Audio Call</button>
+                <button class="btn-primary" onclick="startCall(true)">📹 Video Call</button>
+            </div>
 
-        <div id="chat-box" class="chat-box"></div>
+            <div id="chat-box" class="chat-box"></div>
 
-        <div class="chat-input-area">
-            <input type="text" id="msg-input" placeholder="Type message...">
-            <input type="file" id="file-input" accept="image/*,video/*,audio/*">
-            <button onclick="sendMessage()">Send</button>
+            <div class="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Type message..." class="input-field">
+                <input type="file" id="file-input" accept="image/*,video/*,audio/*">
+                <button class="btn-primary" onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
 
