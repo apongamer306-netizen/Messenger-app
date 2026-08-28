@@ -13,7 +13,8 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-const roomsHostMap = {}; // রুমের হোস্টের নাম সেভ রাখার জন্য
+// রুমের হোস্টের তথ্য স্টোর করার অবজেক্ট
+const activeRooms = {}; 
 
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -40,36 +41,53 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
 io.on('connection', (socket) => {
 
-    // রুমে জয়েনিং এবং হোস্ট ট্র্যাক
-    socket.on('join-room', ({ roomId, userName, isHost }) => {
+    // রুম তৈরি করা
+    socket.on('create-room', ({ roomId, hostName, hostPic }) => {
         socket.join(roomId);
         socket.currentRoom = roomId;
-
-        if (isHost) {
-            roomsHostMap[roomId] = userName;
-        }
-
-        const hostName = roomsHostMap[roomId] || "User";
-
-        // জয়েন করার সাথে সাথে নোটিফিকেশন মেসেজ
-        socket.emit('system-message', `You joined ${hostName}'s room`);
+        socket.userName = hostName;
+        
+        activeRooms[roomId] = {
+            hostName: hostName,
+            hostPic: hostPic || ''
+        };
     });
 
-    socket.on('leave-room', (roomId) => {
-        socket.leave(roomId);
+    // রুমে জয়েন করা
+    socket.on('join-room', ({ roomId, userName, userPic }) => {
+        socket.join(roomId);
+        socket.currentRoom = roomId;
+        socket.userName = userName;
+
+        const roomInfo = activeRooms[roomId] || { hostName: 'User', hostPic: '' };
+
+        // জয়েন করা ইউজারকে হোস্টের নাম ও পিকচার জানানো
+        socket.emit('joined-room-info', {
+            hostName: roomInfo.hostName,
+            hostPic: roomInfo.hostPic
+        });
+
+        // রুমে থাকা বাকিদের জানানো যে নতুন ইউজার জয়েন করেছে
+        socket.to(roomId).emit('user-joined-notify', {
+            userName: userName
+        });
     });
 
-    // রিয়েলটাইম মেসেজ হ্যান্ডলার (একদম ইনস্ট্যান্ট ব্রডকাস্ট)
+    // মেসেজ ব্রডকাস্ট (রুমের সবাইকে পাঠাবে)
     socket.on('send-message', (data) => {
-        io.to(data.roomId).emit('receive-message', data);
+        if (data.roomId) {
+            io.in(data.roomId).emit('receive-message', data);
+        }
     });
 
-    // রিয়েলটাইম ফাইল সেন্ড
+    // ফাইল সেন্ড
     socket.on('send-file', (data) => {
-        io.to(data.roomId).emit('receive-file', data);
+        if (data.roomId) {
+            io.in(data.roomId).emit('receive-file', data);
+        }
     });
 
-    // অডিও/ভিডিও কল
+    // কলিং লজিক
     socket.on('call-user', (data) => {
         socket.to(data.roomId).emit('incoming-call', data);
     });
@@ -83,7 +101,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        if (socket.currentRoom) socket.leave(socket.currentRoom);
+        if (socket.currentRoom) {
+            socket.leave(socket.currentRoom);
+        }
     });
 });
 
