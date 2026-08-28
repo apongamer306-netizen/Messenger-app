@@ -10,18 +10,21 @@ const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  maxHttpBufferSize: 1e8 // 100 MB payload size limit for images and videos
 });
 
-app.use(express.static(path.join(__dirname, "./")));
+app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
 
+  // User Joined Room Event
   socket.on("join-room", ({ roomCode, user, ownerName }) => {
     socket.join(roomCode);
     io.to(roomCode).emit("user-joined-notify", { user, ownerName });
   });
 
+  // Broadcast Message Event to Everyone in Room (Sender + Receiver)
   socket.on("send-message", (msgData) => {
     io.to(msgData.roomCode).emit("receive-message", msgData);
   });
