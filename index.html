@@ -6,7 +6,9 @@
   <title>EKT CHATING APP</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="/socket.io/socket.io.js"></script>
+  
+  <!-- CDN Socket.io Fix (ফাইল লোড না হওয়ার সমস্যা স্থায়ী সমাধান) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body class="dark-theme">
@@ -95,14 +97,6 @@
           <button id="startAudioCallBtn" class="action-btn call-audio"><i class="fa-solid fa-phone"></i></button>
           <button id="startVideoCallBtn" class="action-btn call-video"><i class="fa-solid fa-video"></i></button>
           <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fa-solid fa-right-from-bracket"></i></button>
-        </div>
-      </div>
-
-      <div id="videoCallOverlay" class="video-overlay" style="display: none;">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay playsinline muted></video>
-        <div class="call-controls">
-          <button id="endCallBtn" class="btn btn-danger"><i class="fa-solid fa-phone-slash"></i></button>
         </div>
       </div>
 
