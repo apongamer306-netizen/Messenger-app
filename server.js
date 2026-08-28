@@ -1,68 +1,69 @@
 const express = require('express');
 const http = require('http');
-const path = require('path');
+const { Server } = require('socket.io');
 const multer = require('multer');
-const socketIo = require('socket.io');
-const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = new Server(server);
 
-// Uploads folder creation
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
+// ফাইল আপলোড সেটআপ
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
 const upload = multer({ storage });
 
-// Serve static files from root directory
 app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
+// ফাইল আপলোড এন্ডপয়েন্ট
 app.post('/upload', upload.single('file'), (req, res) => {
-    if (!req.file) return res.status(400).send('No file uploaded.');
-    res.json({ filePath: `/uploads/${req.file.filename}`, fileType: req.file.mimetype });
+    if (!req.file) return res.status(400).send("No file uploaded");
+    res.json({
+        filePath: `/uploads/${req.file.filename}`,
+        fileType: req.file.mimetype
+    });
 });
 
+// Realtime Socket Signalling & Chat Handler
 io.on('connection', (socket) => {
-    socket.on('join-room', (roomId, user) => {
+    
+    // রুমে যুক্ত হওয়া
+    socket.on('join-room', (roomId, userName) => {
         socket.join(roomId);
-        socket.to(roomId).emit('user-connected', user, socket.id);
+        socket.currentRoom = roomId;
+    });
 
-        socket.on('send-message', (data) => {
-            io.to(roomId).emit('receive-message', data);
-        });
+    // রুম থেকে লিভ নেওয়া
+    socket.on('leave-room', (roomId) => {
+        socket.leave(roomId);
+    });
 
-        socket.on('send-file', (data) => {
-            io.to(roomId).emit('receive-file', data);
-        });
+    // মেসেজ রিসিভ এবং ব্রডকাস্ট (রুমের সবার কাছে পাঠানো)
+    socket.on('send-message', (data) => {
+        io.to(data.roomId).emit('receive-message', data);
+    });
 
-        socket.on('call-user', (data) => {
-            io.to(data.userToCall).emit('call-made', {
-                signal: data.signalData,
-                from: socket.id,
-                name: data.name
-            });
-        });
+    // মিডিয়া ফাইল ব্রডকাস্ট
+    socket.on('send-file', (data) => {
+        io.to(data.roomId).emit('receive-file', data);
+    });
 
-        socket.on('answer-call', (data) => {
-            io.to(data.to).emit('call-accepted', data.signal);
-        });
+    // অডিও/ভিডিও কল সিগন্যালিং
+    socket.on('call-user', (data) => {
+        socket.to(data.roomId).emit('incoming-call', data);
+    });
 
-        socket.on('disconnect', () => {
-            socket.to(roomId).emit('user-disconnected', socket.id);
-        });
+    socket.on('answer-call', (data) => {
+        socket.to(data.roomId).emit('call-accepted', data.signal);
+    });
+
+    socket.on('disconnect', () => {
+        if (socket.currentRoom) {
+            socket.leave(socket.currentRoom);
+        }
     });
 });
 
