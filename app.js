@@ -1,11 +1,9 @@
-// Render Socket connection handling
 const socket = io();
 
 let currentUser = null;
 let currentRoom = null;
-let roomOwnerName = "";
 
-// DOM Elements
+// DOM Selectors
 const masterKeyScreen = document.getElementById("masterKeyScreen");
 const authScreen = document.getElementById("authScreen");
 const dashboardScreen = document.getElementById("dashboardScreen");
@@ -43,7 +41,6 @@ const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
 let isSignUpMode = true;
 
-// Password Visibility
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
   if (input.type === "password") {
@@ -55,7 +52,6 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
-// Check Auto Login
 document.addEventListener("DOMContentLoaded", () => {
   const isMasterUnlocked = localStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
@@ -73,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Master Key Unlock
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value === "KT EYAMIN") {
     localStorage.setItem("masterUnlocked", "true");
@@ -86,11 +81,10 @@ unlockBtn.addEventListener("click", () => {
       authScreen.style.display = "block";
     }
   } else {
-    alert("ভুল Master Key দেওয়া হয়েছে!");
+    alert("ভুল Master Key দেওয়া হয়েছে!");
   }
 });
 
-// Toggle Auth Screen
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -109,12 +103,11 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-// Auth Submit
 authSubmitBtn.addEventListener("click", () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
 
-  if (!phone || !password) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+  if (!phone || !password) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
@@ -128,7 +121,7 @@ authSubmitBtn.addEventListener("click", () => {
       currentUser = savedUser;
       showDashboard();
     } else {
-      alert("ফোন নম্বর অথবা পাসওয়ার্ডটি সঠিক নয়!");
+      alert("ফোন নম্বর অথবা পাসওয়ার্ডটি সঠিক নয়!");
     }
   }
 });
@@ -140,7 +133,6 @@ function showDashboard() {
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
 }
 
-// Avatar Change
 avatarUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -154,11 +146,9 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Room Creation & Joining
 createRoomBtn.addEventListener("click", () => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  roomOwnerName = currentUser.name;
-  joinRoom(code, roomOwnerName);
+  joinRoom(code, currentUser.name);
 });
 
 joinRoomBtn.addEventListener("click", () => {
@@ -182,7 +172,6 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// Real-Time Chat Messaging
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -205,7 +194,6 @@ function sendChatMessage() {
   }
 }
 
-// Media Attachment Handling
 fileAttachmentInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file || !currentRoom) return;
@@ -234,7 +222,6 @@ fileAttachmentInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// Socket Listeners for Broadcast
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
@@ -258,7 +245,6 @@ function appendMessage(data, isMe) {
     div.appendChild(textNode);
   }
 
-  // Handle Images and Media
   if (data.file) {
     const mediaContainer = document.createElement("div");
     mediaContainer.className = "media-wrapper";
@@ -270,7 +256,6 @@ function appendMessage(data, isMe) {
       img.onclick = () => openFullscreenImage(data.file);
       mediaContainer.appendChild(img);
 
-      // Add Download Option for Images
       const downloadBtn = document.createElement("a");
       downloadBtn.href = data.file;
       downloadBtn.download = data.fileName || "image.png";
@@ -292,7 +277,6 @@ function appendMessage(data, isMe) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Lightbox/Full Screen Image Display
 function openFullscreenImage(src) {
   const modal = document.createElement("div");
   modal.className = "fullscreen-modal";
@@ -310,7 +294,6 @@ leaveRoomBtn.addEventListener("click", () => {
   dashboardScreen.style.display = "block";
 });
 
-// Theme Toggle
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 themeToggleBtn.addEventListener("click", () => {
   document.body.classList.toggle("light-theme");
