@@ -103,7 +103,6 @@ function toggleAuthMode() {
     }
 }
 
-// অ্যাকাউন্ট তৈরি ও সঠিক পাসওয়ার্ড দিয়ে লগইন ভ্যালিডেশন
 function handleAuth() {
     const name = document.getElementById('auth-name').value.trim();
     const phone = document.getElementById('auth-phone').value.trim();
@@ -114,20 +113,17 @@ function handleAuth() {
     }
 
     if (isSignupMode) {
-        // নতুন অ্যাকাউন্ট তৈরি করার লজিক
         if (!name) return alert("অনুগ্রহ করে আপনার নাম লিখুন");
 
         localStorage.setItem('userPhone', phone);
-        localStorage.setItem('userPass', pass); // রেজিস্টার্ড পাসওয়ার্ড সেভ করা হচ্ছে
+        localStorage.setItem('userPass', pass);
         localStorage.setItem('userName', name);
         localStorage.setItem('isLoggedIn', "true");
 
         document.getElementById('user-display-name').innerText = name;
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('dashboard-screen').classList.remove('hidden');
-        alert("Account Created Successfully!");
     } else {
-        // লগইন করার লজিক এবং পাসওয়ার্ড যাচাইকরণ
         const savedPhone = localStorage.getItem('userPhone');
         const savedPass = localStorage.getItem('userPass');
         const savedName = localStorage.getItem('userName');
@@ -142,7 +138,7 @@ function handleAuth() {
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('dashboard-screen').classList.remove('hidden');
         } else {
-            alert("ভুল ফোন নম্বর অথবা পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।");
+            alert("ভুল ফোন নম্বর অথবা পাসওয়ার্ড!");
         }
     }
 }
@@ -212,7 +208,7 @@ function enterRoomInterface(code) {
     const savedThemeUrl = localStorage.getItem('roomThemeUrl');
     if (savedThemeUrl) applyRoomTheme(savedThemeUrl);
 
-    socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
+    socket.emit('join-room', code, localStorage.getItem('userName'));
 }
 
 function logout() { 
@@ -221,16 +217,19 @@ function logout() {
 }
 
 function leaveRoom() {
+    socket.emit('leave-room', currentRoom);
     localStorage.removeItem("currentRoom");
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
 }
 
+// বার্তা এবং মিডিয়া পাঠানোর ফিক্সড লজিক
 function sendMessage() {
     const msgInput = document.getElementById('msg-input');
-    const msg = msgInput.value;
+    const msg = msgInput.value.trim();
     const fileInput = document.getElementById('file-input');
 
+    // ১. ফাইল অ্যাটাচমেন্ট হ্যান্ডলিং
     if (fileInput.files.length > 0) {
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
@@ -238,17 +237,34 @@ function sendMessage() {
         fetch('/upload', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
-                socket.emit('send-file', { roomId: currentRoom, fileUrl: data.filePath, fileType: data.fileType, user: localStorage.getItem('userName') });
+                socket.emit('send-file', { 
+                    roomId: currentRoom, 
+                    fileUrl: data.filePath, 
+                    fileType: data.fileType, 
+                    user: localStorage.getItem('userName') 
+                });
                 fileInput.value = '';
-            });
+            })
+            .catch(err => console.error("File upload error:", err));
     }
 
-    if (msg) {
-        socket.emit('send-message', { roomId: currentRoom, message: msg, user: localStorage.getItem('userName') });
+    // ২. টেক্সট মেসেজ হ্যান্ডলিং
+    if (msg !== "") {
+        socket.emit('send-message', { 
+            roomId: currentRoom, 
+            message: msg, 
+            user: localStorage.getItem('userName') 
+        });
         msgInput.value = '';
     }
 }
 
+// এন্টার চাপলে মেসেজ পাঠানোর সাপোর্ট
+document.getElementById('msg-input')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
+// মেসেজ রিসিভ করা
 socket.on('receive-message', (data) => {
     const chatBox = document.getElementById('chat-box');
     const isSelf = data.user === localStorage.getItem('userName');
@@ -261,19 +277,20 @@ socket.on('receive-message', (data) => {
     chatBox.scrollTop = chatBox.scrollHeight;
 });
 
+// মিডিয়া ফাইল রিসিভ করা
 socket.on('receive-file', (data) => {
     const chatBox = document.getElementById('chat-box');
     const isSelf = data.user === localStorage.getItem('userName');
     
     let content = '';
     if (data.fileType.startsWith('image/')) {
-        content = `<img src="${data.fileUrl}" style="max-width:100%; border-radius:5px;">`;
+        content = `<img src="${data.fileUrl}" style="max-width:100%; max-height:200px; border-radius:6px; margin-top:5px;">`;
     } else if (data.fileType.startsWith('video/')) {
-        content = `<video src="${data.fileUrl}" controls style="max-width:100%;"></video>`;
+        content = `<video src="${data.fileUrl}" controls style="max-width:100%; max-height:200px; border-radius:6px; margin-top:5px;"></video>`;
     } else if (data.fileType.startsWith('audio/')) {
-        content = `<audio src="${data.fileUrl}" controls style="max-width:100%;"></audio>`;
+        content = `<audio src="${data.fileUrl}" controls style="max-width:100%; margin-top:5px;"></audio>`;
     } else {
-        content = `<a href="${data.fileUrl}" download style="color:#fff;">Download File</a>`;
+        content = `<a href="${data.fileUrl}" download target="_blank" style="color:#60a5fa; text-decoration:underline;">Download File</a>`;
     }
 
     const msgDiv = document.createElement('div');
@@ -284,36 +301,43 @@ socket.on('receive-file', (data) => {
     chatBox.scrollTop = chatBox.scrollHeight;
 });
 
+// অডিও এবং ভিডিও কল হ্যান্ডলিং
 function startCall(isVideo) {
     document.getElementById('video-wrapper').classList.remove('hidden');
-    navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then(stream => {
-        localStream = stream;
-        document.getElementById('localVideo').srcObject = stream;
+    navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true })
+        .then(stream => {
+            localStream = stream;
+            document.getElementById('localVideo').srcObject = stream;
 
-        peer = new SimplePeer({ initiator: true, trickle: false, stream: stream });
+            peer = new SimplePeer({ initiator: true, trickle: false, stream: stream });
 
-        peer.on('signal', data => {
-            socket.emit('call-user', { userToCall: currentRoom, signalData: data, name: localStorage.getItem('userName') });
-        });
+            peer.on('signal', data => {
+                socket.emit('call-user', { 
+                    roomId: currentRoom, 
+                    signalData: data, 
+                    from: localStorage.getItem('userName') 
+                });
+            });
 
-        peer.on('stream', remoteStream => {
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-        });
-    });
+            peer.on('stream', remoteStream => {
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            });
+        })
+        .catch(err => alert("ক্যামেরা বা মাইক্রোফোন অ্যাক্সেস পাওয়া যায়নি!"));
 }
 
-socket.on('call-made', data => {
-    if (confirm(`Incoming Call from ${data.name}. Accept?`)) {
+socket.on('incoming-call', data => {
+    if (confirm(`${data.from} এর থেকে কল আসছে। গ্রহণ করবেন?`)) {
         document.getElementById('video-wrapper').classList.remove('hidden');
         navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             localStream = stream;
             document.getElementById('localVideo').srcObject = stream;
 
             peer = new SimplePeer({ initiator: false, trickle: false, stream: stream });
-            peer.signal(data.signal);
+            peer.signal(data.signalData);
 
             peer.on('signal', signal => {
-                socket.emit('answer-call', { signal: signal, to: data.from });
+                socket.emit('answer-call', { signal: signal, roomId: currentRoom });
             });
 
             peer.on('stream', remoteStream => {
@@ -323,4 +347,6 @@ socket.on('call-made', data => {
     }
 });
 
-socket.on('call-accepted', signal => { peer.signal(signal); });
+socket.on('call-accepted', signal => { 
+    if (peer) peer.signal(signal); 
+});
