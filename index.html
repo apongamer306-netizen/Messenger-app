@@ -11,10 +11,10 @@
 </head>
 <body class="light-mode">
 
-    <!-- Top Navigation Header -->
-    <header class="top-navbar">
-        <h1 class="app-logo">EKT CHATING APP</h1>
-        <button id="theme-btn" onclick="toggleTheme()" class="theme-btn" type="button">
+    <!-- Top App Navigation -->
+    <header class="app-header">
+        <h1 class="app-title">EKT CHATING APP</h1>
+        <button id="theme-btn" onclick="toggleTheme()" class="icon-toggle-btn" type="button">
             <i class="fa-solid fa-moon"></i>
         </button>
     </header>
@@ -32,7 +32,7 @@
         </div>
     </div>
 
-    <!-- Login / Signup Screen -->
+    <!-- Auth Screen -->
     <div id="auth-screen" class="screen hidden">
         <div class="glass-card">
             <h2 id="auth-title">Login</h2>
@@ -50,7 +50,7 @@
 
     <!-- Dashboard Screen -->
     <div id="dashboard-screen" class="screen hidden">
-        <div class="glass-card dashboard-card">
+        <div class="glass-card">
             <div class="profile-section">
                 <div class="avatar-wrapper">
                     <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic">
@@ -73,48 +73,50 @@
         </div>
     </div>
 
-    <!-- Compact No-Scroll Chat Room Screen -->
+    <!-- Messenger Style Room View (No-Scroll) -->
     <div id="room-screen" class="screen hidden">
-        <div class="room-container">
-            <!-- Compact Header -->
-            <div class="compact-room-header">
-                <div class="user-info-bar">
-                    <img id="room-user-pic" src="https://via.placeholder.com/40" class="header-avatar">
-                    <div class="header-text">
-                        <span id="room-user-name" class="header-name">User</span>
-                        <span class="header-code">Code: <b id="active-room-id">--</b></span>
+        <div class="messenger-container">
+            
+            <!-- Top Header (Facebook Messenger Style) -->
+            <div class="messenger-header">
+                <div class="header-user-details">
+                    <img id="room-user-pic" src="https://via.placeholder.com/40" class="mini-avatar">
+                    <div class="header-text-group">
+                        <span id="room-user-name" class="user-display-title">User Name</span>
+                        <span class="room-code-badge">Code: <b id="active-room-id">------</b></span>
                     </div>
                 </div>
 
-                <div class="header-actions">
-                    <button class="icon-btn audio-btn" title="Audio Call" onclick="startCall(false)"><i class="fa-solid fa-phone"></i></button>
-                    <button class="icon-btn video-btn" title="Video Call" onclick="startCall(true)"><i class="fa-solid fa-video"></i></button>
+                <div class="header-action-buttons">
+                    <button class="btn-icon call-audio" title="Audio Call" onclick="startCall(false)"><i class="fa-solid fa-phone"></i></button>
+                    <button class="btn-icon call-video" title="Video Call" onclick="startCall(true)"><i class="fa-solid fa-video"></i></button>
                     
-                    <label for="theme-upload" class="icon-btn theme-btn-room" title="Change Theme">
+                    <label for="theme-upload" class="btn-icon set-theme" title="Change Background Theme">
                         <i class="fa-solid fa-palette"></i>
                     </label>
                     <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="hidden">
 
-                    <button class="icon-btn leave-btn" title="Leave Room" onclick="leaveRoom()"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    <button class="btn-icon exit-room" title="Leave Room" onclick="leaveRoom()"><i class="fa-solid fa-right-from-bracket"></i></button>
                 </div>
             </div>
 
-            <!-- Video Overlay (Appears during call) -->
-            <div id="video-wrapper" class="video-wrapper hidden">
+            <!-- Video Call Container (Overlay) -->
+            <div id="video-wrapper" class="video-overlay hidden">
                 <video id="localVideo" autoplay muted playsinline></video>
                 <video id="remoteVideo" autoplay playsinline></video>
             </div>
 
-            <!-- Main Chat View Area -->
-            <div id="chat-box" class="chat-box-area"></div>
+            <!-- Clean Chat Messages Area -->
+            <div id="chat-box" class="messenger-chat-area"></div>
 
-            <!-- Fixed Input Bar -->
-            <div class="chat-input-bar">
-                <label for="file-input" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
+            <!-- Fixed Bottom Input Field -->
+            <div class="messenger-input-bar">
+                <label for="file-input" class="attach-icon"><i class="fa-solid fa-paperclip"></i></label>
                 <input type="file" id="file-input" accept="image/*,video/*,audio/*" class="hidden">
-                <input type="text" id="msg-input" placeholder="Type a message..." class="chat-input-field">
-                <button class="send-action-btn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                <input type="text" id="msg-input" placeholder="Type a message..." class="message-field">
+                <button class="btn-send" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
+
         </div>
     </div>
 
