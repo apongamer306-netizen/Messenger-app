@@ -1,4 +1,3 @@
-// Render Socket connection dynamically connected to backend domain
 const socket = io();
 
 let currentUser = null;
@@ -43,7 +42,6 @@ const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
 let isSignUpMode = true;
 
-// Password Visibility
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
   if (input.type === "password") {
@@ -55,7 +53,6 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
-// Check Auto Login
 document.addEventListener("DOMContentLoaded", () => {
   const isMasterUnlocked = localStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
@@ -73,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Master Key Unlock
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value === "KT EYAMIN") {
     localStorage.setItem("masterUnlocked", "true");
@@ -90,7 +86,6 @@ unlockBtn.addEventListener("click", () => {
   }
 });
 
-// Toggle Auth Screen
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -109,7 +104,6 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-// Auth Submit
 authSubmitBtn.addEventListener("click", () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
@@ -140,7 +134,6 @@ function showDashboard() {
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
 }
 
-// Avatar Change
 avatarUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -154,20 +147,22 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Room Creation & Joining
+// Create Room Fix
 createRoomBtn.addEventListener("click", () => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   roomOwnerName = currentUser.name;
   joinRoom(code, roomOwnerName);
 });
 
+// Join Room Fix
 joinRoomBtn.addEventListener("click", () => {
   const code = roomCodeInput.value.trim().toUpperCase();
-  if (code) joinRoom(code, "Room");
+  if (code) joinRoom(code, "Room Owner");
 });
 
 function joinRoom(code, owner) {
   currentRoom = code;
+  // Socket Connection to Room Proper Fix
   socket.emit("join-room", { roomCode: code, user: currentUser, ownerName: owner });
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
@@ -182,7 +177,7 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// Real-Time Chat Messaging
+// Messaging Handling Fix
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -197,15 +192,13 @@ function sendChatMessage() {
       senderPic: currentUser.pic,
       text: text,
       file: null,
-      fileType: null,
-      id: Date.now()
+      fileType: null
     };
     socket.emit("send-message", msgData);
     chatMessageInput.value = "";
   }
 }
 
-// Media Attachment Handling
 fileAttachmentInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file || !currentRoom) return;
@@ -215,7 +208,6 @@ fileAttachmentInput.addEventListener("change", (e) => {
     let fType = "file";
     if (file.type.startsWith("image/")) fType = "image";
     else if (file.type.startsWith("video/")) fType = "video";
-    else if (file.type.startsWith("audio/")) fType = "audio";
 
     const msgData = {
       roomCode: currentRoom,
@@ -224,8 +216,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
       text: "",
       file: evt.target.result,
       fileType: fType,
-      fileName: file.name,
-      id: Date.now()
+      fileName: file.name
     };
 
     socket.emit("send-message", msgData);
@@ -234,15 +225,16 @@ fileAttachmentInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// Socket Listeners for Real-Time Receiving
+// Join Notification Handler
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
-  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined <b>${data.ownerName}</b>'s room</span>`;
+  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
   chatMessages.appendChild(systemMsg);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
+// Receiving Broadcast Message
 socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
@@ -258,7 +250,6 @@ function appendMessage(data, isMe) {
     div.appendChild(textNode);
   }
 
-  // Handle Media Elements
   if (data.file) {
     const mediaContainer = document.createElement("div");
     mediaContainer.className = "media-wrapper";
@@ -291,16 +282,13 @@ function appendMessage(data, isMe) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Lightbox
 function openFullscreenImage(src) {
   const modal = document.createElement("div");
   modal.className = "fullscreen-modal";
   modal.onclick = () => modal.remove();
-  
   const img = document.createElement("img");
   img.src = src;
   modal.appendChild(img);
-  
   document.body.appendChild(modal);
 }
 
@@ -309,7 +297,6 @@ leaveRoomBtn.addEventListener("click", () => {
   dashboardScreen.style.display = "block";
 });
 
-// Theme Toggle
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 themeToggleBtn.addEventListener("click", () => {
   document.body.classList.toggle("light-theme");
