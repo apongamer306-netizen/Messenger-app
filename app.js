@@ -1,10 +1,9 @@
-// Socket.io auto connection to the active backend domain
-const socket = io(); // Renders origin dynamically
+// Render Socket connection handling
+const socket = io();
 
 let currentUser = null;
 let currentRoom = null;
-let peer = null;
-let localStream = null;
+let roomOwnerName = "";
 
 // DOM Elements
 const masterKeyScreen = document.getElementById("masterKeyScreen");
@@ -42,16 +41,9 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-const startAudioCallBtn = document.getElementById("startAudioCallBtn");
-const startVideoCallBtn = document.getElementById("startVideoCallBtn");
-const videoCallOverlay = document.getElementById("videoCallOverlay");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
-const endCallBtn = document.getElementById("endCallBtn");
-
 let isSignUpMode = true;
 
-// Toggle Password Field Eye Visibility
+// Password Visibility
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
   if (input.type === "password") {
@@ -59,12 +51,11 @@ function togglePasswordVisibility(inputId, iconElem) {
     iconElem.classList.replace("fa-eye", "fa-eye-slash");
   } else {
     input.type = "password";
-    iconElem.classList.replace("fa-slash-eye", "fa-eye");
     iconElem.classList.replace("fa-eye-slash", "fa-eye");
   }
 }
 
-// Initial Loading Logic (Auto Login check)
+// Check Auto Login
 document.addEventListener("DOMContentLoaded", () => {
   const isMasterUnlocked = localStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
@@ -82,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Unlock Master Key
+// Master Key Unlock
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value === "KT EYAMIN") {
     localStorage.setItem("masterUnlocked", "true");
@@ -99,7 +90,7 @@ unlockBtn.addEventListener("click", () => {
   }
 });
 
-// Auth Toggle (Login <-> Sign Up)
+// Toggle Auth Screen
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -118,7 +109,7 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-// Authentication Action
+// Auth Submit
 authSubmitBtn.addEventListener("click", () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
@@ -147,10 +138,9 @@ function showDashboard() {
   dashboardScreen.style.display = "block";
   dashboardUserName.textContent = currentUser.name;
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
-  initPeer();
 }
 
-// Avatar Photo Upload
+// Avatar Change
 avatarUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -164,21 +154,21 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Create Room Action
+// Room Creation & Joining
 createRoomBtn.addEventListener("click", () => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  joinRoom(code);
+  roomOwnerName = currentUser.name;
+  joinRoom(code, roomOwnerName);
 });
 
-// Join Room Action
 joinRoomBtn.addEventListener("click", () => {
   const code = roomCodeInput.value.trim().toUpperCase();
-  if (code) joinRoom(code);
+  if (code) joinRoom(code, "Room");
 });
 
-function joinRoom(code) {
+function joinRoom(code, owner) {
   currentRoom = code;
-  socket.emit("join-room", { roomCode: code, user: currentUser });
+  socket.emit("join-room", { roomCode: code, user: currentUser, ownerName: owner });
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
@@ -186,14 +176,13 @@ function joinRoom(code) {
   chatRoomCode.textContent = "Code: " + code;
 }
 
-// Logout Action
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   currentUser = null;
   location.reload();
 });
 
-// Send Chat Message / Files
+// Real-Time Chat Messaging
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -202,14 +191,21 @@ chatMessageInput.addEventListener("keypress", (e) => {
 function sendChatMessage() {
   const text = chatMessageInput.value.trim();
   if (text && currentRoom) {
-    const msgData = { roomCode: currentRoom, sender: currentUser.name, text: text, file: null, fileType: null };
+    const msgData = {
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic,
+      text: text,
+      file: null,
+      fileType: null,
+      id: Date.now()
+    };
     socket.emit("send-message", msgData);
-    appendMessage(msgData, true);
     chatMessageInput.value = "";
   }
 }
 
-// File/Media Attachment Handling
+// Media Attachment Handling
 fileAttachmentInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file || !currentRoom) return;
@@ -224,21 +220,32 @@ fileAttachmentInput.addEventListener("change", (e) => {
     const msgData = {
       roomCode: currentRoom,
       sender: currentUser.name,
+      senderPic: currentUser.pic,
       text: "",
       file: evt.target.result,
-      fileType: fType
+      fileType: fType,
+      fileName: file.name,
+      id: Date.now()
     };
 
     socket.emit("send-message", msgData);
-    appendMessage(msgData, true);
     fileAttachmentInput.value = "";
   };
   reader.readAsDataURL(file);
 });
 
-// Receive Socket Message
+// Socket Listeners for Broadcast
+socket.on("user-joined-notify", (data) => {
+  const systemMsg = document.createElement("div");
+  systemMsg.className = "system-notification";
+  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined <b>${data.ownerName}</b>'s room</span>`;
+  chatMessages.appendChild(systemMsg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
 socket.on("receive-message", (data) => {
-  appendMessage(data, false);
+  const isMe = data.sender === currentUser.name;
+  appendMessage(data, isMe);
 });
 
 function appendMessage(data, isMe) {
@@ -246,83 +253,64 @@ function appendMessage(data, isMe) {
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
   
   if (data.text) {
-    div.textContent = (isMe ? "" : data.sender + ": ") + data.text;
+    const textNode = document.createElement("p");
+    textNode.textContent = (isMe ? "" : data.sender + ": ") + data.text;
+    div.appendChild(textNode);
   }
 
+  // Handle Images and Media
   if (data.file) {
+    const mediaContainer = document.createElement("div");
+    mediaContainer.className = "media-wrapper";
+
     if (data.fileType === "image") {
       const img = document.createElement("img");
       img.src = data.file;
-      img.className = "message-media";
-      div.appendChild(img);
+      img.className = "chat-media-preview";
+      img.onclick = () => openFullscreenImage(data.file);
+      mediaContainer.appendChild(img);
+
+      // Add Download Option for Images
+      const downloadBtn = document.createElement("a");
+      downloadBtn.href = data.file;
+      downloadBtn.download = data.fileName || "image.png";
+      downloadBtn.className = "download-btn";
+      downloadBtn.innerHTML = `<i class="fa-solid fa-download"></i> Download`;
+      mediaContainer.appendChild(downloadBtn);
+
     } else if (data.fileType === "video") {
       const vid = document.createElement("video");
       vid.src = data.file;
       vid.controls = true;
-      vid.className = "message-media";
-      div.appendChild(vid);
-    } else if (data.fileType === "audio") {
-      const aud = document.createElement("audio");
-      aud.src = data.file;
-      aud.controls = true;
-      div.appendChild(aud);
+      vid.className = "chat-media-preview";
+      mediaContainer.appendChild(vid);
     }
+    div.appendChild(mediaContainer);
   }
 
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// PeerJS Audio/Video Call Handling
-function initPeer() {
-  peer = new Peer();
-  peer.on("call", (call) => {
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
-      localStream = stream;
-      localVideo.srcObject = stream;
-      videoCallOverlay.style.display = "flex";
-      call.answer(stream);
-      call.on("stream", (remoteStream) => {
-        remoteVideo.srcObject = remoteStream;
-      });
-    });
-  });
+// Lightbox/Full Screen Image Display
+function openFullscreenImage(src) {
+  const modal = document.createElement("div");
+  modal.className = "fullscreen-modal";
+  modal.onclick = () => modal.remove();
+  
+  const img = document.createElement("img");
+  img.src = src;
+  modal.appendChild(img);
+  
+  document.body.appendChild(modal);
 }
-
-startVideoCallBtn.addEventListener("click", () => startCall(true));
-startAudioCallBtn.addEventListener("click", () => startCall(false));
-
-function startCall(enableVideo) {
-  navigator.mediaDevices.getUserMedia({ video: enableVideo, audio: true }).then((stream) => {
-    localStream = stream;
-    localVideo.srcObject = stream;
-    videoCallOverlay.style.display = "flex";
-
-    socket.emit("request-peer-id", { roomCode: currentRoom });
-    socket.once("peer-id-response", (peerId) => {
-      if (peerId) {
-        const call = peer.call(peerId, stream);
-        call.on("stream", (remoteStream) => {
-          remoteVideo.srcObject = remoteStream;
-        });
-      }
-    });
-  });
-}
-
-endCallBtn.addEventListener("click", () => {
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-  }
-  videoCallOverlay.style.display = "none";
-});
 
 leaveRoomBtn.addEventListener("click", () => {
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
 
-// Theme Switcher Logic
+// Theme Toggle
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 themeToggleBtn.addEventListener("click", () => {
   document.body.classList.toggle("light-theme");
