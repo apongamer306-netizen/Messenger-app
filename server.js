@@ -7,21 +7,24 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
   maxHttpBufferSize: 1e8
 });
 
 app.use(express.static(__dirname));
 
 io.on("connection", (socket) => {
-  // Socket Join Room Fix
-  socket.on("join-room", ({ roomCode, user, ownerName }) => {
+  // Join Room Functionality Fix
+  socket.on("join-room", ({ roomCode, user }) => {
     socket.join(roomCode);
-    // Broadcast to EVERYONE in the room including sender and existing users
-    io.to(roomCode).emit("user-joined-notify", { user, ownerName });
+    // রুমের সবাইকে (ইনক্লুডিং যে সদ্য জয়েন করল) নোটিফিকেশন পাঠাবে
+    io.to(roomCode).emit("user-joined-notify", { user });
   });
 
-  // Message Send Fix
+  // Message Sending Broadcast Fix
   socket.on("send-message", (msgData) => {
     io.to(msgData.roomCode).emit("receive-message", msgData);
   });
