@@ -1,326 +1,329 @@
-const socket = io();
-let masterKey = "KT EYAMIN";
-let isSignupMode = false;
-let currentRoom = "";
-let localStream = null;
+// Socket.io auto connection to the active backend domain
+const socket = io(); // Renders origin dynamically
+
+let currentUser = null;
+let currentRoom = null;
 let peer = null;
+let localStream = null;
 
+// DOM Elements
+const masterKeyScreen = document.getElementById("masterKeyScreen");
+const authScreen = document.getElementById("authScreen");
+const dashboardScreen = document.getElementById("dashboardScreen");
+const chatScreen = document.getElementById("chatScreen");
+
+const masterKeyInput = document.getElementById("masterKeyInput");
+const unlockBtn = document.getElementById("unlockBtn");
+
+const authTitle = document.getElementById("authTitle");
+const signupFields = document.getElementById("signupFields");
+const fullNameInput = document.getElementById("fullNameInput");
+const phoneInput = document.getElementById("phoneInput");
+const authPasswordInput = document.getElementById("authPasswordInput");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authToggleLink = document.getElementById("authToggleLink");
+const authToggleMsg = document.getElementById("authToggleMsg");
+
+const dashboardAvatar = document.getElementById("dashboardAvatar");
+const dashboardUserName = document.getElementById("dashboardUserName");
+const avatarUpload = document.getElementById("avatarUpload");
+
+const createRoomBtn = document.getElementById("createRoomBtn");
+const roomCodeInput = document.getElementById("roomCodeInput");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+const chatUserAvatar = document.getElementById("chatUserAvatar");
+const chatUserName = document.getElementById("chatUserName");
+const chatRoomCode = document.getElementById("chatRoomCode");
+const chatMessages = document.getElementById("chatMessages");
+const chatMessageInput = document.getElementById("chatMessageInput");
+const sendMessageBtn = document.getElementById("sendMessageBtn");
+const fileAttachmentInput = document.getElementById("fileAttachmentInput");
+const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+const videoCallOverlay = document.getElementById("videoCallOverlay");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const endCallBtn = document.getElementById("endCallBtn");
+
+let isSignUpMode = true;
+
+// Toggle Password Field Eye Visibility
+function togglePasswordVisibility(inputId, iconElem) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    iconElem.classList.replace("fa-eye", "fa-eye-slash");
+  } else {
+    input.type = "password";
+    iconElem.classList.replace("fa-slash-eye", "fa-eye");
+    iconElem.classList.replace("fa-eye-slash", "fa-eye");
+  }
+}
+
+// Initial Loading Logic (Auto Login check)
 document.addEventListener("DOMContentLoaded", () => {
-    const savedTheme = localStorage.getItem("appTheme") || "light";
-    applyTheme(savedTheme);
+  const isMasterUnlocked = localStorage.getItem("masterUnlocked");
+  const savedUser = JSON.parse(localStorage.getItem("appUser"));
 
-    const savedProfilePic = localStorage.getItem("userProfilePic");
-    if (savedProfilePic) {
-        if (document.getElementById('profile-img-preview')) document.getElementById('profile-img-preview').src = savedProfilePic;
-        if (document.getElementById('room-user-pic')) document.getElementById('room-user-pic').src = savedProfilePic;
+  if (isMasterUnlocked === "true") {
+    masterKeyScreen.style.display = "none";
+    if (savedUser) {
+      currentUser = savedUser;
+      showDashboard();
+    } else {
+      authScreen.style.display = "block";
     }
-
-    checkAutoLogin();
+  } else {
+    masterKeyScreen.style.display = "block";
+  }
 });
 
-function toggleTheme() {
-    const isLight = document.body.classList.contains("light-mode");
-    const newTheme = isLight ? "dark" : "light";
-    applyTheme(newTheme);
-    localStorage.setItem("appTheme", newTheme);
-}
-
-function applyTheme(theme) {
-    const themeBtn = document.getElementById("theme-btn");
-    if (theme === "dark") {
-        document.body.classList.remove("light-mode");
-        if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+// Unlock Master Key
+unlockBtn.addEventListener("click", () => {
+  if (masterKeyInput.value === "KT EYAMIN") {
+    localStorage.setItem("masterUnlocked", "true");
+    masterKeyScreen.style.display = "none";
+    const savedUser = JSON.parse(localStorage.getItem("appUser"));
+    if (savedUser) {
+      currentUser = savedUser;
+      showDashboard();
     } else {
-        document.body.classList.add("light-mode");
-        if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+      authScreen.style.display = "block";
     }
-}
-
-function togglePasswordVisibility(inputId, icon) {
-    const input = document.getElementById(inputId);
-    if (input.type === "password") {
-        input.type = "text";
-        icon.classList.remove("fa-eye");
-        icon.classList.add("fa-eye-slash");
-    } else {
-        input.type = "password";
-        icon.classList.remove("fa-eye-slash");
-        icon.classList.add("fa-eye");
-    }
-}
-
-function checkAutoLogin() {
-    const isSiteUnlocked = localStorage.getItem("isSiteUnlocked");
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const savedName = localStorage.getItem("userName");
-    const savedRoom = localStorage.getItem("currentRoom");
-
-    if (isSiteUnlocked === "true") {
-        document.getElementById('site-lock-screen').classList.add('hidden');
-
-        if (isLoggedIn === "true") {
-            document.getElementById('auth-screen').classList.add('hidden');
-            if(document.getElementById('user-display-name')) document.getElementById('user-display-name').innerText = savedName || "User";
-
-            if (savedRoom) {
-                currentRoom = savedRoom;
-                enterRoomInterface(savedRoom);
-            } else {
-                document.getElementById('dashboard-screen').classList.remove('hidden');
-            }
-        } else {
-            document.getElementById('auth-screen').classList.remove('hidden');
-        }
-    } else {
-        document.getElementById('site-lock-screen').classList.remove('hidden');
-    }
-}
-
-function unlockSite() {
-    const enteredKey = document.getElementById('site-key-input').value;
-    if (enteredKey === masterKey) {
-        localStorage.setItem("isSiteUnlocked", "true");
-        document.getElementById('site-lock-screen').classList.add('hidden');
-        checkAutoLogin();
-    } else {
-        alert("ভুল পাসওয়ার্ড!");
-    }
-}
-
-function toggleAuthMode() {
-    isSignupMode = !isSignupMode;
-    const nameInput = document.getElementById('auth-name');
-    if (isSignupMode) {
-        document.getElementById('auth-title').innerText = "Create Account";
-        document.getElementById('auth-btn').innerText = "Sign Up";
-        document.getElementById('auth-toggle').innerText = "Already have account? Login";
-        nameInput.classList.remove('hidden');
-    } else {
-        document.getElementById('auth-title').innerText = "Login";
-        document.getElementById('auth-btn').innerText = "Login";
-        document.getElementById('auth-toggle').innerText = "Create New Account";
-        nameInput.classList.add('hidden');
-    }
-}
-
-// অ্যাকাউন্ট তৈরি ও সঠিক পাসওয়ার্ড দিয়ে লগইন ভ্যালিডেশন
-function handleAuth() {
-    const name = document.getElementById('auth-name').value.trim();
-    const phone = document.getElementById('auth-phone').value.trim();
-    const pass = document.getElementById('auth-pass').value.trim();
-
-    if (!phone || !pass) {
-        return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
-    }
-
-    if (isSignupMode) {
-        // নতুন অ্যাকাউন্ট তৈরি করার লজিক
-        if (!name) return alert("অনুগ্রহ করে আপনার নাম লিখুন");
-
-        localStorage.setItem('userPhone', phone);
-        localStorage.setItem('userPass', pass); // রেজিস্টার্ড পাসওয়ার্ড সেভ করা হচ্ছে
-        localStorage.setItem('userName', name);
-        localStorage.setItem('isLoggedIn', "true");
-
-        document.getElementById('user-display-name').innerText = name;
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('dashboard-screen').classList.remove('hidden');
-        alert("Account Created Successfully!");
-    } else {
-        // লগইন করার লজিক এবং পাসওয়ার্ড যাচাইকরণ
-        const savedPhone = localStorage.getItem('userPhone');
-        const savedPass = localStorage.getItem('userPass');
-        const savedName = localStorage.getItem('userName');
-
-        if (!savedPhone) {
-            return alert("কোনো অ্যাকাউন্ট পাওয়া যায়নি! আগে 'Create New Account' করুন।");
-        }
-
-        if (phone === savedPhone && pass === savedPass) {
-            localStorage.setItem('isLoggedIn', "true");
-            document.getElementById('user-display-name').innerText = savedName || phone;
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('dashboard-screen').classList.remove('hidden');
-        } else {
-            alert("ভুল ফোন নম্বর অথবা পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।");
-        }
-    }
-}
-
-function previewProfilePic(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const imageDataUrl = reader.result;
-            document.getElementById('profile-img-preview').src = imageDataUrl;
-            document.getElementById('room-user-pic').src = imageDataUrl;
-            localStorage.setItem('userProfilePic', imageDataUrl);
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-function setCustomTheme(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const themeDataUrl = reader.result;
-            localStorage.setItem('roomThemeUrl', themeDataUrl);
-            applyRoomTheme(themeDataUrl);
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-function applyRoomTheme(themeUrl) {
-    const chatBox = document.getElementById('chat-box');
-    if (chatBox && themeUrl) {
-        chatBox.style.backgroundImage = `url(${themeUrl})`;
-        chatBox.style.backgroundSize = 'cover';
-        chatBox.style.backgroundPosition = 'center';
-    }
-}
-
-function createRoom() {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    currentRoom = code;
-    localStorage.setItem("currentRoom", code);
-    enterRoomInterface(code);
-}
-
-function joinRoom() {
-    const code = document.getElementById('join-code-input').value.trim();
-    if (!code) return alert("রুম কোড প্রবেশ করান");
-
-    currentRoom = code;
-    localStorage.setItem("currentRoom", code);
-    enterRoomInterface(code);
-}
-
-function enterRoomInterface(code) {
-    document.getElementById('dashboard-screen').classList.add('hidden');
-    document.getElementById('room-screen').classList.remove('hidden');
-    
-    document.getElementById('active-room-id').innerText = code;
-    document.getElementById('room-user-name').innerText = localStorage.getItem('userName') || "User";
-    
-    const savedPic = localStorage.getItem('userProfilePic');
-    if (savedPic) document.getElementById('room-user-pic').src = savedPic;
-
-    const savedThemeUrl = localStorage.getItem('roomThemeUrl');
-    if (savedThemeUrl) applyRoomTheme(savedThemeUrl);
-
-    socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
-}
-
-function logout() { 
-    localStorage.clear();
-    location.reload(); 
-}
-
-function leaveRoom() {
-    localStorage.removeItem("currentRoom");
-    document.getElementById('room-screen').classList.add('hidden');
-    document.getElementById('dashboard-screen').classList.remove('hidden');
-}
-
-function sendMessage() {
-    const msgInput = document.getElementById('msg-input');
-    const msg = msgInput.value;
-    const fileInput = document.getElementById('file-input');
-
-    if (fileInput.files.length > 0) {
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-
-        fetch('/upload', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                socket.emit('send-file', { roomId: currentRoom, fileUrl: data.filePath, fileType: data.fileType, user: localStorage.getItem('userName') });
-                fileInput.value = '';
-            });
-    }
-
-    if (msg) {
-        socket.emit('send-message', { roomId: currentRoom, message: msg, user: localStorage.getItem('userName') });
-        msgInput.value = '';
-    }
-}
-
-socket.on('receive-message', (data) => {
-    const chatBox = document.getElementById('chat-box');
-    const isSelf = data.user === localStorage.getItem('userName');
-    
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `chat-message ${isSelf ? 'self' : ''}`;
-    msgDiv.innerHTML = `<strong>${data.user}:</strong> ${data.message}`;
-    
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+  } else {
+    alert("ভুল Master Key দেওয়া হয়েছে!");
+  }
 });
 
-socket.on('receive-file', (data) => {
-    const chatBox = document.getElementById('chat-box');
-    const isSelf = data.user === localStorage.getItem('userName');
-    
-    let content = '';
-    if (data.fileType.startsWith('image/')) {
-        content = `<img src="${data.fileUrl}" style="max-width:100%; border-radius:5px;">`;
-    } else if (data.fileType.startsWith('video/')) {
-        content = `<video src="${data.fileUrl}" controls style="max-width:100%;"></video>`;
-    } else if (data.fileType.startsWith('audio/')) {
-        content = `<audio src="${data.fileUrl}" controls style="max-width:100%;"></audio>`;
-    } else {
-        content = `<a href="${data.fileUrl}" download style="color:#fff;">Download File</a>`;
-    }
-
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `chat-message ${isSelf ? 'self' : ''}`;
-    msgDiv.innerHTML = `<strong>${data.user}:</strong><br>${content}`;
-
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+// Auth Toggle (Login <-> Sign Up)
+authToggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  isSignUpMode = !isSignUpMode;
+  if (isSignUpMode) {
+    authTitle.textContent = "Create Account";
+    signupFields.style.display = "block";
+    authSubmitBtn.textContent = "Sign Up";
+    authToggleMsg.textContent = "Already have account?";
+    authToggleLink.textContent = "Login";
+  } else {
+    authTitle.textContent = "Login Account";
+    signupFields.style.display = "none";
+    authSubmitBtn.textContent = "Login";
+    authToggleMsg.textContent = "Don't have an account?";
+    authToggleLink.textContent = "Sign Up";
+  }
 });
 
-function startCall(isVideo) {
-    document.getElementById('video-wrapper').classList.remove('hidden');
-    navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then(stream => {
-        localStream = stream;
-        document.getElementById('localVideo').srcObject = stream;
+// Authentication Action
+authSubmitBtn.addEventListener("click", () => {
+  const phone = phoneInput.value.trim();
+  const password = authPasswordInput.value.trim();
 
-        peer = new SimplePeer({ initiator: true, trickle: false, stream: stream });
+  if (!phone || !password) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
-        peer.on('signal', data => {
-            socket.emit('call-user', { userToCall: currentRoom, signalData: data, name: localStorage.getItem('userName') });
-        });
+  if (isSignUpMode) {
+    const name = fullNameInput.value.trim();
+    if (!name) return alert("আপনার নাম লিখুন");
+    currentUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
+    localStorage.setItem("appUser", JSON.stringify(currentUser));
+    showDashboard();
+  } else {
+    const savedUser = JSON.parse(localStorage.getItem("appUser"));
+    if (savedUser && savedUser.phone === phone && savedUser.password === password) {
+      currentUser = savedUser;
+      showDashboard();
+    } else {
+      alert("ফোন নম্বর অথবা পাসওয়ার্ডটি সঠিক নয়!");
+    }
+  }
+});
 
-        peer.on('stream', remoteStream => {
-            document.getElementById('remoteVideo').srcObject = remoteStream;
-        });
+function showDashboard() {
+  authScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+  dashboardUserName.textContent = currentUser.name;
+  if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
+  initPeer();
+}
+
+// Avatar Photo Upload
+avatarUpload.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      currentUser.pic = evt.target.result;
+      dashboardAvatar.src = currentUser.pic;
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Create Room Action
+createRoomBtn.addEventListener("click", () => {
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  joinRoom(code);
+});
+
+// Join Room Action
+joinRoomBtn.addEventListener("click", () => {
+  const code = roomCodeInput.value.trim().toUpperCase();
+  if (code) joinRoom(code);
+});
+
+function joinRoom(code) {
+  currentRoom = code;
+  socket.emit("join-room", { roomCode: code, user: currentUser });
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "flex";
+  chatUserName.textContent = currentUser.name;
+  chatUserAvatar.src = currentUser.pic;
+  chatRoomCode.textContent = "Code: " + code;
+}
+
+// Logout Action
+logoutBtn.addEventListener("click", () => {
+  localStorage.removeItem("appUser");
+  currentUser = null;
+  location.reload();
+});
+
+// Send Chat Message / Files
+sendMessageBtn.addEventListener("click", sendChatMessage);
+chatMessageInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendChatMessage();
+});
+
+function sendChatMessage() {
+  const text = chatMessageInput.value.trim();
+  if (text && currentRoom) {
+    const msgData = { roomCode: currentRoom, sender: currentUser.name, text: text, file: null, fileType: null };
+    socket.emit("send-message", msgData);
+    appendMessage(msgData, true);
+    chatMessageInput.value = "";
+  }
+}
+
+// File/Media Attachment Handling
+fileAttachmentInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file || !currentRoom) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    let fType = "file";
+    if (file.type.startsWith("image/")) fType = "image";
+    else if (file.type.startsWith("video/")) fType = "video";
+    else if (file.type.startsWith("audio/")) fType = "audio";
+
+    const msgData = {
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      text: "",
+      file: evt.target.result,
+      fileType: fType
+    };
+
+    socket.emit("send-message", msgData);
+    appendMessage(msgData, true);
+    fileAttachmentInput.value = "";
+  };
+  reader.readAsDataURL(file);
+});
+
+// Receive Socket Message
+socket.on("receive-message", (data) => {
+  appendMessage(data, false);
+});
+
+function appendMessage(data, isMe) {
+  const div = document.createElement("div");
+  div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
+  
+  if (data.text) {
+    div.textContent = (isMe ? "" : data.sender + ": ") + data.text;
+  }
+
+  if (data.file) {
+    if (data.fileType === "image") {
+      const img = document.createElement("img");
+      img.src = data.file;
+      img.className = "message-media";
+      div.appendChild(img);
+    } else if (data.fileType === "video") {
+      const vid = document.createElement("video");
+      vid.src = data.file;
+      vid.controls = true;
+      vid.className = "message-media";
+      div.appendChild(vid);
+    } else if (data.fileType === "audio") {
+      const aud = document.createElement("audio");
+      aud.src = data.file;
+      aud.controls = true;
+      div.appendChild(aud);
+    }
+  }
+
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// PeerJS Audio/Video Call Handling
+function initPeer() {
+  peer = new Peer();
+  peer.on("call", (call) => {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
+      localStream = stream;
+      localVideo.srcObject = stream;
+      videoCallOverlay.style.display = "flex";
+      call.answer(stream);
+      call.on("stream", (remoteStream) => {
+        remoteVideo.srcObject = remoteStream;
+      });
     });
+  });
 }
 
-socket.on('call-made', data => {
-    if (confirm(`Incoming Call from ${data.name}. Accept?`)) {
-        document.getElementById('video-wrapper').classList.remove('hidden');
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-            localStream = stream;
-            document.getElementById('localVideo').srcObject = stream;
+startVideoCallBtn.addEventListener("click", () => startCall(true));
+startAudioCallBtn.addEventListener("click", () => startCall(false));
 
-            peer = new SimplePeer({ initiator: false, trickle: false, stream: stream });
-            peer.signal(data.signal);
+function startCall(enableVideo) {
+  navigator.mediaDevices.getUserMedia({ video: enableVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    videoCallOverlay.style.display = "flex";
 
-            peer.on('signal', signal => {
-                socket.emit('answer-call', { signal: signal, to: data.from });
-            });
-
-            peer.on('stream', remoteStream => {
-                document.getElementById('remoteVideo').srcObject = remoteStream;
-            });
+    socket.emit("request-peer-id", { roomCode: currentRoom });
+    socket.once("peer-id-response", (peerId) => {
+      if (peerId) {
+        const call = peer.call(peerId, stream);
+        call.on("stream", (remoteStream) => {
+          remoteVideo.srcObject = remoteStream;
         });
-    }
+      }
+    });
+  });
+}
+
+endCallBtn.addEventListener("click", () => {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
+  videoCallOverlay.style.display = "none";
 });
 
-socket.on('call-accepted', signal => { peer.signal(signal); });
+leaveRoomBtn.addEventListener("click", () => {
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+});
+
+// Theme Switcher Logic
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+themeToggleBtn.addEventListener("click", () => {
+  document.body.classList.toggle("light-theme");
+});
