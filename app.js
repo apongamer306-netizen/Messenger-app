@@ -1,10 +1,51 @@
 const socket = io();
-let masterKey = "yamin123";
+let masterKey = "KT EYAMIN";
 let isSignupMode = false;
 let currentRoom = "";
 let customThemeUrl = "";
 let localStream = null;
 let peer = null;
+
+// DOM লোড হওয়ার সাথে সাথে থিম সেট করা
+document.addEventListener("DOMContentLoaded", () => {
+    const savedTheme = localStorage.getItem("appTheme") || "light";
+    applyTheme(savedTheme);
+});
+
+// ডার্ক এবং লাইট মোড টগল ফাংশন
+function toggleTheme() {
+    const isLight = document.body.classList.contains("light-mode");
+    const newTheme = isLight ? "dark" : "light";
+    
+    applyTheme(newTheme);
+    localStorage.setItem("appTheme", newTheme); // LocalStorage-এ সেভ রাখা
+}
+
+function applyTheme(theme) {
+    const themeBtn = document.getElementById("theme-btn");
+    
+    if (theme === "dark") {
+        document.body.classList.remove("light-mode");
+        if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
+    } else {
+        document.body.classList.add("light-mode");
+        if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i>';
+    }
+}
+
+// আইকন দিয়ে পাসওয়ার্ড দেখা ও লুকানোর ফাংশন
+function togglePasswordVisibility(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+    } else {
+        input.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+    }
+}
 
 function unlockSite() {
     const enteredKey = document.getElementById('site-key-input').value;
