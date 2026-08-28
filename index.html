@@ -11,7 +11,7 @@
 </head>
 <body class="light-mode">
 
-    <!-- Top Full Width Navigation Header -->
+    <!-- Top Navigation Header -->
     <header class="top-navbar">
         <h1 class="app-logo">EKT CHATING APP</h1>
         <button id="theme-btn" onclick="toggleTheme()" class="theme-btn" type="button">
@@ -71,14 +71,6 @@
                 </div>
             </div>
 
-            <!-- Theme Upload Section -->
-            <div class="theme-section">
-                <label for="theme-upload" class="theme-label">
-                    <i class="fa-solid fa-image"></i> Room Background Theme Image
-                </label>
-                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="file-input-custom">
-            </div>
-
             <button onclick="logout()" class="logout-btn">Logout</button>
 
             <h2 class="developer-tag">DEVELOPED BY EYAMIN</h2>
@@ -101,6 +93,14 @@
             <div class="call-controls">
                 <button class="btn-primary" onclick="startCall(false)"><i class="fa-solid fa-phone"></i> Audio Call</button>
                 <button class="btn-primary" onclick="startCall(true)"><i class="fa-solid fa-video"></i> Video Call</button>
+            </div>
+
+            <!-- Theme Change inside Chat Room -->
+            <div class="room-theme-picker">
+                <label for="theme-upload" class="theme-label">
+                    <i class="fa-solid fa-image"></i> Change Room Background Theme
+                </label>
+                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="file-input-custom">
             </div>
 
             <div id="chat-box" class="chat-box"></div>
