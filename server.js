@@ -17,15 +17,11 @@ app.use(express.static(path.join(__dirname, "./")));
 
 io.on("connection", (socket) => {
 
-  // User Joined Room Event
   socket.on("join-room", ({ roomCode, user, ownerName }) => {
     socket.join(roomCode);
-    
-    // Broadcast notification to ALL connected users in that room
     io.to(roomCode).emit("user-joined-notify", { user, ownerName });
   });
 
-  // Broadcast Message to ALL users in the same room (including sender)
   socket.on("send-message", (msgData) => {
     io.to(msgData.roomCode).emit("receive-message", msgData);
   });
