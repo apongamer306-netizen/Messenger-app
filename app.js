@@ -14,14 +14,12 @@ document.addEventListener("DOMContentLoaded", () => {
 function toggleTheme() {
     const isLight = document.body.classList.contains("light-mode");
     const newTheme = isLight ? "dark" : "light";
-    
     applyTheme(newTheme);
     localStorage.setItem("appTheme", newTheme);
 }
 
 function applyTheme(theme) {
     const themeBtn = document.getElementById("theme-btn");
-    
     if (theme === "dark") {
         document.body.classList.remove("light-mode");
         if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i>';
@@ -54,21 +52,19 @@ function unlockSite() {
     }
 }
 
-// Toggle logic for Login / Signup Mode
 function toggleAuthMode() {
     isSignupMode = !isSignupMode;
     const nameInput = document.getElementById('auth-name');
-    
     if (isSignupMode) {
         document.getElementById('auth-title').innerText = "Create Account";
         document.getElementById('auth-btn').innerText = "Sign Up";
         document.getElementById('auth-toggle').innerText = "Already have account? Login";
-        nameInput.classList.remove('hidden'); // Show Name field in signup
+        nameInput.classList.remove('hidden');
     } else {
         document.getElementById('auth-title').innerText = "Login";
         document.getElementById('auth-btn').innerText = "Login";
         document.getElementById('auth-toggle').innerText = "Create New Account";
-        nameInput.classList.add('hidden'); // Hide Name field in login
+        nameInput.classList.add('hidden');
     }
 }
 
@@ -77,13 +73,8 @@ function handleAuth() {
     const phone = document.getElementById('auth-phone').value;
     const pass = document.getElementById('auth-pass').value;
 
-    if (isSignupMode && !name) {
-        return alert("অনুগ্রহ করে আপনার নাম লিখুন");
-    }
-
-    if (!phone || !pass) {
-        return alert("ফোন ও পাসওয়ার্ড দিন");
-    }
+    if (isSignupMode && !name) return alert("অনুগ্রহ করে আপনার নাম লিখুন");
+    if (!phone || !pass) return alert("ফোন ও পাসওয়ার্ড দিন");
 
     const displayName = isSignupMode ? name : (localStorage.getItem('userName') || phone);
     
@@ -91,7 +82,6 @@ function handleAuth() {
     localStorage.setItem('userName', displayName);
     
     document.getElementById('user-display-name').innerText = displayName;
-
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
 }
@@ -99,7 +89,7 @@ function handleAuth() {
 function previewProfilePic(event) {
     const reader = new FileReader();
     reader.onload = () => { document.getElementById('profile-img-preview').src = reader.result; };
-    reader.readAsDataURL(event.target.files[0]);
+    if (event.target.files[0]) reader.readAsDataURL(event.target.files[0]);
 }
 
 function setCustomTheme(event) {
@@ -108,26 +98,33 @@ function setCustomTheme(event) {
         customThemeUrl = reader.result;
         alert("থিম সেট করা হয়েছে!");
     };
-    reader.readAsDataURL(event.target.files[0]);
+    if (event.target.files[0]) reader.readAsDataURL(event.target.files[0]);
 }
 
+// Create Room & Immediately Join
 function createRoom() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    document.getElementById('room-code').innerText = code;
-    document.getElementById('created-code-display').classList.remove('hidden');
+    currentRoom = code;
+    enterRoomInterface(code);
 }
 
+// Join Existing Room with Code
 function joinRoom() {
     const code = document.getElementById('join-code-input').value.trim();
-    if (!code) return alert("রুম কোড দিন");
+    if (!code) return alert("রুম কোড প্রবেশ করান");
 
     currentRoom = code;
+    enterRoomInterface(code);
+}
+
+function enterRoomInterface(code) {
     document.getElementById('dashboard-screen').classList.add('hidden');
     document.getElementById('room-screen').classList.remove('hidden');
     document.getElementById('active-room-id').innerText = code;
 
     if (customThemeUrl) {
         document.getElementById('chat-box').style.backgroundImage = `url(${customThemeUrl})`;
+        document.getElementById('chat-box').style.backgroundSize = 'cover';
     }
 
     socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
