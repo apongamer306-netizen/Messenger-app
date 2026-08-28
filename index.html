@@ -51,7 +51,6 @@
     <!-- Dashboard Screen -->
     <div id="dashboard-screen" class="screen hidden">
         <div class="glass-card dashboard-card">
-            <!-- Profile Section -->
             <div class="profile-section">
                 <div class="avatar-wrapper">
                     <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic">
@@ -61,10 +60,8 @@
                 <h2 id="user-display-name" class="user-name">User Name</h2>
             </div>
 
-            <!-- Actions Section -->
             <div class="room-actions">
                 <button class="btn-primary" onclick="createRoom()">Create Room</button>
-
                 <div class="join-box">
                     <input type="text" id="join-code-input" placeholder="Enter Room Code" class="input-field">
                     <button class="btn-primary" onclick="joinRoom()">Join Room</button>
@@ -72,44 +69,51 @@
             </div>
 
             <button onclick="logout()" class="logout-btn">Logout</button>
-
             <h2 class="developer-tag">DEVELOPED BY EYAMIN</h2>
         </div>
     </div>
 
-    <!-- Chat Room Screen -->
+    <!-- Compact No-Scroll Chat Room Screen -->
     <div id="room-screen" class="screen hidden">
-        <div class="glass-card room-card">
-            <div class="room-header">
-                <h3>Room Code: <span id="active-room-id"></span></h3>
-                <button onclick="leaveRoom()" class="logout-btn">Leave Room</button>
+        <div class="room-container">
+            <!-- Compact Header -->
+            <div class="compact-room-header">
+                <div class="user-info-bar">
+                    <img id="room-user-pic" src="https://via.placeholder.com/40" class="header-avatar">
+                    <div class="header-text">
+                        <span id="room-user-name" class="header-name">User</span>
+                        <span class="header-code">Code: <b id="active-room-id">--</b></span>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button class="icon-btn audio-btn" title="Audio Call" onclick="startCall(false)"><i class="fa-solid fa-phone"></i></button>
+                    <button class="icon-btn video-btn" title="Video Call" onclick="startCall(true)"><i class="fa-solid fa-video"></i></button>
+                    
+                    <label for="theme-upload" class="icon-btn theme-btn-room" title="Change Theme">
+                        <i class="fa-solid fa-palette"></i>
+                    </label>
+                    <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="hidden">
+
+                    <button class="icon-btn leave-btn" title="Leave Room" onclick="leaveRoom()"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
             </div>
 
-            <div class="video-container">
+            <!-- Video Overlay (Appears during call) -->
+            <div id="video-wrapper" class="video-wrapper hidden">
                 <video id="localVideo" autoplay muted playsinline></video>
                 <video id="remoteVideo" autoplay playsinline></video>
             </div>
 
-            <div class="call-controls">
-                <button class="btn-primary" onclick="startCall(false)"><i class="fa-solid fa-phone"></i> Audio Call</button>
-                <button class="btn-primary" onclick="startCall(true)"><i class="fa-solid fa-video"></i> Video Call</button>
-            </div>
+            <!-- Main Chat View Area -->
+            <div id="chat-box" class="chat-box-area"></div>
 
-            <!-- Theme Change inside Chat Room -->
-            <div class="room-theme-picker">
-                <label for="theme-upload" class="theme-label">
-                    <i class="fa-solid fa-image"></i> Change Room Background Theme
-                </label>
-                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="file-input-custom">
-            </div>
-
-            <div id="chat-box" class="chat-box"></div>
-
-            <div class="chat-input-area">
-                <input type="text" id="msg-input" placeholder="Type message..." class="input-field">
-                <label for="file-input" class="file-btn"><i class="fa-solid fa-paperclip"></i></label>
+            <!-- Fixed Input Bar -->
+            <div class="chat-input-bar">
+                <label for="file-input" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
                 <input type="file" id="file-input" accept="image/*,video/*,audio/*" class="hidden">
-                <button class="btn-primary send-btn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                <input type="text" id="msg-input" placeholder="Type a message..." class="chat-input-field">
+                <button class="send-action-btn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </div>
     </div>
