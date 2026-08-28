@@ -6,7 +6,6 @@ const path = require("path");
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS for Socket.io
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -14,30 +13,21 @@ const io = new Server(server, {
   }
 });
 
-// Serve static frontend files from current directory
 app.use(express.static(path.join(__dirname, "./")));
 
-const roomPeers = {};
-
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
 
-  // Join Room
-  socket.on("join-room", ({ roomCode, user }) => {
+  // User Joined Room Event
+  socket.on("join-room", ({ roomCode, user, ownerName }) => {
     socket.join(roomCode);
-    roomPeers[roomCode] = socket.id;
-    console.log(`User ${user.name} joined room: ${roomCode}`);
+    
+    // Broadcast notification to ALL connected users in that room
+    io.to(roomCode).emit("user-joined-notify", { user, ownerName });
   });
 
-  // Relay Chat Messages & File Attachments
+  // Broadcast Message to ALL users in the same room (including sender)
   socket.on("send-message", (msgData) => {
-    socket.to(msgData.roomCode).emit("receive-message", msgData);
-  });
-
-  // Peer ID Transfer for Audio/Video Calls
-  socket.on("request-peer-id", ({ roomCode }) => {
-    const peerId = roomPeers[roomCode];
-    socket.emit("peer-id-response", peerId);
+    io.to(msgData.roomCode).emit("receive-message", msgData);
   });
 
   socket.on("disconnect", () => {
@@ -45,8 +35,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Port settings for local or Render cloud deployment
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
