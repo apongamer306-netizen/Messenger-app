@@ -1,6 +1,14 @@
-// Render-এর লাইভ URL সরাসরি কানেক্ট করার জন্য
 const socket = io("https://ekt-chatter.onrender.com", {
   transports: ["websocket", "polling"]
+});
+
+let myPeer = new Peer();
+let myPeerId = null;
+let currentCall = null;
+let localStream = null;
+
+myPeer.on("open", (id) => {
+  myPeerId = id;
 });
 
 let currentUser = null;
@@ -42,7 +50,17 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-let isSignUpMode = true;
+// Call Modal Elements
+const callModal = document.getElementById("callModal");
+const callStatusText = document.getElementById("callStatusText");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const acceptCallBtn = document.getElementById("acceptCallBtn");
+const rejectCallBtn = document.getElementById("rejectCallBtn");
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+
+let isSignUpMode = false; // ডিফল্ট লগইন মোড
 
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
@@ -106,6 +124,7 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
+// অ্যাকাউন্ট সাইন-আপ ও লগইন হ্যান্ডলার
 authSubmitBtn.addEventListener("click", () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
@@ -115,17 +134,28 @@ authSubmitBtn.addEventListener("click", () => {
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
     if (!name) return alert("আপনার নাম লিখুন");
-    currentUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
-    localStorage.setItem("appUser", JSON.stringify(currentUser));
-    showDashboard();
+    
+    const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
+    socket.emit("register-user", newUser, (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        alert(res.message);
+      }
+    });
+
   } else {
-    const savedUser = JSON.parse(localStorage.getItem("appUser"));
-    if (savedUser && savedUser.phone === phone && savedUser.password === password) {
-      currentUser = savedUser;
-      showDashboard();
-    } else {
-      alert("ফোন নম্বর অথবা পাসওয়ার্ডটি সঠিক নয়!");
-    }
+    socket.emit("login-user", { phone, password }, (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        alert(res.message);
+      }
+    });
   }
 });
 
@@ -161,7 +191,7 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
-  socket.emit("join-room", { roomCode: code, user: currentUser });
+  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
   
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
@@ -223,7 +253,6 @@ fileAttachmentInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// Socket Events
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
@@ -257,14 +286,6 @@ function appendMessage(data, isMe) {
       img.className = "chat-media-preview";
       img.onclick = () => openFullscreenImage(data.file);
       mediaContainer.appendChild(img);
-
-      const downloadBtn = document.createElement("a");
-      downloadBtn.href = data.file;
-      downloadBtn.download = data.fileName || "image.png";
-      downloadBtn.className = "download-btn";
-      downloadBtn.innerHTML = `<i class="fa-solid fa-download"></i> Download`;
-      mediaContainer.appendChild(downloadBtn);
-
     } else if (data.fileType === "video") {
       const vid = document.createElement("video");
       vid.src = data.file;
@@ -279,14 +300,90 @@ function appendMessage(data, isMe) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function openFullscreenImage(src) {
-  const modal = document.createElement("div");
-  modal.className = "fullscreen-modal";
-  modal.onclick = () => modal.remove();
-  const img = document.createElement("img");
-  img.src = src;
-  modal.appendChild(img);
-  document.body.appendChild(modal);
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+
+let incomingCallData = null;
+
+startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
+startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+
+function initiateCall(type) {
+  if (!currentRoom) return;
+  const isVideo = type === "video";
+  
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    callModal.style.display = "flex";
+    callStatusText.textContent = "Calling...";
+    acceptCallBtn.style.display = "none";
+
+    socket.emit("call-user", {
+      roomCode: currentRoom,
+      callerName: currentUser.name,
+      callerPeerId: myPeerId,
+      callType: type
+    });
+  }).catch((err) => alert("Camera/Microphone access denied!"));
+}
+
+socket.on("incoming-call", (data) => {
+  incomingCallData = data;
+  callModal.style.display = "flex";
+  callStatusText.textContent = `${data.callerName} is ${data.callType} calling...`;
+  acceptCallBtn.style.display = "inline-block";
+});
+
+acceptCallBtn.addEventListener("click", () => {
+  if (!incomingCallData) return;
+  const isVideo = incomingCallData.callType === "video";
+
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+
+    const call = myPeer.call(incomingCallData.callerPeerId, stream);
+    currentCall = call;
+
+    call.on("stream", (remoteStream) => {
+      remoteVideo.srcObject = remoteStream;
+    });
+
+    callStatusText.textContent = "Connected";
+    acceptCallBtn.style.display = "none";
+  });
+});
+
+myPeer.on("call", (call) => {
+  currentCall = call;
+  call.answer(localStream);
+  call.on("stream", (remoteStream) => {
+    remoteVideo.srcObject = remoteStream;
+    callStatusText.textContent = "Connected";
+  });
+});
+
+rejectCallBtn.addEventListener("click", endCall);
+
+socket.on("call-ended", () => {
+  closeCallUI();
+});
+
+function endCall() {
+  if (currentRoom) {
+    socket.emit("end-call", { roomCode: currentRoom });
+  }
+  closeCallUI();
+}
+
+function closeCallUI() {
+  if (currentCall) currentCall.close();
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
+  callModal.style.display = "none";
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
 }
 
 leaveRoomBtn.addEventListener("click", () => {
