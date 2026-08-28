@@ -13,7 +13,7 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-// রুমের হোস্টের তথ্য স্টোর করার অবজেক্ট
+// রুমে কে হোস্ট আর কে মেম্বার তা ট্র্যাক করার অবজেক্ট
 const activeRooms = {}; 
 
 const uploadDir = path.join(__dirname, 'uploads');
@@ -41,53 +41,53 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
 io.on('connection', (socket) => {
 
-    // রুম তৈরি করা
+    // ১. হোস্ট যখন রুম তৈরি করবে
     socket.on('create-room', ({ roomId, hostName, hostPic }) => {
         socket.join(roomId);
         socket.currentRoom = roomId;
         socket.userName = hostName;
         
         activeRooms[roomId] = {
-            hostName: hostName,
-            hostPic: hostPic || ''
+            hostName: hostName || "User Name",
+            hostPic: hostPic || ""
         };
     });
 
-    // রুমে জয়েন করা
+    // ২. মেম্বার যখন কোড দিয়ে জয়েন করবে
     socket.on('join-room', ({ roomId, userName, userPic }) => {
         socket.join(roomId);
         socket.currentRoom = roomId;
         socket.userName = userName;
 
-        const roomInfo = activeRooms[roomId] || { hostName: 'User', hostPic: '' };
+        const roomData = activeRooms[roomId] || { hostName: 'User Name', hostPic: '' };
 
-        // জয়েন করা ইউজারকে হোস্টের নাম ও পিকচার জানানো
+        // যে জয়েন করলো তাকে সরাসরি হোস্টের ডাটা পাঠানো
         socket.emit('joined-room-info', {
-            hostName: roomInfo.hostName,
-            hostPic: roomInfo.hostPic
+            hostName: roomData.hostName,
+            hostPic: roomData.hostPic
         });
 
-        // রুমে থাকা বাকিদের জানানো যে নতুন ইউজার জয়েন করেছে
+        // হোস্টকে জানানো যে কেউ জয়েন করেছে
         socket.to(roomId).emit('user-joined-notify', {
             userName: userName
         });
     });
 
-    // মেসেজ ব্রডকাস্ট (রুমের সবাইকে পাঠাবে)
+    // ৩. রিয়েলটাইম মেসেজ পাঠানো (সবার কাছে ইনস্ট্যান্ট পৌঁছাবে)
     socket.on('send-message', (data) => {
         if (data.roomId) {
-            io.in(data.roomId).emit('receive-message', data);
+            io.to(data.roomId).emit('receive-message', data);
         }
     });
 
-    // ফাইল সেন্ড
+    // ৪. ফাইল পাঠানো
     socket.on('send-file', (data) => {
         if (data.roomId) {
-            io.in(data.roomId).emit('receive-file', data);
+            io.to(data.roomId).emit('receive-file', data);
         }
     });
 
-    // কলিং লজিক
+    // ৫. কলিং ফিচার
     socket.on('call-user', (data) => {
         socket.to(data.roomId).emit('incoming-call', data);
     });
