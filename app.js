@@ -60,7 +60,7 @@ const rejectCallBtn = document.getElementById("rejectCallBtn");
 const startAudioCallBtn = document.getElementById("startAudioCallBtn");
 const startVideoCallBtn = document.getElementById("startVideoCallBtn");
 
-let isSignUpMode = false; // ডিফল্ট লগইন মোড
+let isSignUpMode = false;
 
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
@@ -124,7 +124,6 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-// অ্যাকাউন্ট সাইন-আপ ও লগইন হ্যান্ডলার
 authSubmitBtn.addEventListener("click", () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
@@ -266,14 +265,24 @@ socket.on("receive-message", (data) => {
   appendMessage(data, isMe);
 });
 
+// মেসেজের পাশে প্রোফাইল ছবি দেখানো (নাম বাতিল করা হয়েছে)
 function appendMessage(data, isMe) {
   const div = document.createElement("div");
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
   
+  // প্রোফাইল ছবি যুক্তকরণ
+  const userAvatar = document.createElement("img");
+  userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
+  userAvatar.className = "msg-avatar";
+  div.appendChild(userAvatar);
+
+  const contentBox = document.createElement("div");
+  contentBox.className = "msg-content";
+
   if (data.text) {
     const textNode = document.createElement("p");
-    textNode.textContent = (isMe ? "" : data.sender + ": ") + data.text;
-    div.appendChild(textNode);
+    textNode.textContent = data.text;
+    contentBox.appendChild(textNode);
   }
 
   if (data.file) {
@@ -293,14 +302,15 @@ function appendMessage(data, isMe) {
       vid.className = "chat-media-preview";
       mediaContainer.appendChild(vid);
     }
-    div.appendChild(mediaContainer);
+    contentBox.appendChild(mediaContainer);
   }
 
+  div.appendChild(contentBox);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+// ------------------- AUDIO / VIDEO CALLING FIXED -------------------
 
 let incomingCallData = null;
 
@@ -324,7 +334,7 @@ function initiateCall(type) {
       callerPeerId: myPeerId,
       callType: type
     });
-  }).catch((err) => alert("Camera/Microphone access denied!"));
+  }).catch((err) => alert("Camera/Microphone permission dynamic enable করুন!"));
 }
 
 socket.on("incoming-call", (data) => {
@@ -347,9 +357,9 @@ acceptCallBtn.addEventListener("click", () => {
 
     call.on("stream", (remoteStream) => {
       remoteVideo.srcObject = remoteStream;
+      callStatusText.textContent = "Connected";
     });
 
-    callStatusText.textContent = "Connected";
     acceptCallBtn.style.display = "none";
   });
 });
