@@ -318,7 +318,7 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+// ------------------- AUDIO / VIDEO CALLING LOGIC (FIXED) -------------------
 
 let incomingCallData = null;
 
@@ -329,20 +329,25 @@ function initiateCall(type) {
   if (!currentRoom) return;
   const isVideo = type === "video";
   
-  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
-    localStream = stream;
-    localVideo.srcObject = stream;
-    callModal.style.display = "flex";
-    callStatusText.textContent = "Calling...";
-    acceptCallBtn.style.display = "none";
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true })
+    .then((stream) => {
+      localStream = stream;
+      localVideo.srcObject = stream;
+      callModal.style.display = "flex";
+      callStatusText.textContent = "Calling...";
+      acceptCallBtn.style.display = "none";
 
-    socket.emit("call-user", {
-      roomCode: currentRoom,
-      callerName: currentUser.name,
-      callerPeerId: myPeerId,
-      callType: type
+      socket.emit("call-user", {
+        roomCode: currentRoom,
+        callerName: currentUser.name,
+        callerPeerId: myPeerId,
+        callType: type
+      });
+    })
+    .catch((err) => {
+      alert("ক্যামেরা বা মাইক্রোফোন চালু করা যাচ্ছে না! ব্রাউজার পারমিশন চেক করুন।");
+      console.error(err);
     });
-  }).catch((err) => alert("Camera & Microphone Access Required!"));
 }
 
 socket.on("incoming-call", (data) => {
@@ -356,29 +361,48 @@ acceptCallBtn.addEventListener("click", () => {
   if (!incomingCallData) return;
   const isVideo = incomingCallData.callType === "video";
 
-  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
-    localStream = stream;
-    localVideo.srcObject = stream;
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true })
+    .then((stream) => {
+      localStream = stream;
+      localVideo.srcObject = stream;
 
-    const call = myPeer.call(incomingCallData.callerPeerId, stream);
-    currentCall = call;
+      const call = myPeer.call(incomingCallData.callerPeerId, stream);
+      currentCall = call;
 
-    call.on("stream", (remoteStream) => {
-      remoteVideo.srcObject = remoteStream;
-      callStatusText.textContent = "Connected";
+      call.on("stream", (remoteStream) => {
+        remoteVideo.srcObject = remoteStream;
+        callStatusText.textContent = "Connected";
+      });
+
+      acceptCallBtn.style.display = "none";
+    })
+    .catch((err) => {
+      alert("ক্যামেরা/মাইক্রোফোন অ্যাক্সেস করতে সমস্যা হচ্ছে!");
+      console.error(err);
     });
-
-    acceptCallBtn.style.display = "none";
-  });
 });
 
 myPeer.on("call", (call) => {
   currentCall = call;
-  call.answer(localStream);
-  call.on("stream", (remoteStream) => {
-    remoteVideo.srcObject = remoteStream;
-    callStatusText.textContent = "Connected";
-  });
+  
+  if (localStream) {
+    call.answer(localStream);
+    call.on("stream", (remoteStream) => {
+      remoteVideo.srcObject = remoteStream;
+      callStatusText.textContent = "Connected";
+    });
+  } else {
+    const isVideo = incomingCallData ? incomingCallData.callType === "video" : true;
+    navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+      localStream = stream;
+      localVideo.srcObject = stream;
+      call.answer(stream);
+      call.on("stream", (remoteStream) => {
+        remoteVideo.srcObject = remoteStream;
+        callStatusText.textContent = "Connected";
+      });
+    });
+  }
 });
 
 rejectCallBtn.addEventListener("click", endCall);
@@ -398,6 +422,7 @@ function closeCallUI() {
   if (currentCall) currentCall.close();
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
   }
   callModal.style.display = "none";
   localVideo.srcObject = null;
