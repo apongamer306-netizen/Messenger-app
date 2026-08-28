@@ -6,11 +6,15 @@ let customThemeUrl = "";
 let localStream = null;
 let peer = null;
 
+// DOM লোড হওয়ার সাথে সাথে স্টেট চেক করা
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem("appTheme") || "light";
     applyTheme(savedTheme);
+
+    checkAutoLogin();
 });
 
+// ডার্ক এবং লাইট মোড টগল
 function toggleTheme() {
     const isLight = document.body.classList.contains("light-mode");
     const newTheme = isLight ? "dark" : "light";
@@ -29,6 +33,7 @@ function applyTheme(theme) {
     }
 }
 
+// পাসওয়ার্ড দেখা/লুকানো
 function togglePasswordVisibility(inputId, icon) {
     const input = document.getElementById(inputId);
     if (input.type === "password") {
@@ -42,11 +47,47 @@ function togglePasswordVisibility(inputId, icon) {
     }
 }
 
+// অটো-লগইন এবং রিফ্রেশ স্টেট হ্যান্ডলার
+function checkAutoLogin() {
+    const isSiteUnlocked = localStorage.getItem("isSiteUnlocked");
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    const savedName = localStorage.getItem("userName");
+    const savedRoom = localStorage.getItem("currentRoom");
+
+    if (isSiteUnlocked === "true") {
+        document.getElementById('site-lock-screen').classList.add('hidden');
+
+        if (isLoggedIn === "true") {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('user-display-name').innerText = savedName || "User";
+
+            if (savedRoom) {
+                // রিফ্রেশ দিলেও আগের চ্যাট রুমেই থাকবে
+                currentRoom = savedRoom;
+                enterRoomInterface(savedRoom);
+            } else {
+                // চ্যাট রুমে না থাকলে ড্যাশবোর্ডে নিয়ে যাবে
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+            }
+        } else {
+            document.getElementById('auth-screen').classList.remove('hidden');
+        }
+    } else {
+        document.getElementById('site-lock-screen').classList.remove('hidden');
+    }
+}
+
 function unlockSite() {
     const enteredKey = document.getElementById('site-key-input').value;
     if (enteredKey === masterKey) {
+        localStorage.setItem("isSiteUnlocked", "true");
         document.getElementById('site-lock-screen').classList.add('hidden');
-        document.getElementById('auth-screen').classList.remove('hidden');
+        
+        if (localStorage.getItem("isLoggedIn") === "true") {
+            checkAutoLogin();
+        } else {
+            document.getElementById('auth-screen').classList.remove('hidden');
+        }
     } else {
         alert("ভুল পাসওয়ার্ড!");
     }
@@ -80,6 +121,7 @@ function handleAuth() {
     
     localStorage.setItem('userPhone', phone);
     localStorage.setItem('userName', displayName);
+    localStorage.setItem('isLoggedIn', "true");
     
     document.getElementById('user-display-name').innerText = displayName;
     document.getElementById('auth-screen').classList.add('hidden');
@@ -101,19 +143,19 @@ function setCustomTheme(event) {
     if (event.target.files[0]) reader.readAsDataURL(event.target.files[0]);
 }
 
-// Create Room & Immediately Join
 function createRoom() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     currentRoom = code;
+    localStorage.setItem("currentRoom", code);
     enterRoomInterface(code);
 }
 
-// Join Existing Room with Code
 function joinRoom() {
     const code = document.getElementById('join-code-input').value.trim();
     if (!code) return alert("রুম কোড প্রবেশ করান");
 
     currentRoom = code;
+    localStorage.setItem("currentRoom", code);
     enterRoomInterface(code);
 }
 
@@ -130,9 +172,18 @@ function enterRoomInterface(code) {
     socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
 }
 
-function logout() { location.reload(); }
+// ম্যানুয়ালি লগআউট করলে সব ডাটা ক্লিয়ার হবে
+function logout() { 
+    localStorage.removeItem("isSiteUnlocked");
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userPhone");
+    localStorage.removeItem("currentRoom");
+    location.reload(); 
+}
 
 function leaveRoom() {
+    localStorage.removeItem("currentRoom");
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
 }
