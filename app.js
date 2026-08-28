@@ -265,12 +265,10 @@ socket.on("receive-message", (data) => {
   appendMessage(data, isMe);
 });
 
-// মেসেজের পাশে প্রোফাইল ছবি দেখানো (নাম বাতিল করা হয়েছে)
 function appendMessage(data, isMe) {
   const div = document.createElement("div");
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
   
-  // প্রোফাইল ছবি যুক্তকরণ
   const userAvatar = document.createElement("img");
   userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
   userAvatar.className = "msg-avatar";
@@ -310,7 +308,17 @@ function appendMessage(data, isMe) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// ------------------- AUDIO / VIDEO CALLING FIXED -------------------
+function openFullscreenImage(src) {
+  const modal = document.createElement("div");
+  modal.className = "fullscreen-modal";
+  modal.onclick = () => modal.remove();
+  const img = document.createElement("img");
+  img.src = src;
+  modal.appendChild(img);
+  document.body.appendChild(modal);
+}
+
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
 
 let incomingCallData = null;
 
@@ -334,7 +342,7 @@ function initiateCall(type) {
       callerPeerId: myPeerId,
       callType: type
     });
-  }).catch((err) => alert("Camera/Microphone permission dynamic enable করুন!"));
+  }).catch((err) => alert("Camera & Microphone Access Required!"));
 }
 
 socket.on("incoming-call", (data) => {
