@@ -1,337 +1,81 @@
-:root {
-  --bg-color: #0d1117;
-  --card-bg: #161b22;
-  --text-color: #ffffff;
-  --input-bg: #21262d;
-  --input-border: #30363d;
-  --primary-color: #2563eb;
-  --danger-color: #ef4444;
-  --success-color: #10b981;
-}
+/* আগের CSS-এর পাশাপাশি নিচের অংশটুকু style.css-এর একদম নিচে যুক্ত করুন */
 
-body.light-theme {
-  --bg-color: #f3f4f6;
-  --card-bg: #ffffff;
-  --text-color: #1f2937;
-  --input-bg: #f9fafb;
-  --input-border: #d1d5db;
-  --primary-color: #2563eb;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Navbar Header */
-.navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background-color: var(--card-bg);
-  border-bottom: 1px solid var(--input-border);
-}
-
-.logo {
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  color: var(--text-color);
-  font-size: 1.2rem;
-  cursor: pointer;
-  margin-left: 10px;
-}
-
-/* Main Container */
-.main-container {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-}
-
-/* Cards (Auth/Dashboard) */
-.card-screen {
-  background-color: var(--card-bg);
-  padding: 30px;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 400px;
-  text-align: center;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-
-.card-screen h2, .card-screen h3 {
-  margin-bottom: 20px;
-}
-
-/* Input Wrapper & Eye Icon inside Box */
-.input-wrapper {
-  position: relative;
-  width: 100%;
-  margin-bottom: 15px;
-}
-
-.input-wrapper input {
-  width: 100%;
-  padding: 12px 40px 12px 14px; /* Right padding for Eye icon space */
-  background-color: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  color: var(--text-color);
-  font-size: 0.95rem;
-  outline: none;
-}
-
-.input-wrapper .toggle-eye {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: pointer;
-  color: #8b949e;
-}
-
-/* Buttons */
-.btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 10px;
-  font-size: 1rem;
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.btn-danger {
-  background-color: var(--danger-color);
-  color: white;
-}
-
-.footer-text {
-  font-size: 0.75rem;
-  color: #8b949e;
-  margin-top: 20px;
-}
-
-.auth-toggle-text {
-  margin-top: 15px;
-  font-size: 0.9rem;
-}
-
-.auth-toggle-text a {
-  color: var(--primary-color);
-  text-decoration: none;
-}
-
-/* Avatar Profile styling */
-.avatar-container {
-  position: relative;
-  width: 90px;
-  height: 90px;
-  margin: 0 auto 15px auto;
-}
-
-.avatar-container img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.avatar-edit-badge {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background-color: var(--primary-color);
-  color: white;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-/* Chat Screen */
-.chat-container {
-  width: 100%;
-  max-width: 900px;
-  height: 85vh;
-  background-color: var(--card-bg);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-
-.chat-header {
-  padding: 12px 20px;
-  background-color: var(--input-bg);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--input-border);
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-info img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-}
-
-.chat-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.action-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.call-audio { background-color: var(--success-color); }
-.call-video { background-color: var(--primary-color); }
-.leave-room { background-color: var(--danger-color); }
-
-.chat-messages {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.message-bubble {
-  max-width: 70%;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 0.95rem;
-  word-wrap: break-word;
-}
-
-.message-bubble.my-msg {
-  align-self: flex-end;
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.message-bubble.other-msg {
-  align-self: flex-start;
-  background-color: var(--input-bg);
-  color: var(--text-color);
-}
-
-.message-media {
-  max-width: 100%;
-  border-radius: 8px;
-  margin-top: 5px;
-}
-
-/* Chat Input Bar */
-.chat-input-area {
-  padding: 12px 20px;
-  background-color: var(--input-bg);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.chat-input-area input[type="text"] {
-  flex: 1;
-  padding: 12px;
-  background-color: var(--card-bg);
-  border: 1px solid var(--input-border);
+/* System Notification Banner */
+.system-notification {
+  align-self: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 6px 16px;
   border-radius: 20px;
-  color: var(--text-color);
-  outline: none;
+  font-size: 0.85rem;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a0aec0;
 }
 
-.attach-btn {
-  color: #8b949e;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 5px;
-}
-
-.send-btn {
-  background-color: var(--primary-color);
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
+.sys-avatar {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  cursor: pointer;
+  object-fit: cover;
 }
 
-/* Video Call Screen Overlay */
-.video-overlay {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0,0,0,0.9);
-  z-index: 100;
+/* Fixed Image/Video Small Resizing */
+.media-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-media-preview {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 10px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1px solid var(--input-border);
+  transition: transform 0.2s ease;
+}
+
+.chat-media-preview:hover {
+  transform: scale(1.02);
+}
+
+/* Image Download Button */
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.download-btn:hover {
+  background-color: var(--primary-color);
+}
+
+/* Fullscreen Lightbox Modal */
+.fullscreen-modal {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background-color: rgba(0, 0, 0, 0.9);
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 9999;
+  cursor: zoom-out;
 }
 
-#remoteVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-#localVideo {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 150px;
-  height: 100px;
+.fullscreen-modal img {
+  max-width: 90%;
+  max-height: 90%;
   border-radius: 8px;
-  object-fit: cover;
-  border: 2px solid white;
-}
-
-.call-controls {
-  position: absolute;
-  bottom: 30px;
+  box-shadow: 0 0 20px rgba(255,255,255,0.2);
 }
