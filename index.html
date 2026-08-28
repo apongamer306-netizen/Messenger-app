@@ -11,7 +11,8 @@
 </head>
 <body class="light-mode">
 
-    <button id="theme-btn" onclick="toggleTheme()" class="theme-btn">
+    <!-- Theme Switch Button -->
+    <button id="theme-btn" onclick="toggleTheme()" class="theme-btn" type="button">
         <i class="fa-solid fa-moon"></i>
     </button>
 
@@ -19,10 +20,12 @@
         <div class="glass-card">
             <h2>💬 EKT CHATING APP</h2>
             <p>Master Key প্রবেশ করান:</p>
-            <div class="password-wrapper">
+            
+            <div class="input-box-container">
                 <input type="password" id="site-key-input" placeholder="Enter Site Password">
-                <i class="fa-solid fa-eye toggle-pwd" onclick="togglePasswordVisibility('site-key-input', this)"></i>
+                <i class="fa-solid fa-eye eye-icon" onclick="togglePasswordVisibility('site-key-input', this)"></i>
             </div>
+
             <button class="btn-primary" onclick="unlockSite()">Unlock</button>
             <footer class="card-footer">DEVELOPED BY EYAMIN</footer>
         </div>
@@ -32,10 +35,12 @@
         <div class="glass-card">
             <h2 id="auth-title">Login</h2>
             <input type="text" id="auth-phone" placeholder="Phone Number" class="input-field">
-            <div class="password-wrapper">
+            
+            <div class="input-box-container">
                 <input type="password" id="auth-pass" placeholder="Password">
-                <i class="fa-solid fa-eye toggle-pwd" onclick="togglePasswordVisibility('auth-pass', this)"></i>
+                <i class="fa-solid fa-eye eye-icon" onclick="togglePasswordVisibility('auth-pass', this)"></i>
             </div>
+
             <button onclick="handleAuth()" id="auth-btn" class="btn-primary">Login</button>
             <p onclick="toggleAuthMode()" class="toggle-link" id="auth-toggle">Create New Account</p>
         </div>
