@@ -1,5 +1,7 @@
-// Render Socket connection via dynamic location host
-const socket = io(window.location.origin);
+// Render-এর লাইভ URL সরাসরি কানেক্ট করার জন্য
+const socket = io("https://ekt-chatter.onrender.com", {
+  transports: ["websocket", "polling"]
+});
 
 let currentUser = null;
 let currentRoom = null;
@@ -147,13 +149,11 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Create Room Action
 createRoomBtn.addEventListener("click", () => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   joinRoom(code);
 });
 
-// Join Room Action
 joinRoomBtn.addEventListener("click", () => {
   const code = roomCodeInput.value.trim().toUpperCase();
   if (code) joinRoom(code);
@@ -161,7 +161,6 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
-  // Socket Joining Event
   socket.emit("join-room", { roomCode: code, user: currentUser });
   
   dashboardScreen.style.display = "none";
@@ -177,7 +176,6 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// Send Chat Message
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -225,7 +223,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// Socket Event Listeners
+// Socket Events
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
