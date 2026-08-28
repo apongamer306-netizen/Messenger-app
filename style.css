@@ -14,7 +14,7 @@ body.light-mode {
     --card-bg: #ffffff;
     --card-border: rgba(0, 0, 0, 0.08);
     --text-color: #0f172a;
-    --input-bg: #f8fafc;
+    --input-bg: #ffffff;
     --input-border: #cbd5e1;
     --btn-bg: #0072ff;
     --btn-hover: #0056b3;
@@ -58,39 +58,42 @@ body {
     border: 1px solid var(--card-border);
     border-radius: 16px;
     padding: 30px;
-    width: 330px;
+    width: 350px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     text-align: center;
 }
 
-/* Input Box with Inside Right Eye Icon */
+/* Wider Input Box Container with Eye Icon Inside */
 .input-box-container {
     position: relative;
     width: 100%;
-    margin: 15px 0;
+    margin: 20px 0;
     display: flex;
     align-items: center;
 }
 
 .input-box-container input {
     width: 100%;
-    padding: 12px 42px 12px 14px;
+    height: 48px; /* বক্স বড় করা হলো */
+    padding: 0 45px 0 15px; /* ডানপাশে আইকনের জন্য জায়গা */
     border: 1px solid var(--input-border);
     background: var(--input-bg);
     color: var(--text-color);
-    border-radius: 8px;
+    border-radius: 10px;
     box-sizing: border-box;
     outline: none;
-    font-size: 14px;
+    font-size: 15px;
 }
 
 .eye-icon {
     position: absolute;
-    right: 14px;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
     cursor: pointer;
     color: var(--text-color);
     opacity: 0.6;
-    font-size: 16px;
+    font-size: 18px;
     z-index: 10;
     pointer-events: auto;
 }
@@ -101,26 +104,29 @@ body {
 
 .input-field {
     width: 100%;
-    padding: 12px;
+    height: 48px;
+    padding: 0 15px;
     border: 1px solid var(--input-border);
     background: var(--input-bg);
     color: var(--text-color);
-    border-radius: 8px;
+    border-radius: 10px;
     box-sizing: border-box;
     outline: none;
     margin: 10px 0;
+    font-size: 15px;
 }
 
 .btn-primary {
     background: var(--btn-bg);
     color: white;
     border: none;
-    padding: 12px;
-    border-radius: 8px;
+    height: 48px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: bold;
     width: 100%;
-    font-size: 15px;
+    font-size: 16px;
+    transition: background 0.3s ease;
 }
 
 .btn-primary:hover {
@@ -128,7 +134,7 @@ body {
 }
 
 .card-footer {
-    margin-top: 20px;
+    margin-top: 25px;
     font-size: 11px;
     font-weight: bold;
     letter-spacing: 1px;
