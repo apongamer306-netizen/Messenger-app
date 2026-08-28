@@ -2,9 +2,13 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 app.use(cors());
+
+// স্ট্যাটিক ফাইলসমূহ (index.html, style.css, app.js) সার্ভ করার জন্য
+app.use(express.static(path.join(__dirname)));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -13,6 +17,11 @@ const io = new Server(server, {
     methods: ["GET", "POST"]
   },
   maxHttpBufferSize: 1e8 // ৫০ থেকে ১০০ মেগাবাইট পর্যন্ত ফাইল আপলোড সাপোর্ট করার জন্য
+});
+
+// হোম রুটে index.html ফাইল লোড করা
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 // ইউজারের ডেটাবেজ (মেমোরিতে জমা রাখা)
