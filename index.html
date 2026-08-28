@@ -1,50 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Messenger Test App</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yamin Messenger App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
 </head>
 <body>
-  <!-- Login Screen -->
-  <div id="login-screen" class="screen">
-    <div class="card">
-      <h2>Enter Messenger</h2>
-      <input type="text" id="username-input" placeholder="Enter your name...">
-      <button onclick="login()">Start</button>
-    </div>
-  </div>
 
-  <!-- Chat Screen -->
-  <div id="chat-screen" class="screen hidden">
-    <div class="chat-container">
-      <div class="header">
-        <h3>Messenger App</h3>
-        <div>
-          <button onclick="startCall('audio')">🎙️ Audio</button>
-          <button onclick="startCall('video')">📹 Video</button>
+    <div id="site-lock-screen" class="screen">
+        <div class="card">
+            <h2>🔒 Access Protection</h2>
+            <p>Master Key দিন (Default: yamin123):</p>
+            <input type="password" id="site-key-input" placeholder="Site Password">
+            <button onclick="unlockSite()">Unlock</button>
         </div>
-      </div>
-
-      <div class="video-container hidden" id="video-area">
-        <video id="local-video" autoplay muted></video>
-        <video id="remote-video" autoplay></video>
-        <button onclick="endCall()" class="end-call-btn">End Call</button>
-      </div>
-
-      <div class="messages" id="messages-box"></div>
-
-      <div class="input-box">
-        <label for="file-input" class="file-label">📎</label>
-        <input type="file" id="file-input" onchange="sendFile()" hidden>
-        <input type="text" id="message-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
-      </div>
     </div>
-  </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+    <div id="auth-screen" class="screen hidden">
+        <div class="card">
+            <h2 id="auth-title">Login</h2>
+            <input type="text" id="auth-phone" placeholder="Phone Number">
+            <input type="password" id="auth-pass" placeholder="Password">
+            <button onclick="handleAuth()" id="auth-btn">Login</button>
+            <p onclick="toggleAuthMode()" class="toggle-link" id="auth-toggle">Create New Account</p>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="screen hidden">
+        <header>
+            <h1>My Messenger App</h1>
+        </header>
+
+        <div class="profile-section">
+            <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic"><br>
+            <input type="file" id="profile-upload" accept="image/*" onchange="previewProfilePic(event)">
+            <h3 id="user-display-name">User Name</h3>
+        </div>
+
+        <div class="room-actions">
+            <button onclick="createRoom()">Create Room</button>
+            <div id="created-code-display" class="hidden">
+                <p>Room Code: <strong id="room-code"></strong></p>
+            </div>
+            <div class="join-box">
+                <input type="text" id="join-code-input" placeholder="Enter Room Code">
+                <button onclick="joinRoom()">Join Room</button>
+            </div>
+        </div>
+
+        <div class="theme-section">
+            <label>Room Background Theme Image:</label>
+            <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)">
+        </div>
+
+        <button onclick="logout()" class="logout-btn">Logout</button>
+
+        <footer>Developed by Yamin</footer>
+    </div>
+
+    <div id="room-screen" class="screen hidden">
+        <div class="room-header">
+            <h3>Chat Room: <span id="active-room-id"></span></h3>
+            <button onclick="leaveRoom()">Leave Room</button>
+        </div>
+
+        <div class="video-container">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+
+        <div class="call-controls">
+            <button onclick="startCall(false)">🎤 Audio Call</button>
+            <button onclick="startCall(true)">📹 Video Call</button>
+        </div>
+
+        <div id="chat-box" class="chat-box"></div>
+
+        <div class="chat-input-area">
+            <input type="text" id="msg-input" placeholder="Type message...">
+            <input type="file" id="file-input" accept="image/*,video/*,audio/*">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
