@@ -6,19 +6,17 @@ let customThemeUrl = "";
 let localStream = null;
 let peer = null;
 
-// DOM লোড হওয়ার সাথে সাথে থিম সেট করা
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem("appTheme") || "light";
     applyTheme(savedTheme);
 });
 
-// ডার্ক এবং লাইট মোড টগল ফাংশন
 function toggleTheme() {
     const isLight = document.body.classList.contains("light-mode");
     const newTheme = isLight ? "dark" : "light";
     
     applyTheme(newTheme);
-    localStorage.setItem("appTheme", newTheme); // LocalStorage-এ সেভ রাখা
+    localStorage.setItem("appTheme", newTheme);
 }
 
 function applyTheme(theme) {
@@ -33,7 +31,6 @@ function applyTheme(theme) {
     }
 }
 
-// আইকন দিয়ে পাসওয়ার্ড দেখা ও লুকানোর ফাংশন
 function togglePasswordVisibility(inputId, icon) {
     const input = document.getElementById(inputId);
     if (input.type === "password") {
@@ -57,21 +54,43 @@ function unlockSite() {
     }
 }
 
+// Toggle logic for Login / Signup Mode
 function toggleAuthMode() {
     isSignupMode = !isSignupMode;
-    document.getElementById('auth-title').innerText = isSignupMode ? "Create Account" : "Login";
-    document.getElementById('auth-btn').innerText = isSignupMode ? "Sign Up" : "Login";
-    document.getElementById('auth-toggle').innerText = isSignupMode ? "Already have account? Login" : "Create New Account";
+    const nameInput = document.getElementById('auth-name');
+    
+    if (isSignupMode) {
+        document.getElementById('auth-title').innerText = "Create Account";
+        document.getElementById('auth-btn').innerText = "Sign Up";
+        document.getElementById('auth-toggle').innerText = "Already have account? Login";
+        nameInput.classList.remove('hidden'); // Show Name field in signup
+    } else {
+        document.getElementById('auth-title').innerText = "Login";
+        document.getElementById('auth-btn').innerText = "Login";
+        document.getElementById('auth-toggle').innerText = "Create New Account";
+        nameInput.classList.add('hidden'); // Hide Name field in login
+    }
 }
 
 function handleAuth() {
+    const name = document.getElementById('auth-name').value;
     const phone = document.getElementById('auth-phone').value;
     const pass = document.getElementById('auth-pass').value;
 
-    if (!phone || !pass) return alert("ফোন ও পাসওয়ার্ড দিন");
+    if (isSignupMode && !name) {
+        return alert("অনুগ্রহ করে আপনার নাম লিখুন");
+    }
 
+    if (!phone || !pass) {
+        return alert("ফোন ও পাসওয়ার্ড দিন");
+    }
+
+    const displayName = isSignupMode ? name : (localStorage.getItem('userName') || phone);
+    
     localStorage.setItem('userPhone', phone);
-    document.getElementById('user-display-name').innerText = "User: " + phone;
+    localStorage.setItem('userName', displayName);
+    
+    document.getElementById('user-display-name').innerText = displayName;
 
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
@@ -111,7 +130,7 @@ function joinRoom() {
         document.getElementById('chat-box').style.backgroundImage = `url(${customThemeUrl})`;
     }
 
-    socket.emit('join-room', currentRoom, localStorage.getItem('userPhone'));
+    socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
 }
 
 function logout() { location.reload(); }
@@ -132,13 +151,13 @@ function sendMessage() {
         fetch('/upload', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
-                socket.emit('send-file', { roomId: currentRoom, fileUrl: data.filePath, fileType: data.fileType, user: localStorage.getItem('userPhone') });
+                socket.emit('send-file', { roomId: currentRoom, fileUrl: data.filePath, fileType: data.fileType, user: localStorage.getItem('userName') });
                 fileInput.value = '';
             });
     }
 
     if (msg) {
-        socket.emit('send-message', { roomId: currentRoom, message: msg, user: localStorage.getItem('userPhone') });
+        socket.emit('send-message', { roomId: currentRoom, message: msg, user: localStorage.getItem('userName') });
         document.getElementById('msg-input').value = '';
     }
 }
@@ -175,7 +194,7 @@ function startCall(isVideo) {
         peer = new SimplePeer({ initiator: true, trickle: false, stream: stream });
 
         peer.on('signal', data => {
-            socket.emit('call-user', { userToCall: currentRoom, signalData: data, name: localStorage.getItem('userPhone') });
+            socket.emit('call-user', { userToCall: currentRoom, signalData: data, name: localStorage.getItem('userName') });
         });
 
         peer.on('stream', remoteStream => {
