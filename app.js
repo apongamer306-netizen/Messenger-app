@@ -2,19 +2,23 @@ const socket = io();
 let masterKey = "KT EYAMIN";
 let isSignupMode = false;
 let currentRoom = "";
-let customThemeUrl = "";
 let localStream = null;
 let peer = null;
 
-// DOM লোড হওয়ার সাথে সাথে স্টেট চেক করা
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem("appTheme") || "light";
     applyTheme(savedTheme);
 
+    // লোড হওয়ার সময় প্রোফাইল পিকচার ফিরিয়ে আনা
+    const savedProfilePic = localStorage.getItem("userProfilePic");
+    if (savedProfilePic) {
+        const imgElement = document.getElementById('profile-img-preview');
+        if (imgElement) imgElement.src = savedProfilePic;
+    }
+
     checkAutoLogin();
 });
 
-// ডার্ক এবং লাইট মোড টগল
 function toggleTheme() {
     const isLight = document.body.classList.contains("light-mode");
     const newTheme = isLight ? "dark" : "light";
@@ -33,7 +37,6 @@ function applyTheme(theme) {
     }
 }
 
-// পাসওয়ার্ড দেখা/লুকানো
 function togglePasswordVisibility(inputId, icon) {
     const input = document.getElementById(inputId);
     if (input.type === "password") {
@@ -47,7 +50,6 @@ function togglePasswordVisibility(inputId, icon) {
     }
 }
 
-// অটো-লগইন এবং রিফ্রেশ স্টেট হ্যান্ডলার
 function checkAutoLogin() {
     const isSiteUnlocked = localStorage.getItem("isSiteUnlocked");
     const isLoggedIn = localStorage.getItem("isLoggedIn");
@@ -62,11 +64,9 @@ function checkAutoLogin() {
             document.getElementById('user-display-name').innerText = savedName || "User";
 
             if (savedRoom) {
-                // রিফ্রেশ দিলেও আগের চ্যাট রুমেই থাকবে
                 currentRoom = savedRoom;
                 enterRoomInterface(savedRoom);
             } else {
-                // চ্যাট রুমে না থাকলে ড্যাশবোর্ডে নিয়ে যাবে
                 document.getElementById('dashboard-screen').classList.remove('hidden');
             }
         } else {
@@ -128,19 +128,41 @@ function handleAuth() {
     document.getElementById('dashboard-screen').classList.remove('hidden');
 }
 
+// প্রোফাইল পিকচার পার্মানেন্ট সেভ
 function previewProfilePic(event) {
-    const reader = new FileReader();
-    reader.onload = () => { document.getElementById('profile-img-preview').src = reader.result; };
-    if (event.target.files[0]) reader.readAsDataURL(event.target.files[0]);
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const imageDataUrl = reader.result;
+            document.getElementById('profile-img-preview').src = imageDataUrl;
+            localStorage.setItem('userProfilePic', imageDataUrl); // Save locally
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
+// রুম ব্যাকগ্রাউন্ড থিম পার্মানেন্ট সেভ
 function setCustomTheme(event) {
-    const reader = new FileReader();
-    reader.onload = () => {
-        customThemeUrl = reader.result;
-        alert("থিম সেট করা হয়েছে!");
-    };
-    if (event.target.files[0]) reader.readAsDataURL(event.target.files[0]);
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const themeDataUrl = reader.result;
+            localStorage.setItem('roomThemeUrl', themeDataUrl);
+            applyRoomTheme(themeDataUrl);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function applyRoomTheme(themeUrl) {
+    const chatBox = document.getElementById('chat-box');
+    if (chatBox && themeUrl) {
+        chatBox.style.backgroundImage = `url(${themeUrl})`;
+        chatBox.style.backgroundSize = 'cover';
+        chatBox.style.backgroundPosition = 'center';
+    }
 }
 
 function createRoom() {
@@ -164,21 +186,23 @@ function enterRoomInterface(code) {
     document.getElementById('room-screen').classList.remove('hidden');
     document.getElementById('active-room-id').innerText = code;
 
-    if (customThemeUrl) {
-        document.getElementById('chat-box').style.backgroundImage = `url(${customThemeUrl})`;
-        document.getElementById('chat-box').style.backgroundSize = 'cover';
+    // সেভ হওয়া থিম অ্যাপ্লাই করা
+    const savedThemeUrl = localStorage.getItem('roomThemeUrl');
+    if (savedThemeUrl) {
+        applyRoomTheme(savedThemeUrl);
     }
 
     socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
 }
 
-// ম্যানুয়ালি লগআউট করলে সব ডাটা ক্লিয়ার হবে
 function logout() { 
     localStorage.removeItem("isSiteUnlocked");
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("userName");
     localStorage.removeItem("userPhone");
     localStorage.removeItem("currentRoom");
+    localStorage.removeItem("userProfilePic");
+    localStorage.removeItem("roomThemeUrl");
     location.reload(); 
 }
 
