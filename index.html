@@ -11,83 +11,85 @@
 </head>
 <body class="light-mode">
 
-    <!-- Theme Switch Button -->
-    <button id="theme-btn" onclick="toggleTheme()" class="theme-btn" type="button">
-        <i class="fa-solid fa-moon"></i>
-    </button>
+    <!-- Top Full Width Navigation Header -->
+    <header class="top-navbar">
+        <h1 class="app-logo">EKT CHATING APP</h1>
+        <button id="theme-btn" onclick="toggleTheme()" class="theme-btn" type="button">
+            <i class="fa-solid fa-moon"></i>
+        </button>
+    </header>
 
+    <!-- Master Key Screen -->
     <div id="site-lock-screen" class="screen">
         <div class="glass-card">
-            <h2>💬 EKT CHATING APP</h2>
-            <p>Master Key প্রবেশ করান:</p>
-            
+            <h2>Master Key প্রবেশ করান</h2>
             <div class="input-box-container">
                 <input type="password" id="site-key-input" placeholder="Enter Site Password">
                 <i class="fa-solid fa-eye eye-icon" onclick="togglePasswordVisibility('site-key-input', this)"></i>
             </div>
-
             <button class="btn-primary" onclick="unlockSite()">Unlock</button>
-            <footer class="card-footer">DEVELOPED BY EYAMIN</footer>
+            <h2 class="developer-tag">DEVELOPED BY EYAMIN</h2>
         </div>
     </div>
 
+    <!-- Login / Signup Screen -->
     <div id="auth-screen" class="screen hidden">
         <div class="glass-card">
             <h2 id="auth-title">Login</h2>
-            
-            <!-- Full Name Input (Visible in Signup Mode) -->
             <input type="text" id="auth-name" placeholder="Full Name" class="input-field hidden">
-            
             <input type="text" id="auth-phone" placeholder="Phone Number" class="input-field">
-            
             <div class="input-box-container">
                 <input type="password" id="auth-pass" placeholder="Password">
                 <i class="fa-solid fa-eye eye-icon" onclick="togglePasswordVisibility('auth-pass', this)"></i>
             </div>
-
             <button onclick="handleAuth()" id="auth-btn" class="btn-primary">Login</button>
             <p onclick="toggleAuthMode()" class="toggle-link" id="auth-toggle">Create New Account</p>
+            <h2 class="developer-tag">DEVELOPED BY EYAMIN</h2>
         </div>
     </div>
 
+    <!-- Dashboard Screen -->
     <div id="dashboard-screen" class="screen hidden">
-        <div class="glass-card">
-            <header>
-                <h1>EKT CHATING APP</h1>
-            </header>
-
+        <div class="glass-card dashboard-card">
+            <!-- Profile Section -->
             <div class="profile-section">
-                <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic"><br>
-                <input type="file" id="profile-upload" accept="image/*" onchange="previewProfilePic(event)">
-                <h3 id="user-display-name">User Name</h3>
+                <div class="avatar-wrapper">
+                    <img id="profile-img-preview" src="https://via.placeholder.com/100" class="profile-pic">
+                    <label for="profile-upload" class="upload-badge"><i class="fa-solid fa-camera"></i></label>
+                    <input type="file" id="profile-upload" accept="image/*" onchange="previewProfilePic(event)" class="hidden">
+                </div>
+                <h2 id="user-display-name" class="user-name">User Name</h2>
             </div>
 
+            <!-- Actions Section -->
             <div class="room-actions">
                 <button class="btn-primary" onclick="createRoom()">Create Room</button>
-                <div id="created-code-display" class="hidden">
-                    <p>Room Code: <strong id="room-code"></strong></p>
-                </div>
+
                 <div class="join-box">
                     <input type="text" id="join-code-input" placeholder="Enter Room Code" class="input-field">
                     <button class="btn-primary" onclick="joinRoom()">Join Room</button>
                 </div>
             </div>
 
+            <!-- Theme Upload Section -->
             <div class="theme-section">
-                <label>Room Background Theme Image:</label>
-                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)">
+                <label for="theme-upload" class="theme-label">
+                    <i class="fa-solid fa-image"></i> Room Background Theme Image
+                </label>
+                <input type="file" id="theme-upload" accept="image/*" onchange="setCustomTheme(event)" class="file-input-custom">
             </div>
 
             <button onclick="logout()" class="logout-btn">Logout</button>
 
-            <footer class="card-footer">DEVELOPED BY EYAMIN</footer>
+            <h2 class="developer-tag">DEVELOPED BY EYAMIN</h2>
         </div>
     </div>
 
+    <!-- Chat Room Screen -->
     <div id="room-screen" class="screen hidden">
         <div class="glass-card room-card">
             <div class="room-header">
-                <h3>Chat Room: <span id="active-room-id"></span></h3>
+                <h3>Room Code: <span id="active-room-id"></span></h3>
                 <button onclick="leaveRoom()" class="logout-btn">Leave Room</button>
             </div>
 
@@ -97,16 +99,17 @@
             </div>
 
             <div class="call-controls">
-                <button class="btn-primary" onclick="startCall(false)">🎤 Audio Call</button>
-                <button class="btn-primary" onclick="startCall(true)">📹 Video Call</button>
+                <button class="btn-primary" onclick="startCall(false)"><i class="fa-solid fa-phone"></i> Audio Call</button>
+                <button class="btn-primary" onclick="startCall(true)"><i class="fa-solid fa-video"></i> Video Call</button>
             </div>
 
             <div id="chat-box" class="chat-box"></div>
 
             <div class="chat-input-area">
                 <input type="text" id="msg-input" placeholder="Type message..." class="input-field">
-                <input type="file" id="file-input" accept="image/*,video/*,audio/*">
-                <button class="btn-primary" onclick="sendMessage()">Send</button>
+                <label for="file-input" class="file-btn"><i class="fa-solid fa-paperclip"></i></label>
+                <input type="file" id="file-input" accept="image/*,video/*,audio/*" class="hidden">
+                <button class="btn-primary send-btn" onclick="sendMessage()"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </div>
     </div>
