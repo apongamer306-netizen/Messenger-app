@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messenger Test App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="login-screen" class="screen">
+    <div class="card">
+      <h2>Enter Messenger</h2>
+      <input type="text" id="username-input" placeholder="Enter your name...">
+      <button onclick="login()">Start</button>
+    </div>
+  </div>
+
+  <!-- Chat Screen -->
+  <div id="chat-screen" class="screen hidden">
+    <div class="chat-container">
+      <div class="header">
+        <h3>Messenger App</h3>
+        <div>
+          <button onclick="startCall('audio')">🎙️ Audio</button>
+          <button onclick="startCall('video')">📹 Video</button>
+        </div>
+      </div>
+
+      <div class="video-container hidden" id="video-area">
+        <video id="local-video" autoplay muted></video>
+        <video id="remote-video" autoplay></video>
+        <button onclick="endCall()" class="end-call-btn">End Call</button>
+      </div>
+
+      <div class="messages" id="messages-box"></div>
+
+      <div class="input-box">
+        <label for="file-input" class="file-label">📎</label>
+        <input type="file" id="file-input" onchange="sendFile()" hidden>
+        <input type="text" id="message-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
