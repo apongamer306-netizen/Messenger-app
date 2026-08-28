@@ -1,8 +1,8 @@
-const socket = io();
+// Render Socket connection via dynamic location host
+const socket = io(window.location.origin);
 
 let currentUser = null;
 let currentRoom = null;
-let roomOwnerName = "";
 
 // DOM Elements
 const masterKeyScreen = document.getElementById("masterKeyScreen");
@@ -147,23 +147,23 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Create Room Fix
+// Create Room Action
 createRoomBtn.addEventListener("click", () => {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  roomOwnerName = currentUser.name;
-  joinRoom(code, roomOwnerName);
+  joinRoom(code);
 });
 
-// Join Room Fix
+// Join Room Action
 joinRoomBtn.addEventListener("click", () => {
   const code = roomCodeInput.value.trim().toUpperCase();
-  if (code) joinRoom(code, "Room Owner");
+  if (code) joinRoom(code);
 });
 
-function joinRoom(code, owner) {
+function joinRoom(code) {
   currentRoom = code;
-  // Socket Connection to Room Proper Fix
-  socket.emit("join-room", { roomCode: code, user: currentUser, ownerName: owner });
+  // Socket Joining Event
+  socket.emit("join-room", { roomCode: code, user: currentUser });
+  
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
@@ -177,7 +177,7 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// Messaging Handling Fix
+// Send Chat Message
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -225,7 +225,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// Join Notification Handler
+// Socket Event Listeners
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
@@ -234,7 +234,6 @@ socket.on("user-joined-notify", (data) => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-// Receiving Broadcast Message
 socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
