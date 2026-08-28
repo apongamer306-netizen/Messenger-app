@@ -2,26 +2,17 @@ const socket = io();
 let masterKey = "KT EYAMIN";
 let isSignupMode = false;
 let currentRoom = "";
-let currentUser = { name: "", pic: "" };
 let localStream = null;
 let peer = null;
-let ringtoneAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3');
-ringtoneAudio.loop = true;
 
 document.addEventListener("DOMContentLoaded", () => {
     const savedTheme = localStorage.getItem("appTheme") || "light";
     applyTheme(savedTheme);
 
-    // সেসন মেমোরি থেকে ডাটা লোড (ইনকোগনিটো বা সেম ব্রাউজার ট্যাবের ওভাররাইট বাগ ফিক্সের জন্য)
-    const savedName = sessionStorage.getItem("session_userName") || localStorage.getItem("userName");
-    const savedPic = sessionStorage.getItem("session_userPic") || localStorage.getItem("userProfilePic");
-
-    if (savedName) currentUser.name = savedName;
-    if (savedPic) currentUser.pic = savedPic;
-
-    if (currentUser.pic) {
-        if (document.getElementById('profile-img-preview')) document.getElementById('profile-img-preview').src = currentUser.pic;
-        if (document.getElementById('room-user-pic')) document.getElementById('room-user-pic').src = currentUser.pic;
+    const savedProfilePic = localStorage.getItem("userProfilePic");
+    if (savedProfilePic) {
+        if (document.getElementById('profile-img-preview')) document.getElementById('profile-img-preview').src = savedProfilePic;
+        if (document.getElementById('room-user-pic')) document.getElementById('room-user-pic').src = savedProfilePic;
     }
 
     checkAutoLogin();
@@ -45,19 +36,38 @@ function applyTheme(theme) {
     }
 }
 
+function togglePasswordVisibility(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+    } else {
+        input.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+    }
+}
+
 function checkAutoLogin() {
     const isSiteUnlocked = localStorage.getItem("isSiteUnlocked");
-    const isLoggedIn = sessionStorage.getItem("isLoggedIn") || localStorage.getItem("isLoggedIn");
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    const savedName = localStorage.getItem("userName");
+    const savedRoom = localStorage.getItem("currentRoom");
 
     if (isSiteUnlocked === "true") {
         document.getElementById('site-lock-screen').classList.add('hidden');
 
         if (isLoggedIn === "true") {
             document.getElementById('auth-screen').classList.add('hidden');
-            if (document.getElementById('user-display-name')) {
-                document.getElementById('user-display-name').innerText = currentUser.name || "User";
+            if(document.getElementById('user-display-name')) document.getElementById('user-display-name').innerText = savedName || "User";
+
+            if (savedRoom) {
+                currentRoom = savedRoom;
+                enterRoomInterface(savedRoom);
+            } else {
+                document.getElementById('dashboard-screen').classList.remove('hidden');
             }
-            document.getElementById('dashboard-screen').classList.remove('hidden');
         } else {
             document.getElementById('auth-screen').classList.remove('hidden');
         }
@@ -93,33 +103,47 @@ function toggleAuthMode() {
     }
 }
 
+// অ্যাকাউন্ট তৈরি ও সঠিক পাসওয়ার্ড দিয়ে লগইন ভ্যালিডেশন
 function handleAuth() {
     const name = document.getElementById('auth-name').value.trim();
     const phone = document.getElementById('auth-phone').value.trim();
     const pass = document.getElementById('auth-pass').value.trim();
 
-    if (!phone || !pass) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+    if (!phone || !pass) {
+        return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+    }
 
     if (isSignupMode) {
+        // নতুন অ্যাকাউন্ট তৈরি করার লজিক
         if (!name) return alert("অনুগ্রহ করে আপনার নাম লিখুন");
 
-        currentUser.name = name;
-        sessionStorage.setItem('session_userName', name);
-        sessionStorage.setItem('isLoggedIn', "true");
+        localStorage.setItem('userPhone', phone);
+        localStorage.setItem('userPass', pass); // রেজিস্টার্ড পাসওয়ার্ড সেভ করা হচ্ছে
         localStorage.setItem('userName', name);
         localStorage.setItem('isLoggedIn', "true");
 
         document.getElementById('user-display-name').innerText = name;
         document.getElementById('auth-screen').classList.add('hidden');
         document.getElementById('dashboard-screen').classList.remove('hidden');
+        alert("Account Created Successfully!");
     } else {
-        currentUser.name = name || phone;
-        sessionStorage.setItem('session_userName', currentUser.name);
-        sessionStorage.setItem('isLoggedIn', "true");
+        // লগইন করার লজিক এবং পাসওয়ার্ড যাচাইকরণ
+        const savedPhone = localStorage.getItem('userPhone');
+        const savedPass = localStorage.getItem('userPass');
+        const savedName = localStorage.getItem('userName');
 
-        document.getElementById('user-display-name').innerText = currentUser.name;
-        document.getElementById('auth-screen').classList.add('hidden');
-        document.getElementById('dashboard-screen').classList.remove('hidden');
+        if (!savedPhone) {
+            return alert("কোনো অ্যাকাউন্ট পাওয়া যায়নি! আগে 'Create New Account' করুন।");
+        }
+
+        if (phone === savedPhone && pass === savedPass) {
+            localStorage.setItem('isLoggedIn', "true");
+            document.getElementById('user-display-name').innerText = savedName || phone;
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+        } else {
+            alert("ভুল ফোন নম্বর অথবা পাসওয়ার্ড! সঠিক পাসওয়ার্ড দিন।");
+        }
     }
 }
 
@@ -129,175 +153,174 @@ function previewProfilePic(event) {
         const reader = new FileReader();
         reader.onload = () => {
             const imageDataUrl = reader.result;
-            currentUser.pic = imageDataUrl;
             document.getElementById('profile-img-preview').src = imageDataUrl;
             document.getElementById('room-user-pic').src = imageDataUrl;
-            sessionStorage.setItem('session_userPic', imageDataUrl);
             localStorage.setItem('userProfilePic', imageDataUrl);
         };
         reader.readAsDataURL(file);
     }
 }
 
-// রুম ক্রিয়েট লজিক
+function setCustomTheme(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const themeDataUrl = reader.result;
+            localStorage.setItem('roomThemeUrl', themeDataUrl);
+            applyRoomTheme(themeDataUrl);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function applyRoomTheme(themeUrl) {
+    const chatBox = document.getElementById('chat-box');
+    if (chatBox && themeUrl) {
+        chatBox.style.backgroundImage = `url(${themeUrl})`;
+        chatBox.style.backgroundSize = 'cover';
+        chatBox.style.backgroundPosition = 'center';
+    }
+}
+
 function createRoom() {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     currentRoom = code;
-    
-    document.getElementById('dashboard-screen').classList.add('hidden');
-    document.getElementById('room-screen').classList.remove('hidden');
-    document.getElementById('active-room-id').innerText = code;
-    document.getElementById('room-user-name').innerText = currentUser.name || "User";
-    if (currentUser.pic) document.getElementById('room-user-pic').src = currentUser.pic;
-
-    document.getElementById('chat-box').innerHTML = '';
-
-    socket.emit('create-room', {
-        roomId: code,
-        hostName: currentUser.name || "User",
-        hostPic: currentUser.pic || ""
-    });
+    localStorage.setItem("currentRoom", code);
+    enterRoomInterface(code);
 }
 
-// রুম জয়েন লজিক
 function joinRoom() {
-    const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+    const code = document.getElementById('join-code-input').value.trim();
     if (!code) return alert("রুম কোড প্রবেশ করান");
 
     currentRoom = code;
-
-    document.getElementById('dashboard-screen').classList.add('hidden');
-    document.getElementById('room-screen').classList.remove('hidden');
-    document.getElementById('active-room-id').innerText = code;
-
-    document.getElementById('chat-box').innerHTML = '';
-
-    socket.emit('join-room', {
-        roomId: code,
-        userName: currentUser.name || "User",
-        userPic: currentUser.pic || ""
-    });
+    localStorage.setItem("currentRoom", code);
+    enterRoomInterface(code);
 }
 
-// জয়েন করার পর সার্ভার থেকে পাওয়া হোস্টের নাম ও পিকচার শো করা
-socket.on('joined-room-info', (data) => {
-    document.getElementById('room-user-name').innerText = data.hostName;
-    if (data.hostPic) {
-        document.getElementById('room-user-pic').src = data.hostPic;
-    }
+function enterRoomInterface(code) {
+    document.getElementById('dashboard-screen').classList.add('hidden');
+    document.getElementById('room-screen').classList.remove('hidden');
+    
+    document.getElementById('active-room-id').innerText = code;
+    document.getElementById('room-user-name').innerText = localStorage.getItem('userName') || "User";
+    
+    const savedPic = localStorage.getItem('userProfilePic');
+    if (savedPic) document.getElementById('room-user-pic').src = savedPic;
 
-    // সিস্টেমে মেসেজ শো করানো
-    const chatBox = document.getElementById('chat-box');
-    const sysDiv = document.createElement('div');
-    sysDiv.style.cssText = 'text-align: center; font-size: 13px; color: #38bdf8; margin: 10px 0; font-weight: bold;';
-    sysDiv.innerText = `You joined ${data.hostName}'s room`;
-    chatBox.appendChild(sysDiv);
-});
+    const savedThemeUrl = localStorage.getItem('roomThemeUrl');
+    if (savedThemeUrl) applyRoomTheme(savedThemeUrl);
 
-socket.on('user-joined-notify', (data) => {
-    const chatBox = document.getElementById('chat-box');
-    const sysDiv = document.createElement('div');
-    sysDiv.style.cssText = 'text-align: center; font-size: 12px; color: #4ade80; margin: 8px 0;';
-    sysDiv.innerText = `${data.userName} joined the room`;
-    chatBox.appendChild(sysDiv);
-});
+    socket.emit('join-room', currentRoom, localStorage.getItem('userName'));
+}
+
+function logout() { 
+    localStorage.clear();
+    location.reload(); 
+}
 
 function leaveRoom() {
-    socket.emit('leave-room', currentRoom);
+    localStorage.removeItem("currentRoom");
     document.getElementById('room-screen').classList.add('hidden');
     document.getElementById('dashboard-screen').classList.remove('hidden');
 }
 
-// -----------------------------------------------------------------
-// মেসেজিং লজিক (১০০% ইনস্ট্যান্ট সেন্ড ও রিসিভ)
-// -----------------------------------------------------------------
-
-async function sendMessage() {
+function sendMessage() {
     const msgInput = document.getElementById('msg-input');
-    const msg = msgInput.value.trim();
+    const msg = msgInput.value;
     const fileInput = document.getElementById('file-input');
 
     if (fileInput.files.length > 0) {
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        try {
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (data.filePath) {
-                socket.emit('send-file', {
-                    roomId: currentRoom,
-                    filePath: data.filePath,
-                    fileName: data.fileName,
-                    fileType: data.fileType,
-                    senderName: currentUser.name
-                });
+        fetch('/upload', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                socket.emit('send-file', { roomId: currentRoom, fileUrl: data.filePath, fileType: data.fileType, user: localStorage.getItem('userName') });
                 fileInput.value = '';
-            }
-        } catch (err) {
-            alert("ফাইল সেন্ড করা সম্ভব হয়নি!");
-        }
+            });
     }
 
-    if (msg !== "") {
-        socket.emit('send-message', {
-            roomId: currentRoom,
-            message: msg,
-            senderName: currentUser.name
-        });
+    if (msg) {
+        socket.emit('send-message', { roomId: currentRoom, message: msg, user: localStorage.getItem('userName') });
         msgInput.value = '';
     }
 }
 
-document.getElementById('msg-input')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});
-
 socket.on('receive-message', (data) => {
     const chatBox = document.getElementById('chat-box');
-    const isSelf = data.senderName === currentUser.name;
-
+    const isSelf = data.user === localStorage.getItem('userName');
+    
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-message ${isSelf ? 'self' : ''}`;
-    msgDiv.innerText = data.message;
-
+    msgDiv.innerHTML = `<strong>${data.user}:</strong> ${data.message}`;
+    
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 });
 
 socket.on('receive-file', (data) => {
     const chatBox = document.getElementById('chat-box');
-    const isSelf = data.senderName === currentUser.name;
-
-    let mediaContent = '';
+    const isSelf = data.user === localStorage.getItem('userName');
+    
+    let content = '';
     if (data.fileType.startsWith('image/')) {
-        mediaContent = `
-            <div>
-                <img src="${data.filePath}" style="max-width:100%; max-height:220px; border-radius:8px; display:block;">
-                <a href="${data.filePath}" download="${data.fileName}" style="display:inline-block; margin-top:5px; color:#60a5fa; font-size:12px; text-decoration:underline;">
-                    <i class="fa-solid fa-download"></i> Download Image
-                </a>
-            </div>`;
+        content = `<img src="${data.fileUrl}" style="max-width:100%; border-radius:5px;">`;
     } else if (data.fileType.startsWith('video/')) {
-        mediaContent = `
-            <div>
-                <video src="${data.filePath}" controls style="max-width:100%; max-height:220px; border-radius:8px; display:block;"></video>
-                <a href="${data.filePath}" download="${data.fileName}" style="display:inline-block; margin-top:5px; color:#60a5fa; font-size:12px; text-decoration:underline;">
-                    <i class="fa-solid fa-download"></i> Download Video
-                </a>
-            </div>`;
+        content = `<video src="${data.fileUrl}" controls style="max-width:100%;"></video>`;
+    } else if (data.fileType.startsWith('audio/')) {
+        content = `<audio src="${data.fileUrl}" controls style="max-width:100%;"></audio>`;
     } else {
-        mediaContent = `
-            <a href="${data.filePath}" download="${data.fileName}" style="color:#60a5fa; text-decoration:underline; font-size:13px;">
-                <i class="fa-solid fa-file"></i> Download ${data.fileName}
-            </a>`;
+        content = `<a href="${data.fileUrl}" download style="color:#fff;">Download File</a>`;
     }
 
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-message ${isSelf ? 'self' : ''}`;
-    msgDiv.innerHTML = mediaContent;
+    msgDiv.innerHTML = `<strong>${data.user}:</strong><br>${content}`;
 
     chatBox.appendChild(msgDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 });
+
+function startCall(isVideo) {
+    document.getElementById('video-wrapper').classList.remove('hidden');
+    navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then(stream => {
+        localStream = stream;
+        document.getElementById('localVideo').srcObject = stream;
+
+        peer = new SimplePeer({ initiator: true, trickle: false, stream: stream });
+
+        peer.on('signal', data => {
+            socket.emit('call-user', { userToCall: currentRoom, signalData: data, name: localStorage.getItem('userName') });
+        });
+
+        peer.on('stream', remoteStream => {
+            document.getElementById('remoteVideo').srcObject = remoteStream;
+        });
+    });
+}
+
+socket.on('call-made', data => {
+    if (confirm(`Incoming Call from ${data.name}. Accept?`)) {
+        document.getElementById('video-wrapper').classList.remove('hidden');
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+            localStream = stream;
+            document.getElementById('localVideo').srcObject = stream;
+
+            peer = new SimplePeer({ initiator: false, trickle: false, stream: stream });
+            peer.signal(data.signal);
+
+            peer.on('signal', signal => {
+                socket.emit('answer-call', { signal: signal, to: data.from });
+            });
+
+            peer.on('stream', remoteStream => {
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+            });
+        });
+    }
+});
+
+socket.on('call-accepted', signal => { peer.signal(signal); });
