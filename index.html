@@ -5,20 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EKT CHATING APP</title>
   <link rel="stylesheet" href="style.css">
-  <!-- FontAwesome for Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Socket.io and PeerJS Library -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body class="dark-theme">
 
-  <!-- Header Section -->
   <header class="navbar">
     <div class="logo">EKT CHATING APP</div>
     <div class="nav-controls">
       <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
-      <button id="headerSettingsBtn" class="icon-btn" style="display:none;"><i class="fa-solid fa-gear"></i></button>
     </div>
   </header>
 
@@ -35,7 +31,7 @@
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 2: Auth Screen (Login / Sign Up) -->
+    <!-- Screen 2: Auth Screen -->
     <div id="authScreen" class="card-screen" style="display: none;">
       <h2 id="authTitle">Create Account</h2>
       
@@ -63,7 +59,7 @@
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 3: User Dashboard (Create/Join Room) -->
+    <!-- Screen 3: Dashboard -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="profile-header">
         <div class="avatar-container">
@@ -76,7 +72,7 @@
 
       <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
 
-      <div class="input-wrapper">
+      <div class="input-wrapper" style="margin-top: 15px;">
         <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
       </div>
 
@@ -85,9 +81,8 @@
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 4: Active Chat Room -->
+    <!-- Screen 4: Chat Room -->
     <div id="chatScreen" class="chat-container" style="display: none;">
-      <!-- Chat Header -->
       <div class="chat-header">
         <div class="user-info">
           <img id="chatUserAvatar" src="https://via.placeholder.com/40" alt="Avatar">
@@ -103,7 +98,6 @@
         </div>
       </div>
 
-      <!-- Video Call Screen Overlay -->
       <div id="videoCallOverlay" class="video-overlay" style="display: none;">
         <video id="remoteVideo" autoplay playsinline></video>
         <video id="localVideo" autoplay playsinline muted></video>
@@ -112,12 +106,8 @@
         </div>
       </div>
 
-      <!-- Chat Messages Display Area -->
-      <div id="chatMessages" class="chat-messages">
-        <!-- Messages will be dynamically appended here -->
-      </div>
+      <div id="chatMessages" class="chat-messages"></div>
 
-      <!-- Chat Input Controls Area -->
       <div class="chat-input-area">
         <label for="fileAttachmentInput" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
         <input type="file" id="fileAttachmentInput" accept="image/*,video/*,audio/*" style="display: none;">
