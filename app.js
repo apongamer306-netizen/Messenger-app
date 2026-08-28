@@ -9,6 +9,9 @@ let localStream = null;
 
 myPeer.on("open", (id) => {
   myPeerId = id;
+  
+  // Peer ID পাওয়ার পর যদি আগের কোনো সেভড রুম থাকে তাতে অটো-রি-জয়েন করবে
+  checkAndAutoRejoinRoom();
 });
 
 let currentUser = null;
@@ -49,6 +52,7 @@ const chatMessageInput = document.getElementById("chatMessageInput");
 const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+const bgImageUpload = document.getElementById("bgImageUpload");
 
 // Call Modal Elements
 const callModal = document.getElementById("callModal");
@@ -82,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedUser) {
       currentUser = savedUser;
       showDashboard();
+      checkAndAutoRejoinRoom();
     } else {
       authScreen.style.display = "block";
     }
@@ -89,6 +94,14 @@ document.addEventListener("DOMContentLoaded", () => {
     masterKeyScreen.style.display = "block";
   }
 });
+
+// অটো-রিজয়েন লজিক (রিফ্রেশ করলেও রুমে রেখে দেওয়ার জন্য)
+function checkAndAutoRejoinRoom() {
+  const savedRoom = sessionStorage.getItem("currentChatRoom");
+  if (savedRoom && currentUser && myPeerId) {
+    joinRoom(savedRoom);
+  }
+}
 
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value === "KT EYAMIN") {
@@ -190,6 +203,8 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
+  sessionStorage.setItem("currentChatRoom", code); // সেশন স্টোরেজে রুম আইডি রাখা হলো
+
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
   
   dashboardScreen.style.display = "none";
@@ -197,10 +212,39 @@ function joinRoom(code) {
   chatUserName.textContent = currentUser.name;
   chatUserAvatar.src = currentUser.pic;
   chatRoomCode.textContent = "Code: " + code;
+
+  // আগে কোনো সেভ করা ওয়ালপেপার থাকলে তা লোড করা
+  const savedBg = localStorage.getItem("chatWallpaper_" + code);
+  if (savedBg) {
+    chatMessages.style.backgroundImage = `url('${savedBg}')`;
+    chatMessages.style.backgroundSize = "cover";
+    chatMessages.style.backgroundPosition = "center";
+  } else {
+    chatMessages.style.backgroundImage = "none";
+  }
 }
+
+// চ্যাট রুম ব্যাকগ্রাউন্ড / ওয়ালপেপার পরিবর্তন লজিক
+bgImageUpload.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file && currentRoom) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bgData = evt.target.result;
+      chatMessages.style.backgroundImage = `url('${bgData}')`;
+      chatMessages.style.backgroundSize = "cover";
+      chatMessages.style.backgroundPosition = "center";
+      
+      // সেই রুমের জন্য ওয়ালপেপার সেভ রাখা
+      localStorage.setItem("chatWallpaper_" + currentRoom, bgData);
+    };
+    reader.readAsDataURL(file);
+  }
+});
 
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
+  sessionStorage.removeItem("currentChatRoom");
   currentUser = null;
   location.reload();
 });
@@ -318,7 +362,7 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC (FIXED) -------------------
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
 
 let incomingCallData = null;
 
@@ -429,9 +473,17 @@ function closeCallUI() {
   remoteVideo.srcObject = null;
 }
 
+// রুম থেকে বের হওয়ার বাটন
 leaveRoomBtn.addEventListener("click", () => {
+  if (currentRoom) {
+    socket.emit("leave-room", { roomCode: currentRoom });
+    localStorage.removeItem("chatWallpaper_" + currentRoom);
+  }
+  sessionStorage.removeItem("currentChatRoom");
+  chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
+  currentRoom = null;
 });
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
