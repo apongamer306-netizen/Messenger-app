@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- CDN Socket.io Fix (ফাইল লোড না হওয়ার সমস্যা স্থায়ী সমাধান) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
@@ -22,7 +21,7 @@
 
   <main class="main-container">
 
-    <!-- Screen 1: Master Key Screen -->
+    <!-- Screen 1: Master Key -->
     <div id="masterKeyScreen" class="card-screen">
       <h2>Master Key প্রবেশ করান</h2>
       <div class="input-wrapper">
@@ -35,9 +34,9 @@
 
     <!-- Screen 2: Auth Screen -->
     <div id="authScreen" class="card-screen" style="display: none;">
-      <h2 id="authTitle">Create Account</h2>
+      <h2 id="authTitle">Login Account</h2>
       
-      <div id="signupFields">
+      <div id="signupFields" style="display: none;">
         <div class="input-wrapper">
           <input type="text" id="fullNameInput" placeholder="Full Name">
         </div>
@@ -52,11 +51,11 @@
         <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('authPasswordInput', this)"></i>
       </div>
 
-      <button id="authSubmitBtn" class="btn btn-primary">Sign Up</button>
+      <button id="authSubmitBtn" class="btn btn-primary">Login</button>
 
       <p class="auth-toggle-text">
-        <span id="authToggleMsg">Already have account?</span>
-        <a href="#" id="authToggleLink">Login</a>
+        <span id="authToggleMsg">Don't have an account?</span>
+        <a href="#" id="authToggleLink">Sign Up</a>
       </p>
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
@@ -108,6 +107,21 @@
         
         <input type="text" id="chatMessageInput" placeholder="Type a message...">
         <button id="sendMessageBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+
+    <!-- Call Overlay Modal -->
+    <div id="callModal" class="call-modal" style="display: none;">
+      <div class="call-box">
+        <h3 id="callStatusText">Incoming Call...</h3>
+        <div class="video-grid">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+        <div class="call-controls">
+          <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
+          <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
+        </div>
       </div>
     </div>
 
