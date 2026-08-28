@@ -5,7 +5,7 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* স্ক্রলিং পুরোপুরি বন্ধ করার জন্য */
+/* স্ক্রলিং বন্ধের গ্যারান্টি */
 html, body {
     width: 100%;
     height: 100vh;
@@ -15,7 +15,7 @@ html, body {
 }
 
 body.light-mode {
-    background-color: #f1f5f9;
+    background-color: #f8fafc;
     color: #0f172a;
 }
 
@@ -23,51 +23,58 @@ body.light-mode {
     display: none !important;
 }
 
-.top-navbar {
-    height: 50px;
+/* Top App Bar */
+.app-header {
+    height: 45px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: #1e293b;
+    border-bottom: 1px solid #334155;
 }
 
-.app-logo {
-    font-size: 16px;
-    font-weight: bold;
+.light-mode .app-header {
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.theme-btn {
+.app-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.icon-toggle-btn {
     background: transparent;
     border: none;
     color: inherit;
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
 }
 
+/* Screen Wrapper */
 .screen {
-    height: calc(100vh - 50px);
+    height: calc(100vh - 45px);
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 10px;
 }
 
-/* Glassmorphic Box for Screens */
+/* Glass Card Component */
 .glass-card {
-    background: rgba(30, 41, 59, 0.85);
+    background: #1e293b;
     padding: 20px;
     border-radius: 12px;
     width: 100%;
-    max-width: 380px;
+    max-width: 360px;
     text-align: center;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
 }
 
 .light-mode .glass-card {
-    background: rgba(255, 255, 255, 0.85);
-    color: #0f172a;
+    background: #ffffff;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
 }
 
 .input-field, .input-box-container input {
@@ -76,13 +83,14 @@ body.light-mode {
     margin: 8px 0;
     border-radius: 6px;
     border: 1px solid #334155;
-    background: #1e293b;
+    background: #0f172a;
     color: #fff;
 }
 
 .light-mode .input-field, .light-mode .input-box-container input {
-    background: #e2e8f0;
-    color: #000;
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #0f172a;
 }
 
 .btn-primary {
@@ -109,11 +117,16 @@ body.light-mode {
     margin-top: 10px;
 }
 
-/* Profile Section */
+.developer-tag {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 15px;
+}
+
 .avatar-wrapper {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 75px;
+    height: 75px;
     margin: 0 auto 10px auto;
 }
 
@@ -133,158 +146,197 @@ body.light-mode {
     color: white;
     padding: 5px;
     border-radius: 50%;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
 }
 
-/* Compact Room Styling */
-.room-container {
+/* ------------------------------------------------ */
+/* MESSENGER STYLE CHAT ROOM (FULL SCREEN COMPACT) */
+/* ------------------------------------------------ */
+
+.messenger-container {
     width: 100%;
     height: 100%;
+    max-width: 480px;
     display: flex;
     flex-direction: column;
-    max-width: 500px;
-    margin: 0 auto;
-    background: rgba(15, 23, 42, 0.95);
+    background: #0f172a;
     border-radius: 8px;
+    border: 1px solid #334155;
     overflow: hidden;
 }
 
-.compact-room-header {
-    height: 55px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.light-mode .messenger-container {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+
+/* Messenger Header */
+.messenger-header {
+    height: 52px;
     padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: #1e293b;
     border-bottom: 1px solid #334155;
 }
 
-.user-info-bar {
+.light-mode .messenger-header {
+    background: #f8fafc;
+    border-bottom-color: #cbd5e1;
+}
+
+.header-user-details {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
-.header-avatar {
-    width: 38px;
-    height: 38px;
+.mini-avatar {
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     object-fit: cover;
+    border: 1px solid #2563eb;
 }
 
-.header-text {
+.header-text-group {
     display: flex;
     flex-direction: column;
-    text-align: left;
 }
 
-.header-name {
+.user-display-title {
     font-size: 13px;
-    font-weight: bold;
+    font-weight: 700;
 }
 
-.header-code {
-    font-size: 11px;
+.room-code-badge {
+    font-size: 10px;
     color: #94a3b8;
 }
 
-.header-actions {
+.header-action-buttons {
     display: flex;
+    align-items: center;
     gap: 6px;
 }
 
-.icon-btn {
-    width: 34px;
-    height: 34px;
+.btn-icon {
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: #fff;
+    font-size: 12px;
     cursor: pointer;
-    font-size: 13px;
 }
 
-.audio-btn { background: #10b981; }
-.video-btn { background: #3b82f6; }
-.theme-btn-room { background: #8b5cf6; }
-.leave-btn { background: #ef4444; }
+.call-audio { background: #10b981; }
+.call-video { background: #2563eb; }
+.set-theme { background: #8b5cf6; }
+.exit-room { background: #ef4444; }
 
-/* Video Wrapper Overlay */
-.video-wrapper {
-    height: 100px;
-    display: flex;
-    gap: 5px;
+/* Video Call Window */
+.video-overlay {
+    height: 90px;
     background: #000;
-    padding: 5px;
+    display: flex;
+    padding: 4px;
+    gap: 4px;
 }
 
-.video-wrapper video {
+.video-overlay video {
     width: 50%;
     height: 100%;
     object-fit: cover;
     border-radius: 4px;
 }
 
-/* Chat Box Area */
-.chat-box-area {
+/* Chat History Display Area */
+.messenger-chat-area {
     flex: 1;
-    padding: 10px;
+    padding: 12px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    background-color: transparent;
 }
 
 .chat-message {
-    background: #334155;
+    background: #1e293b;
+    color: #fff;
     padding: 8px 12px;
-    border-radius: 8px;
-    max-width: 80%;
+    border-radius: 12px;
+    max-width: 75%;
     font-size: 13px;
+    line-height: 1.4;
     word-break: break-word;
+    align-self: flex-start;
+}
+
+.light-mode .chat-message {
+    background: #e2e8f0;
+    color: #0f172a;
 }
 
 .chat-message.self {
     align-self: flex-end;
     background: #2563eb;
+    color: #fff;
 }
 
-/* Fixed Input Bar */
-.chat-input-bar {
+/* Messenger Bottom Input Bar */
+.messenger-input-bar {
     height: 50px;
+    padding: 0 10px;
     display: flex;
     align-items: center;
-    padding: 0 8px;
+    gap: 8px;
     background: #1e293b;
-    gap: 6px;
+    border-top: 1px solid #334155;
 }
 
-.attach-btn {
-    color: #94a3b8;
-    font-size: 18px;
+.light-mode .messenger-input-bar {
+    background: #f8fafc;
+    border-top-color: #cbd5e1;
+}
+
+.attach-icon {
+    font-size: 16px;
+    color: #64748b;
     cursor: pointer;
-    padding: 5px;
+    padding: 4px;
 }
 
-.chat-input-field {
+.message-field {
     flex: 1;
-    height: 35px;
-    border-radius: 18px;
+    height: 34px;
+    border-radius: 17px;
     border: 1px solid #334155;
+    padding: 0 12px;
     background: #0f172a;
     color: #fff;
-    padding: 0 12px;
+    font-size: 13px;
 }
 
-.send-action-btn {
-    background: #2563eb;
-    border: none;
-    color: white;
-    width: 35px;
-    height: 35px;
+.light-mode .message-field {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+.btn-send {
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
+    border: none;
+    background: #2563eb;
+    color: #fff;
     cursor: pointer;
+    font-size: 12px;
 }
