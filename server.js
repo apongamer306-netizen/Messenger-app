@@ -19,6 +19,11 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e8 // ৫০ থেকে ১০০ মেগাবাইট পর্যন্ত ফাইল আপলোড সাপোর্ট করার জন্য
 });
 
+// হোম রুটে index.html ফাইল লোড করা
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 // ইউজারের ডেটাবেজ (মেমোরিতে জমা রাখা)
 const users = {};
 // রুমের ফাইল ও মেসেজ ডাটা
@@ -109,11 +114,6 @@ io.on("connection", (socket) => {
       }
     }
   }
-});
-
-// যে কোনো URL-এ রিফ্রেশ করলেও যেন একই পেজ লোড হয় (Catch-all route)
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
