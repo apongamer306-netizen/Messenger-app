@@ -8,7 +8,6 @@ let currentCall = null;
 let localStream = null;
 let currentCallType = null;
 
-// Audio player for remote streams
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 document.body.appendChild(remoteAudioElement);
@@ -103,7 +102,7 @@ function checkActiveSession() {
     if (savedUser) {
       currentUser = savedUser;
       if (activeRoom) {
-        joinRoom(activeRoom, true); // True passed to prevent clearing saved room chat on refresh
+        joinRoom(activeRoom, true);
       } else {
         showDashboard();
       }
@@ -230,7 +229,6 @@ function joinRoom(code, isRefresh = false) {
   chatUserAvatar.src = currentUser.pic;
   chatRoomCode.textContent = "Code: " + code;
 
-  // রিফ্রেশ করার পর মেসেজ রিকভার করা
   if (isRefresh) {
     restoreSavedMessages();
   } else {
@@ -354,12 +352,10 @@ function appendMessage(data, isMe) {
   saveCurrentMessages();
 }
 
-// মেসেজ সেশন স্টোরেজে জমা রাখা
 function saveCurrentMessages() {
   sessionStorage.setItem("savedRoomMessages", chatMessages.innerHTML);
 }
 
-// রিফ্রেশ হলে সেশন স্টোরেজ থেকে মেসেজগুলো ফেরত আনা
 function restoreSavedMessages() {
   const savedHtml = sessionStorage.getItem("savedRoomMessages");
   if (savedHtml) {
@@ -378,7 +374,7 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+// ------------------- FIX FOR CALL RECEIVE & AUDIO STREAMS -------------------
 
 let incomingCallData = null;
 
@@ -397,9 +393,9 @@ function setCallUI(type, remoteUser) {
     localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
     localCallName.textContent = currentUser.name || "Me";
 
-    if (remoteUser) {
+    if (remoteUser && remoteUser.name) {
       remoteCallAvatar.src = remoteUser.pic || "https://via.placeholder.com/100";
-      remoteCallName.textContent = remoteUser.name || "User";
+      remoteCallName.textContent = remoteUser.name;
     } else {
       remoteCallAvatar.src = "https://via.placeholder.com/100";
       remoteCallName.textContent = "Connecting...";
@@ -440,6 +436,7 @@ socket.on("incoming-call", (data) => {
   acceptCallBtn.style.display = "inline-block";
 });
 
+// Receiver answers call
 acceptCallBtn.addEventListener("click", () => {
   if (!incomingCallData) return;
   const isVideo = incomingCallData.callType === "video";
@@ -452,29 +449,39 @@ acceptCallBtn.addEventListener("click", () => {
 
     setCallUI(incomingCallData.callType, { name: incomingCallData.callerName, pic: incomingCallData.callerPic });
 
-    const call = myPeer.call(incomingCallData.callerPeerId, stream, {
-      metadata: { name: currentUser.name, pic: currentUser.pic }
+    // Answer incoming Peer call
+    myPeer.on("call", (call) => {
+      currentCall = call;
+      call.answer(stream);
+      handleStream(call, isVideo);
     });
-    currentCall = call;
 
-    handleStream(call, isVideo);
+    // Notify caller via Socket that call was accepted along with receiver profile
+    socket.emit("accept-call-notify", {
+      roomCode: currentRoom,
+      receiverName: currentUser.name,
+      receiverPic: currentUser.pic,
+      receiverPeerId: myPeerId
+    });
 
     acceptCallBtn.style.display = "none";
+    callStatusText.textContent = "Connecting...";
   });
 });
 
-myPeer.on("call", (call) => {
-  currentCall = call;
-  call.answer(localStream);
-  const isVideo = currentCallType === "video";
-  
-  // কলারের স্ক্রিনে রিসিভারের ছবি ও নাম আপডেট করা
-  if (call.metadata && currentCallType === "audio") {
-    remoteCallAvatar.src = call.metadata.pic || "https://via.placeholder.com/100";
-    remoteCallName.textContent = call.metadata.name || "Connected User";
+// Caller receives notification that receiver accepted the call
+socket.on("call-accepted-by-receiver", (data) => {
+  if (currentCallType === "audio") {
+    remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
+    remoteCallName.textContent = data.receiverName || "Connected User";
   }
-
-  handleStream(call, isVideo);
+  
+  // Make call from Caller to Receiver using Receiver's peerId
+  if (localStream && data.receiverPeerId) {
+    const call = myPeer.call(data.receiverPeerId, localStream);
+    currentCall = call;
+    handleStream(call, currentCallType === "video");
+  }
 });
 
 function handleStream(call, isVideo) {
@@ -513,7 +520,6 @@ function closeCallUI() {
   currentCallType = null;
 }
 
-// রুম ছেড়ে বের হলে মেসেজ ডাটা মুছে যাবে
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("savedRoomMessages");
