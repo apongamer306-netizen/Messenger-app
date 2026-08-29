@@ -9,6 +9,8 @@ let localStream = null;
 
 myPeer.on("open", (id) => {
   myPeerId = id;
+  // Peer ID তৈরি হওয়ার পর সেশন চেক করবে
+  checkActiveSession();
 });
 
 let currentUser = null;
@@ -74,26 +76,43 @@ function togglePasswordVisibility(inputId, iconElem) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const isMasterUnlocked = localStorage.getItem("masterUnlocked");
+  checkActiveSession();
+});
+
+// ব্রাউজারে সাইট ওপেন করার সময়ে সেশন ভেরিফিকেশন
+function checkActiveSession() {
+  // sessionStorage ব্যবহার করায় লিংক কেটে ঢুকলে প্রতিবার Master Key চাইবে
+  const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
+  const activeRoom = sessionStorage.getItem("activeRoom");
 
   if (isMasterUnlocked === "true") {
     masterKeyScreen.style.display = "none";
     if (savedUser) {
       currentUser = savedUser;
-      showDashboard();
+      if (activeRoom) {
+        joinRoom(activeRoom);
+      } else {
+        showDashboard();
+      }
     } else {
       authScreen.style.display = "block";
     }
   } else {
+    // Master Key আনলক করা না থাকলে Master Key স্ক্রিন দেখাবে
     masterKeyScreen.style.display = "block";
+    authScreen.style.display = "none";
+    dashboardScreen.style.display = "none";
+    chatScreen.style.display = "none";
   }
-});
+}
 
+// Master Key সাবমিট লজিক
 unlockBtn.addEventListener("click", () => {
-  if (masterKeyInput.value === "KT EYAMIN") {
-    localStorage.setItem("masterUnlocked", "true");
+  if (masterKeyInput.value.trim() === "KT EYAMIN") {
+    sessionStorage.setItem("masterUnlocked", "true");
     masterKeyScreen.style.display = "none";
+    
     const savedUser = JSON.parse(localStorage.getItem("appUser"));
     if (savedUser) {
       currentUser = savedUser;
@@ -160,6 +179,7 @@ authSubmitBtn.addEventListener("click", () => {
 
 function showDashboard() {
   authScreen.style.display = "none";
+  chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
   dashboardUserName.textContent = currentUser.name;
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
@@ -178,8 +198,9 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
+// নির্দিষ্ট কোড "1430909" জেনারেট হওয়ার অপশন
 createRoomBtn.addEventListener("click", () => {
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const code = "1430909";
   joinRoom(code);
 });
 
@@ -190,6 +211,8 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
+  sessionStorage.setItem("activeRoom", code);
+
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
   
   dashboardScreen.style.display = "none";
@@ -201,6 +224,8 @@ function joinRoom(code) {
 
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
+  sessionStorage.removeItem("activeRoom");
+  sessionStorage.removeItem("masterUnlocked");
   currentUser = null;
   location.reload();
 });
@@ -404,7 +429,10 @@ function closeCallUI() {
   remoteVideo.srcObject = null;
 }
 
+// রুম ছাড়ার বাটন
 leaveRoomBtn.addEventListener("click", () => {
+  sessionStorage.removeItem("activeRoom");
+  currentRoom = null;
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
