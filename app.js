@@ -1,268 +1,423 @@
-const socket = io();
+const socket = io("https://ekt-chatter.onrender.com", {
+  transports: ["websocket", "polling"]
+});
 
-// Your original Master Key preserved
-const MASTER_KEY = "1234"; 
+let myPeer = new Peer();
+let myPeerId = null;
+let currentCall = null;
+let localStream = null;
+
+myPeer.on("open", (id) => {
+  myPeerId = id;
+  // Peer ID পাওয়ার পর যদি আগে থেকেই সেভ করা রুম থাকে, তবে আবার জয়েন করবে
+  const savedRoom = localStorage.getItem("currentRoom");
+  if (savedRoom && currentUser) {
+    joinRoom(savedRoom);
+  }
+});
 
 let currentUser = null;
-let currentRoomId = null;
-let currentDirectRoomId = null;
+let currentRoom = null;
 
-// Elements
-const masterKeyModal = document.getElementById('master-key-modal');
-const masterKeyInput = document.getElementById('master-key-input');
-const masterKeySubmitBtn = document.getElementById('master-key-submit-btn');
+// DOM Elements
+const masterKeyScreen = document.getElementById("masterKeyScreen");
+const authScreen = document.getElementById("authScreen");
+const dashboardScreen = document.getElementById("dashboardScreen");
+const chatScreen = document.getElementById("chatScreen");
 
-const authContainer = document.getElementById('auth-container');
-const authUsername = document.getElementById('auth-username');
-const authPassword = document.getElementById('auth-password');
-const authActionBtn = document.getElementById('auth-action-btn');
+const masterKeyInput = document.getElementById("masterKeyInput");
+const unlockBtn = document.getElementById("unlockBtn");
 
-const appDashboard = document.getElementById('app-dashboard');
-const displayUserName = document.getElementById('display-user-name');
-const logoutBtn = document.getElementById('logout-btn');
+const authTitle = document.getElementById("authTitle");
+const signupFields = document.getElementById("signupFields");
+const fullNameInput = document.getElementById("fullNameInput");
+const phoneInput = document.getElementById("phoneInput");
+const authPasswordInput = document.getElementById("authPasswordInput");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authToggleLink = document.getElementById("authToggleLink");
+const authToggleMsg = document.getElementById("authToggleMsg");
 
-const activeRoomBox = document.getElementById('active-room-box');
-const currentRoomCodeSpan = document.getElementById('current-room-code');
-const createRoomBtn = document.getElementById('create-room-btn');
-const joinRoomInput = document.getElementById('join-room-input');
-const joinRoomBtn = document.getElementById('join-room-btn');
-const leaveRoomBtn = document.getElementById('leave-room-btn');
+const dashboardAvatar = document.getElementById("dashboardAvatar");
+const dashboardUserName = document.getElementById("dashboardUserName");
+const avatarUpload = document.getElementById("avatarUpload");
 
-const roomChatMessages = document.getElementById('room-chat-messages');
-const roomChatInput = document.getElementById('room-chat-input');
-const sendRoomMsgBtn = document.getElementById('send-room-msg-btn');
+const createRoomBtn = document.getElementById("createRoomBtn");
+const roomCodeInput = document.getElementById("roomCodeInput");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+const logoutBtn = document.getElementById("logoutBtn");
 
-const friendsListContainer = document.getElementById('friends-list-container');
-const directChatBox = document.getElementById('direct-chat-box');
-const directChatUserSpan = document.getElementById('direct-chat-user');
-const directChatMessages = document.getElementById('direct-chat-messages');
-const directChatInput = document.getElementById('direct-chat-input');
-const sendDirectMsgBtn = document.getElementById('send-direct-msg-btn');
+const chatUserAvatar = document.getElementById("chatUserAvatar");
+const chatUserName = document.getElementById("chatUserName");
+const chatRoomCode = document.getElementById("chatRoomCode");
+const chatMessages = document.getElementById("chatMessages");
+const chatMessageInput = document.getElementById("chatMessageInput");
+const sendMessageBtn = document.getElementById("sendMessageBtn");
+const fileAttachmentInput = document.getElementById("fileAttachmentInput");
+const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-// --- 1. Master Key Validation ---
-window.addEventListener('DOMContentLoaded', () => {
-    sessionStorage.removeItem('mk_verified');
-    masterKeyModal.classList.remove('hidden');
-    
-    // Restore Saved Theme
-    const savedTheme = localStorage.getItem('app_theme') || 'light';
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-theme');
-        document.getElementById('theme-icon').className = 'fas fa-sun';
-        document.getElementById('theme-text').textContent = 'Light Mode';
-    }
+// Call Modal Elements
+const callModal = document.getElementById("callModal");
+const callStatusText = document.getElementById("callStatusText");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const acceptCallBtn = document.getElementById("acceptCallBtn");
+const rejectCallBtn = document.getElementById("rejectCallBtn");
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+
+let isSignUpMode = false;
+
+function togglePasswordVisibility(inputId, iconElem) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    iconElem.classList.replace("fa-eye", "fa-eye-slash");
+  } else {
+    input.type = "password";
+    iconElem.classList.replace("fa-eye-slash", "fa-eye");
+  }
+}
+
+// পেজ লোড হলে প্রতিবার মাস্টার কি স্ক্রিন দেখাবে
+document.addEventListener("DOMContentLoaded", () => {
+  masterKeyScreen.style.display = "block";
+  authScreen.style.display = "none";
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "none";
 });
 
-masterKeySubmitBtn.addEventListener('click', () => {
-    const enteredKey = masterKeyInput.value.trim();
-    if (enteredKey === MASTER_KEY) {
-        sessionStorage.setItem('mk_verified', 'true');
-        masterKeyModal.classList.add('hidden');
-        checkAuthentication();
-    } else {
-        alert('ভুল মাস্টার কি! সঠিক মাস্টার কি দিয়ে আবার চেষ্টা করুন।');
-    }
-});
+unlockBtn.addEventListener("click", () => {
+  if (masterKeyInput.value === "KT EYAMIN") {
+    masterKeyScreen.style.display = "none";
+    const savedUser = JSON.parse(localStorage.getItem("appUser"));
+    const savedRoom = localStorage.getItem("currentRoom");
 
-function checkAuthentication() {
-    const savedUser = localStorage.getItem('app_saved_user');
     if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        initDashboard();
+      currentUser = savedUser;
+      if (savedRoom) {
+        joinRoom(savedRoom); // যদি পূর্বে রুম সেভ থাকে তবে সরাসরি রুমে ঢুকাবে
+      } else {
+        showDashboard();
+      }
     } else {
-        authContainer.classList.remove('hidden');
+      authScreen.style.display = "block";
     }
-}
-
-// --- 2. Theme Toggle (Dark/Light) ---
-function toggleTheme() {
-    const body = document.body;
-    const themeIcon = document.getElementById('theme-icon');
-    const themeText = document.getElementById('theme-text');
-
-    if (body.classList.contains('dark-theme')) {
-        body.classList.remove('dark-theme');
-        themeIcon.className = 'fas fa-moon';
-        themeText.textContent = 'Dark Mode';
-        localStorage.setItem('app_theme', 'light');
-    } else {
-        body.classList.add('dark-theme');
-        themeIcon.className = 'fas fa-sun';
-        themeText.textContent = 'Light Mode';
-        localStorage.setItem('app_theme', 'dark');
-    }
-}
-
-// --- 3. Auth Flow ---
-authActionBtn.addEventListener('click', () => {
-    const username = authUsername.value.trim();
-    if (!username) return alert('দয়া করে ইউজারনেম দিন');
-
-    currentUser = {
-        id: 'usr_' + Date.now(),
-        name: username
-    };
-
-    localStorage.setItem('app_saved_user', JSON.stringify(currentUser));
-    authContainer.classList.add('hidden');
-    initDashboard();
+  } else {
+    alert("ভুল Master Key দেওয়া হয়েছে!");
+  }
 });
 
-logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('app_saved_user');
-    sessionStorage.clear();
-    location.reload();
+authToggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  isSignUpMode = !isSignUpMode;
+  if (isSignUpMode) {
+    authTitle.textContent = "Create Account";
+    signupFields.style.display = "block";
+    authSubmitBtn.textContent = "Sign Up";
+    authToggleMsg.textContent = "Already have account?";
+    authToggleLink.textContent = "Login";
+  } else {
+    authTitle.textContent = "Login Account";
+    signupFields.style.display = "none";
+    authSubmitBtn.textContent = "Login";
+    authToggleMsg.textContent = "Don't have an account?";
+    authToggleLink.textContent = "Sign Up";
+  }
 });
 
-// --- 4. Dashboard & Rooms ---
-function initDashboard() {
-    appDashboard.classList.remove('hidden');
-    displayUserName.textContent = currentUser.name;
+authSubmitBtn.addEventListener("click", () => {
+  const phone = phoneInput.value.trim();
+  const password = authPasswordInput.value.trim();
 
-    socket.emit('register-user', currentUser);
+  if (!phone || !password) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
-    const savedRoom = sessionStorage.getItem('active_room_code');
-    if (savedRoom) {
-        joinRoom(savedRoom);
-    }
-}
-
-function switchTab(tabName) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-
-    if (tabName === 'rooms') {
-        document.getElementById('tab-rooms').classList.remove('hidden');
-        document.getElementById('nav-rooms-btn').classList.add('active');
-    } else if (tabName === 'friends') {
-        document.getElementById('tab-friends').classList.remove('hidden');
-        document.getElementById('nav-friends-btn').classList.add('active');
-    }
-}
-
-createRoomBtn.addEventListener('click', () => {
-    const generatedRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    joinRoom(generatedRoomCode);
-});
-
-joinRoomBtn.addEventListener('click', () => {
-    const code = joinRoomInput.value.trim();
-    if (code) joinRoom(code);
-});
-
-function joinRoom(roomId) {
-    currentRoomId = roomId;
-    sessionStorage.setItem('active_room_code', roomId);
-
-    currentRoomCodeSpan.textContent = roomId;
-    activeRoomBox.classList.remove('hidden');
-
-    socket.emit('join-room', { roomId, user: currentUser });
-}
-
-leaveRoomBtn.addEventListener('click', () => {
-    sessionStorage.removeItem('active_room_code');
-    currentRoomId = null;
-    activeRoomBox.classList.add('hidden');
-    roomChatMessages.innerHTML = '';
-});
-
-sendRoomMsgBtn.addEventListener('click', sendRoomMessage);
-function sendRoomMessage() {
-    const text = roomChatInput.value.trim();
-    if (!text || !currentRoomId) return;
-
-    const messageData = {
-        sender: currentUser.name,
-        text: text,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    socket.emit('send-room-message', { roomId: currentRoomId, message: messageData });
-    roomChatInput.value = '';
-}
-
-socket.on('receive-room-message', (msg) => {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('msg-item');
-    msgDiv.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
-    roomChatMessages.appendChild(msgDiv);
-    roomChatMessages.scrollTop = roomChatMessages.scrollHeight;
-});
-
-socket.on('room-history', (messages) => {
-    roomChatMessages.innerHTML = '';
-    messages.forEach(msg => {
-        const msgDiv = document.createElement('div');
-        msgDiv.classList.add('msg-item');
-        msgDiv.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
-        roomChatMessages.appendChild(msgDiv);
-    });
-});
-
-// --- 5. Friends System ---
-socket.on('update-friends-list', (friends) => {
-    friendsListContainer.innerHTML = '';
+  if (isSignUpMode) {
+    const name = fullNameInput.value.trim();
+    if (!name) return alert("আপনার নাম লিখুন");
     
-    if(friends.length === 0) {
-        friendsListContainer.innerHTML = '<p>আপনার কোনো ফ্রেন্ড যুক্ত নেই।</p>';
-        return;
-    }
-
-    friends.forEach(friend => {
-        const friendCard = document.createElement('div');
-        friendCard.classList.add('friend-card');
-        
-        const statusClass = friend.isOnline ? 'online' : '';
-
-        friendCard.innerHTML = `
-            <div class="profile-avatar">
-                ${friend.id.substring(4, 6)}
-                <span class="status-indicator ${statusClass}"></span>
-            </div>
-            <div>
-                <h4>Friend (${friend.id.substring(0, 6)})</h4>
-                <small>${friend.isOnline ? 'অনলাইন আছে' : 'অফলাইন'}</small>
-            </div>
-        `;
-
-        friendCard.addEventListener('click', () => {
-            startDirectChat(friend.id);
-        });
-
-        friendsListContainer.appendChild(friendCard);
+    const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
+    socket.emit("register-user", newUser, (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        alert(res.message);
+      }
     });
+
+  } else {
+    socket.emit("login-user", { phone, password }, (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        alert(res.message);
+      }
+    });
+  }
 });
 
-function startDirectChat(friendId) {
-    directChatUserSpan.textContent = friendId;
-    directChatBox.classList.remove('hidden');
-    socket.emit('start-direct-chat', { friendId });
+function showDashboard() {
+  authScreen.style.display = "none";
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+  dashboardUserName.textContent = currentUser.name;
+  if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
 }
 
-socket.on('direct-chat-started', ({ directRoomId }) => {
-    currentDirectRoomId = directRoomId;
-    directChatMessages.innerHTML = '';
+avatarUpload.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      currentUser.pic = evt.target.result;
+      dashboardAvatar.src = currentUser.pic;
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+    };
+    reader.readAsDataURL(file);
+  }
 });
 
-function closeDirectChat() {
-    directChatBox.classList.add('hidden');
-    currentDirectRoomId = null;
+createRoomBtn.addEventListener("click", () => {
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  joinRoom(code);
+});
+
+joinRoomBtn.addEventListener("click", () => {
+  const code = roomCodeInput.value.trim().toUpperCase();
+  if (code) joinRoom(code);
+});
+
+function joinRoom(code) {
+  currentRoom = code;
+  localStorage.setItem("currentRoom", code); // রুমের কোড সেভ রাখা হচ্ছে
+
+  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
+  
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "flex";
+  chatUserName.textContent = currentUser.name;
+  chatUserAvatar.src = currentUser.pic;
+  chatRoomCode.textContent = "Code: " + code;
 }
 
-sendDirectMsgBtn.addEventListener('click', () => {
-    const text = directChatInput.value.trim();
-    if (!text || !currentDirectRoomId) return;
-
-    const messageData = { sender: currentUser.name, text: text };
-    socket.emit('send-direct-message', { directRoomId: currentDirectRoomId, message: messageData });
-    directChatInput.value = '';
+logoutBtn.addEventListener("click", () => {
+  localStorage.removeItem("appUser");
+  localStorage.removeItem("currentRoom");
+  currentUser = null;
+  location.reload();
 });
 
-socket.on('receive-direct-message', (msg) => {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('msg-item');
-    msgDiv.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
-    directChatMessages.appendChild(msgDiv);
-    directChatMessages.scrollTop = directChatMessages.scrollHeight;
+sendMessageBtn.addEventListener("click", sendChatMessage);
+chatMessageInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendChatMessage();
+});
+
+function sendChatMessage() {
+  const text = chatMessageInput.value.trim();
+  if (text && currentRoom) {
+    const msgData = {
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic,
+      text: text,
+      file: null,
+      fileType: null
+    };
+    socket.emit("send-message", msgData);
+    chatMessageInput.value = "";
+  }
+}
+
+fileAttachmentInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file || !currentRoom) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    let fType = "file";
+    if (file.type.startsWith("image/")) fType = "image";
+    else if (file.type.startsWith("video/")) fType = "video";
+
+    const msgData = {
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic,
+      text: "",
+      file: evt.target.result,
+      fileType: fType,
+      fileName: file.name
+    };
+
+    socket.emit("send-message", msgData);
+    fileAttachmentInput.value = "";
+  };
+  reader.readAsDataURL(file);
+});
+
+socket.on("user-joined-notify", (data) => {
+  const systemMsg = document.createElement("div");
+  systemMsg.className = "system-notification";
+  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
+  chatMessages.appendChild(systemMsg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+socket.on("receive-message", (data) => {
+  const isMe = data.sender === currentUser.name;
+  appendMessage(data, isMe);
+});
+
+function appendMessage(data, isMe) {
+  const div = document.createElement("div");
+  div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
+  
+  const userAvatar = document.createElement("img");
+  userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
+  userAvatar.className = "msg-avatar";
+  div.appendChild(userAvatar);
+
+  const contentBox = document.createElement("div");
+  contentBox.className = "msg-content";
+
+  if (data.text) {
+    const textNode = document.createElement("p");
+    textNode.textContent = data.text;
+    contentBox.appendChild(textNode);
+  }
+
+  if (data.file) {
+    const mediaContainer = document.createElement("div");
+    mediaContainer.className = "media-wrapper";
+
+    if (data.fileType === "image") {
+      const img = document.createElement("img");
+      img.src = data.file;
+      img.className = "chat-media-preview";
+      img.onclick = () => openFullscreenImage(data.file);
+      mediaContainer.appendChild(img);
+    } else if (data.fileType === "video") {
+      const vid = document.createElement("video");
+      vid.src = data.file;
+      vid.controls = true;
+      vid.className = "chat-media-preview";
+      mediaContainer.appendChild(vid);
+    }
+    contentBox.appendChild(mediaContainer);
+  }
+
+  div.appendChild(contentBox);
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function openFullscreenImage(src) {
+  const modal = document.createElement("div");
+  modal.className = "fullscreen-modal";
+  modal.onclick = () => modal.remove();
+  const img = document.createElement("img");
+  img.src = src;
+  modal.appendChild(img);
+  document.body.appendChild(modal);
+}
+
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+
+let incomingCallData = null;
+
+startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
+startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+
+function initiateCall(type) {
+  if (!currentRoom) return;
+  const isVideo = type === "video";
+  
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+    callModal.style.display = "flex";
+    callStatusText.textContent = "Calling...";
+    acceptCallBtn.style.display = "none";
+
+    socket.emit("call-user", {
+      roomCode: currentRoom,
+      callerName: currentUser.name,
+      callerPeerId: myPeerId,
+      callType: type
+    });
+  }).catch((err) => alert("Camera & Microphone Access Required!"));
+}
+
+socket.on("incoming-call", (data) => {
+  incomingCallData = data;
+  callModal.style.display = "flex";
+  callStatusText.textContent = `${data.callerName} is ${data.callType} calling...`;
+  acceptCallBtn.style.display = "inline-block";
+});
+
+acceptCallBtn.addEventListener("click", () => {
+  if (!incomingCallData) return;
+  const isVideo = incomingCallData.callType === "video";
+
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    localVideo.srcObject = stream;
+
+    const call = myPeer.call(incomingCallData.callerPeerId, stream);
+    currentCall = call;
+
+    call.on("stream", (remoteStream) => {
+      remoteVideo.srcObject = remoteStream;
+      callStatusText.textContent = "Connected";
+    });
+
+    acceptCallBtn.style.display = "none";
+  });
+});
+
+myPeer.on("call", (call) => {
+  currentCall = call;
+  call.answer(localStream);
+  call.on("stream", (remoteStream) => {
+    remoteVideo.srcObject = remoteStream;
+    callStatusText.textContent = "Connected";
+  });
+});
+
+rejectCallBtn.addEventListener("click", endCall);
+
+socket.on("call-ended", () => {
+  closeCallUI();
+});
+
+function endCall() {
+  if (currentRoom) {
+    socket.emit("end-call", { roomCode: currentRoom });
+  }
+  closeCallUI();
+}
+
+function closeCallUI() {
+  if (currentCall) currentCall.close();
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
+  callModal.style.display = "none";
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
+}
+
+// রুম থেকে বের হয়ে গেলে লোকাল স্টোরেজ থেকে রুম রিমুভ করা
+leaveRoomBtn.addEventListener("click", () => {
+  localStorage.removeItem("currentRoom");
+  currentRoom = null;
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+});
+
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+themeToggleBtn.addEventListener("click", () => {
+  document.body.classList.toggle("light-theme");
 });
