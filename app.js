@@ -1,6 +1,6 @@
 const socket = io();
 
-// Set your Master Key here
+// Master Key (Change if needed)
 const MASTER_KEY = "1234"; 
 
 let currentUser = null;
@@ -16,7 +16,6 @@ const authContainer = document.getElementById('auth-container');
 const authUsername = document.getElementById('auth-username');
 const authPassword = document.getElementById('auth-password');
 const authActionBtn = document.getElementById('auth-action-btn');
-const toggleAuthLink = document.getElementById('toggle-auth-link');
 
 const appDashboard = document.getElementById('app-dashboard');
 const displayUserName = document.getElementById('display-user-name');
@@ -40,9 +39,8 @@ const directChatMessages = document.getElementById('direct-chat-messages');
 const directChatInput = document.getElementById('direct-chat-input');
 const sendDirectMsgBtn = document.getElementById('send-direct-msg-btn');
 
-// --- 1. Master Key Validation & Logic ---
+// --- 1. Master Key Validation (Always Prompts First) ---
 window.addEventListener('DOMContentLoaded', () => {
-    // Session-এ মাস্টার কি যাচাই মুছে দেয়া যাতে রিফ্রেশ বা নতুন করে লিংকে চাপ দিলে সবসময় আগে মাস্টার কি চায়
     sessionStorage.removeItem('mk_verified');
     masterKeyModal.classList.remove('hidden');
 });
@@ -94,17 +92,15 @@ function initDashboard() {
     appDashboard.classList.remove('hidden');
     displayUserName.textContent = currentUser.name;
 
-    // Socket server registration
     socket.emit('register-user', currentUser);
 
-    // Refresh Recovery Check for Active Room
     const savedRoom = sessionStorage.getItem('active_room_code');
     if (savedRoom) {
         joinRoom(savedRoom);
     }
 }
 
-// Nav Tabs
+// Nav Tabs Navigation
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -118,7 +114,7 @@ function switchTab(tabName) {
     }
 }
 
-// --- 4. Room Management (Persists on Refresh) ---
+// --- 4. Room Management ---
 createRoomBtn.addEventListener('click', () => {
     const generatedRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     joinRoom(generatedRoomCode);
@@ -131,7 +127,7 @@ joinRoomBtn.addEventListener('click', () => {
 
 function joinRoom(roomId) {
     currentRoomId = roomId;
-    sessionStorage.setItem('active_room_code', roomId); // Store room state
+    sessionStorage.setItem('active_room_code', roomId);
 
     currentRoomCodeSpan.textContent = roomId;
     activeRoomBox.classList.remove('hidden');
@@ -146,7 +142,6 @@ leaveRoomBtn.addEventListener('click', () => {
     roomChatMessages.innerHTML = '';
 });
 
-// Room Chat Messages
 sendRoomMsgBtn.addEventListener('click', sendRoomMessage);
 function sendRoomMessage() {
     const text = roomChatInput.value.trim();
@@ -197,7 +192,6 @@ socket.on('update-friends-list', (friends) => {
         const friendCard = document.createElement('div');
         friendCard.classList.add('friend-card');
         
-        // Online Green Dot Status Check
         const statusClass = friend.isOnline ? 'online' : '';
 
         friendCard.innerHTML = `
@@ -211,7 +205,6 @@ socket.on('update-friends-list', (friends) => {
             </div>
         `;
 
-        // Direct Chat on Friend Click
         friendCard.addEventListener('click', () => {
             startDirectChat(friend.id);
         });
