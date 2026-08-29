@@ -1,132 +1,114 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EKT CHATING APP</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Chat App</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="dark-theme">
+<body>
 
-  <header class="navbar">
-    <div class="logo">EKT CHATING APP</div>
-    <div class="nav-controls">
-      <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
-    </div>
-  </header>
-
-  <main class="main-container">
-
-    <!-- Screen 1: Master Key -->
-    <div id="masterKeyScreen" class="card-screen">
-      <h2>Master Key প্রবেশ করান</h2>
-      <div class="input-wrapper">
-        <input type="password" id="masterKeyInput" placeholder="Enter Site Password">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('masterKeyInput', this)"></i>
-      </div>
-      <button id="unlockBtn" class="btn btn-primary">Unlock</button>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
+    <!-- 1. Master Key Overlay (Always Prompts First) -->
+    <div id="master-key-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h2><i class="fas fa-key"></i> Master Key দিন</h2>
+            <p>অ্যাপে প্রবেশ করার জন্য মাস্টার কি দিন:</p>
+            <input type="password" id="master-key-input" placeholder="Enter Master Key">
+            <button id="master-key-submit-btn">প্রবেশ করুন</button>
+        </div>
     </div>
 
-    <!-- Screen 2: Auth Screen -->
-    <div id="authScreen" class="card-screen" style="display: none;">
-      <h2 id="authTitle">Login Account</h2>
-      
-      <div id="signupFields" style="display: none;">
-        <div class="input-wrapper">
-          <input type="text" id="fullNameInput" placeholder="Full Name">
+    <!-- 2. Auth Container (Login / Signup) -->
+    <div id="auth-container" class="container hidden">
+        <div class="auth-box">
+            <h2 id="auth-title">লগইন করুন</h2>
+            <input type="text" id="auth-username" placeholder="ইউজারনেম লিখুন">
+            <input type="password" id="auth-password" placeholder="পাসওয়ার্ড লিখুন">
+            <button id="auth-action-btn">লগইন</button>
+            <p class="toggle-auth">
+                অ্যাকাউন্ট নেই? <span id="toggle-auth-link">সাইনআপ করুন</span>
+            </p>
         </div>
-      </div>
-
-      <div class="input-wrapper">
-        <input type="text" id="phoneInput" placeholder="Phone Number">
-      </div>
-
-      <div class="input-wrapper">
-        <input type="password" id="authPasswordInput" placeholder="Password">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('authPasswordInput', this)"></i>
-      </div>
-
-      <button id="authSubmitBtn" class="btn btn-primary">Login</button>
-
-      <p class="auth-toggle-text">
-        <span id="authToggleMsg">Don't have an account?</span>
-        <a href="#" id="authToggleLink">Sign Up</a>
-      </p>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 3: Dashboard -->
-    <div id="dashboardScreen" class="card-screen" style="display: none;">
-      <div class="profile-header">
-        <div class="avatar-container">
-          <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture">
-          <label for="avatarUpload" class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></label>
-          <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
-        </div>
-        <h3 id="dashboardUserName">User Name</h3>
-      </div>
-
-      <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
-
-      <div class="input-wrapper" style="margin-top: 15px;">
-        <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
-      </div>
-
-      <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-      <button id="logoutBtn" class="btn btn-danger">Logout</button>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
-    </div>
-
-    <!-- Screen 4: Chat Room -->
-    <div id="chatScreen" class="chat-container" style="display: none;">
-      <div class="chat-header">
-        <div class="user-info">
-          <img id="chatUserAvatar" src="https://via.placeholder.com/40" alt="Avatar">
-          <div>
-            <h4 id="chatUserName">User Name</h4>
-            <span id="chatRoomCode">Code: ------</span>
-          </div>
-        </div>
-        <div class="chat-actions">
-          <button id="startAudioCallBtn" class="action-btn call-audio"><i class="fa-solid fa-phone"></i></button>
-          <button id="startVideoCallBtn" class="action-btn call-video"><i class="fa-solid fa-video"></i></button>
-          <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fa-solid fa-right-from-bracket"></i></button>
-        </div>
-      </div>
-
-      <div id="chatMessages" class="chat-messages"></div>
-
-      <div class="chat-input-area">
-        <label for="fileAttachmentInput" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
-        <input type="file" id="fileAttachmentInput" accept="image/*,video/*,audio/*" style="display: none;">
+    <!-- 3. Main Dashboard Layout -->
+    <div id="app-dashboard" class="dashboard-container hidden">
         
-        <input type="text" id="chatMessageInput" placeholder="Type a message...">
-        <button id="sendMessageBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-      </div>
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="brand">
+                <i class="fas fa-comments"></i> ChatApp
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" id="nav-rooms-btn" onclick="switchTab('rooms')">
+                    <i class="fas fa-door-open"></i> Rooms
+                </button>
+                <button class="nav-btn" id="nav-friends-btn" onclick="switchTab('friends')">
+                    <i class="fas fa-user-friends"></i> Friends
+                </button>
+            </nav>
+
+            <div class="user-profile-footer">
+                <span id="display-user-name">User Name</span>
+                <button id="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main-content">
+            
+            <!-- Tab 1: Room Section -->
+            <div id="tab-rooms" class="tab-content">
+                <div class="room-actions">
+                    <button id="create-room-btn"><i class="fas fa-plus"></i> রুম তৈরি করুন</button>
+                    <div class="join-box">
+                        <input type="text" id="join-room-input" placeholder="রুম কোড দিন">
+                        <button id="join-room-btn">জয়েন করুন</button>
+                    </div>
+                </div>
+
+                <!-- Active Room UI -->
+                <div id="active-room-box" class="chat-wrapper hidden">
+                    <div class="chat-header">
+                        <h3>রুম কোড: <span id="current-room-code">-</span></h3>
+                        <button id="add-friend-in-room-btn"><i class="fas fa-user-plus"></i> সবাইকে ফ্রেন্ড রিকোয়েস্ট পাঠান</button>
+                        <button id="leave-room-btn" class="danger-btn">রুম ছাড়ুন</button>
+                    </div>
+                    <div id="room-chat-messages" class="chat-body"></div>
+                    <div class="chat-footer">
+                        <input type="text" id="room-chat-input" placeholder="মেসেজ লিখুন...">
+                        <button id="send-room-msg-btn"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Friends Section -->
+            <div id="tab-friends" class="tab-content hidden">
+                <h3>আমার ফ্রেন্ড লিস্ট</h3>
+                <div id="friends-list-container" class="friends-grid">
+                    <!-- Dynamic Friends List with Online Indicators will go here -->
+                </div>
+
+                <!-- Direct Message Chat Box -->
+                <div id="direct-chat-box" class="chat-wrapper hidden">
+                    <div class="chat-header">
+                        <h3>কথা বলছেন: <span id="direct-chat-user">-</span></h3>
+                        <button onclick="closeDirectChat()" class="danger-btn">বন্ধ করুন</button>
+                    </div>
+                    <div id="direct-chat-messages" class="chat-body"></div>
+                    <div class="chat-footer">
+                        <input type="text" id="direct-chat-input" placeholder="প্রাইভেট মেসেজ লিখুন...">
+                        <button id="send-direct-msg-btn"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <!-- Call Overlay Modal -->
-    <div id="callModal" class="call-modal" style="display: none;">
-      <div class="call-box">
-        <h3 id="callStatusText">Incoming Call...</h3>
-        <div class="video-grid">
-          <video id="localVideo" autoplay muted playsinline></video>
-          <video id="remoteVideo" autoplay playsinline></video>
-        </div>
-        <div class="call-controls">
-          <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
-          <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <script src="app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
