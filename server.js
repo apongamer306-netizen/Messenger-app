@@ -66,18 +66,34 @@ io.on("connection", (socket) => {
     socket.to(roomCode).emit("user-joined-notify", { user });
   });
 
-  // মেসেজ ও ফাইল সেন্ড করা
-  socket.on("send-message", (msgData) => {
+  // মেসেজ ও ফাইল সেন্ড করা (কলব্যাক যোগ করা হয়েছে Sent স্ট্যাটাসের জন্য)
+  socket.on("send-message", (msgData, callback) => {
     const roomCode = msgData.roomCode;
     if (roomMessages[roomCode]) {
       roomMessages[roomCode].push(msgData);
     }
-    io.to(roomCode).emit("receive-message", msgData);
+    // রুমের বাকিদের মেসেজ পাঠানো
+    socket.to(roomCode).emit("receive-message", msgData);
+
+    // মেসেজ সেন্ডারের কাছে কনফার্মেশন পাঠানো (Sent স্ট্যাটাস দেখানোর জন্য)
+    if (typeof callback === "function") {
+      callback({ success: true });
+    }
+  });
+
+  // মেসেজ "Seen" হলে সিগন্যাল বাকিদের পাঠানো
+  socket.on("mark-as-seen", (data) => {
+    socket.to(data.roomCode).emit("message-seen", { msgId: data.msgId });
   });
 
   // কল দেওয়া
   socket.on("call-user", (data) => {
     socket.to(data.roomCode).emit("incoming-call", data);
+  });
+
+  // কল একসেপ্ট নোটিফিকেশন
+  socket.on("accept-call-notify", (data) => {
+    socket.to(data.roomCode).emit("call-accepted-by-receiver", data);
   });
 
   // কল কেটে দেওয়া
