@@ -3,42 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Messenger App</title>
+    <title>EKT CHATTER</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
+<body class="light-theme">
 
-    <!-- 1. Master Key Overlay (Always Prompts First) -->
+    <!-- 1. Master Key Modal -->
     <div id="master-key-modal" class="modal-overlay">
         <div class="modal-box">
-            <h2><i class="fas fa-key"></i> Master Key দিন</h2>
-            <p>অ্যাপে প্রবেশ করার জন্য মাস্টার কি দিন:</p>
+            <h2><i class="fas fa-key"></i> EKT CHATTER</h2>
+            <p>অ্যাপে প্রবেশ করার জন্য Master Key দিন:</p>
             <input type="password" id="master-key-input" placeholder="Enter Master Key">
             <button id="master-key-submit-btn">প্রবেশ করুন</button>
         </div>
     </div>
 
-    <!-- 2. Auth Container (Login / Signup) -->
+    <!-- 2. Auth Container -->
     <div id="auth-container" class="container hidden">
         <div class="auth-box">
-            <h2 id="auth-title">লগইন করুন</h2>
+            <h2>EKT CHATTER</h2>
             <input type="text" id="auth-username" placeholder="ইউজারনেম লিখুন">
             <input type="password" id="auth-password" placeholder="পাসওয়ার্ড লিখুন">
             <button id="auth-action-btn">লগইন</button>
-            <p class="toggle-auth">
-                অ্যাকাউন্ট নেই? <span id="toggle-auth-link">সাইনআপ করুন</span>
-            </p>
+            <p class="toggle-auth">অ্যাকাউন্ট নেই? <span id="toggle-auth-link">সাইনআপ করুন</span></p>
         </div>
     </div>
 
-    <!-- 3. Main Dashboard Layout -->
+    <!-- 3. Dashboard -->
     <div id="app-dashboard" class="dashboard-container hidden">
         
-        <!-- Sidebar Navigation -->
         <div class="sidebar">
             <div class="brand">
-                <i class="fas fa-comments"></i> ChatApp
+                <i class="fas fa-comments"></i> EKT CHATTER
             </div>
             
             <nav class="nav-menu">
@@ -50,16 +47,21 @@
                 </button>
             </nav>
 
+            <div class="theme-toggle-box">
+                <button id="theme-toggle-btn" onclick="toggleTheme()">
+                    <i class="fas fa-moon" id="theme-icon"></i> <span id="theme-text">Dark Mode</span>
+                </button>
+            </div>
+
             <div class="user-profile-footer">
                 <span id="display-user-name">User Name</span>
                 <button id="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </div>
 
-        <!-- Main Content Area -->
         <div class="main-content">
             
-            <!-- Tab 1: Room Section -->
+            <!-- Rooms Tab -->
             <div id="tab-rooms" class="tab-content">
                 <div class="room-actions">
                     <button id="create-room-btn"><i class="fas fa-plus"></i> রুম তৈরি করুন</button>
@@ -69,11 +71,10 @@
                     </div>
                 </div>
 
-                <!-- Active Room UI -->
                 <div id="active-room-box" class="chat-wrapper hidden">
                     <div class="chat-header">
                         <h3>রুম কোড: <span id="current-room-code">-</span></h3>
-                        <button id="add-friend-in-room-btn"><i class="fas fa-user-plus"></i> সবাইকে ফ্রেন্ড রিকোয়েস্ট পাঠান</button>
+                        <button id="add-friend-in-room-btn"><i class="fas fa-user-plus"></i> ফ্রেন্ড রিকোয়েস্ট পাঠান</button>
                         <button id="leave-room-btn" class="danger-btn">রুম ছাড়ুন</button>
                     </div>
                     <div id="room-chat-messages" class="chat-body"></div>
@@ -84,12 +85,11 @@
                 </div>
             </div>
 
-            <!-- Tab 2: Friends Section -->
+            <!-- Friends Tab -->
             <div id="tab-friends" class="tab-content hidden">
                 <h3>আমার ফ্রেন্ড লিস্ট</h3>
                 <div id="friends-list-container" class="friends-grid"></div>
 
-                <!-- Direct Message Chat Box -->
                 <div id="direct-chat-box" class="chat-wrapper hidden">
                     <div class="chat-header">
                         <h3>কথা বলছেন: <span id="direct-chat-user">-</span></h3>
