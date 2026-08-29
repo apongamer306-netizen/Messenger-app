@@ -103,7 +103,7 @@ function checkActiveSession() {
     if (savedUser) {
       currentUser = savedUser;
       if (activeRoom) {
-        joinRoom(activeRoom, true); // true পাঠানোর ফলে রিফ্রেশে মেসেজ ডিলিট হবে না
+        joinRoom(activeRoom, true);
       } else {
         showDashboard();
       }
@@ -230,7 +230,6 @@ function joinRoom(code, isRefresh = false) {
   chatUserAvatar.src = currentUser.pic;
   chatRoomCode.textContent = "Code: " + code;
 
-  // রিফ্রেশ দিয়ে ঢুকলে আগের মেসেজগুলো উদ্ধার করা হবে
   if (isRefresh) {
     restoreMessages();
   } else {
@@ -248,6 +247,8 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
+// ------------------- MESSAGE SENDING & STATUS TRACKING -------------------
+
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -256,16 +257,28 @@ chatMessageInput.addEventListener("keypress", (e) => {
 function sendChatMessage() {
   const text = chatMessageInput.value.trim();
   if (text && currentRoom) {
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
     const msgData = {
+      id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
       senderPic: currentUser.pic,
       text: text,
       file: null,
-      fileType: null
+      fileType: null,
+      status: "sending"
     };
-    socket.emit("send-message", msgData);
+
+    // ১. নিজের মেসেজ হিসেবে UI-তে যুক্ত করা ("Sending..." স্ট্যাটাস সহ)
+    appendMessage(msgData, true);
     chatMessageInput.value = "";
+
+    // ২. সকেটে সেন্ড করা এবং কনফার্মেশন (Ack) পাওয়া মাত্র স্ট্যাটাস "Sent" করা
+    socket.emit("send-message", msgData, (ack) => {
+      if (ack && ack.success) {
+        updateMessageStatus(msgId, "Sent");
+      }
+    });
   }
 }
 
@@ -279,18 +292,27 @@ fileAttachmentInput.addEventListener("change", (e) => {
     if (file.type.startsWith("image/")) fType = "image";
     else if (file.type.startsWith("video/")) fType = "video";
 
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
     const msgData = {
+      id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
       senderPic: currentUser.pic,
       text: "",
       file: evt.target.result,
       fileType: fType,
-      fileName: file.name
+      fileName: file.name,
+      status: "sending"
     };
 
-    socket.emit("send-message", msgData);
+    appendMessage(msgData, true);
     fileAttachmentInput.value = "";
+
+    socket.emit("send-message", msgData, (ack) => {
+      if (ack && ack.success) {
+        updateMessageStatus(msgId, "Sent");
+      }
+    });
   };
   reader.readAsDataURL(file);
 });
@@ -310,8 +332,12 @@ socket.on("receive-message", (data) => {
 });
 
 function appendMessage(data, isMe) {
+  // ডুপ্লিকেট মেসেজ রোধ
+  if (data.id && document.getElementById(data.id)) return;
+
   const div = document.createElement("div");
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
+  if (data.id) div.id = data.id;
   
   const userAvatar = document.createElement("img");
   userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
@@ -347,14 +373,48 @@ function appendMessage(data, isMe) {
     contentBox.appendChild(mediaContainer);
   }
 
+  // নিজের পাঠানো মেসেজ হলে নিচে স্ট্যাটাস ইন্দিকেটর থাকবে
+  if (isMe) {
+    const statusSpan = document.createElement("span");
+    statusSpan.className = "msg-status";
+    statusSpan.style.cssText = "font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 3px;";
+    
+    let statusText = "Sending...";
+    if (data.status === "sent") statusText = "Sent";
+    if (data.status === "seen") statusText = "Seen";
+    
+    statusSpan.textContent = statusText;
+    contentBox.appendChild(statusSpan);
+  }
+
   div.appendChild(contentBox);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
+  // অন্যের পাঠানো মেসেজ রিসিভ করার সাথে সাথে সার্ভারকে "Seen" ইনফো পাঠানো
+  if (!isMe && data.id) {
+    socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
+  }
+
   saveMessages();
 }
 
-// মেসেজ সেভ করে রাখার ফিউচার
+function updateMessageStatus(msgId, statusText) {
+  const msgElem = document.getElementById(msgId);
+  if (msgElem) {
+    const statusSpan = msgElem.querySelector(".msg-status");
+    if (statusSpan) {
+      statusSpan.textContent = statusText;
+    }
+  }
+  saveMessages();
+}
+
+// সকেট লিসেনার: চ্যাটের অপর কেউ মেসেজটি দেখলে এটি ট্রিগার হবে
+socket.on("message-seen", (data) => {
+  updateMessageStatus(data.msgId, "Seen");
+});
+
 function saveMessages() {
   sessionStorage.setItem("savedChatLogs", chatMessages.innerHTML);
 }
@@ -517,7 +577,6 @@ function closeCallUI() {
   currentCallType = null;
 }
 
-// রুম ছেড়ে দিলে সেভ করা মেসেজ ক্লিয়ার হবে
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("savedChatLogs");
