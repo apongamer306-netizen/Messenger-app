@@ -12,7 +12,12 @@ const io = new Server(server, {
     }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Root directory static serve
+app.use(express.static(__dirname));
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Store data in-memory
 const activeUsers = new Map(); // socket.id -> userData
@@ -40,7 +45,6 @@ io.on('connection', (socket) => {
             friendRequests.set(user.id, new Set());
         }
 
-        // Notify friends about online status
         broadcastUserStatus(user.id, 'online');
         sendFriendsList(socket);
     });
@@ -56,10 +60,7 @@ io.on('connection', (socket) => {
             roomMessages.set(roomId, []);
         }
 
-        // Send existing room history
         socket.emit('room-history', roomMessages.get(roomId));
-
-        // Notify room members
         io.to(roomId).emit('user-joined-room', { user, roomId });
     });
 
@@ -72,7 +73,7 @@ io.on('connection', (socket) => {
         
         const history = roomMessages.get(roomId);
         history.push(message);
-        if (history.length > 100) history.shift(); // keep last 100
+        if (history.length > 100) history.shift();
 
         io.to(roomId).emit('receive-room-message', message);
     });
@@ -99,7 +100,6 @@ io.on('connection', (socket) => {
         const userId = socket.userId;
         if (!userId || !senderId) return;
 
-        // Add to friends lists
         if (!friendsStore.has(userId)) friendsStore.set(userId, new Set());
         if (!friendsStore.has(senderId)) friendsStore.set(senderId, new Set());
 
@@ -110,7 +110,6 @@ io.on('connection', (socket) => {
             friendRequests.get(userId).delete(senderId);
         }
 
-        // Notify both users
         sendFriendsList(socket);
         const senderSocketId = onlineUsers.get(senderId);
         if (senderSocketId) {
