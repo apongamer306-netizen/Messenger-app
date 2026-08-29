@@ -9,11 +9,6 @@ let localStream = null;
 
 myPeer.on("open", (id) => {
   myPeerId = id;
-  // Peer ID পাওয়ার পর যদি আগে থেকেই সেভ করা রুম থাকে, তবে আবার জয়েন করবে
-  const savedRoom = localStorage.getItem("currentRoom");
-  if (savedRoom && currentUser) {
-    joinRoom(savedRoom);
-  }
 });
 
 let currentUser = null;
@@ -78,27 +73,31 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
-// পেজ লোড হলে প্রতিবার মাস্টার কি স্ক্রিন দেখাবে
 document.addEventListener("DOMContentLoaded", () => {
-  masterKeyScreen.style.display = "block";
-  authScreen.style.display = "none";
-  dashboardScreen.style.display = "none";
-  chatScreen.style.display = "none";
+  const isMasterUnlocked = localStorage.getItem("masterUnlocked");
+  const savedUser = JSON.parse(localStorage.getItem("appUser"));
+
+  if (isMasterUnlocked === "true") {
+    masterKeyScreen.style.display = "none";
+    if (savedUser) {
+      currentUser = savedUser;
+      showDashboard();
+    } else {
+      authScreen.style.display = "block";
+    }
+  } else {
+    masterKeyScreen.style.display = "block";
+  }
 });
 
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value === "KT EYAMIN") {
+    localStorage.setItem("masterUnlocked", "true");
     masterKeyScreen.style.display = "none";
     const savedUser = JSON.parse(localStorage.getItem("appUser"));
-    const savedRoom = localStorage.getItem("currentRoom");
-
     if (savedUser) {
       currentUser = savedUser;
-      if (savedRoom) {
-        joinRoom(savedRoom); // যদি পূর্বে রুম সেভ থাকে তবে সরাসরি রুমে ঢুকাবে
-      } else {
-        showDashboard();
-      }
+      showDashboard();
     } else {
       authScreen.style.display = "block";
     }
@@ -161,7 +160,6 @@ authSubmitBtn.addEventListener("click", () => {
 
 function showDashboard() {
   authScreen.style.display = "none";
-  chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
   dashboardUserName.textContent = currentUser.name;
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
@@ -192,8 +190,6 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
-  localStorage.setItem("currentRoom", code); // রুমের কোড সেভ রাখা হচ্ছে
-
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
   
   dashboardScreen.style.display = "none";
@@ -205,7 +201,6 @@ function joinRoom(code) {
 
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
-  localStorage.removeItem("currentRoom");
   currentUser = null;
   location.reload();
 });
@@ -409,10 +404,7 @@ function closeCallUI() {
   remoteVideo.srcObject = null;
 }
 
-// রুম থেকে বের হয়ে গেলে লোকাল স্টোরেজ থেকে রুম রিমুভ করা
 leaveRoomBtn.addEventListener("click", () => {
-  localStorage.removeItem("currentRoom");
-  currentRoom = null;
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
