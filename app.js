@@ -1,13 +1,13 @@
 const socket = io();
 
-// Master Key (Change if needed)
+// Your original Master Key preserved
 const MASTER_KEY = "1234"; 
 
 let currentUser = null;
 let currentRoomId = null;
 let currentDirectRoomId = null;
 
-// DOM Elements
+// Elements
 const masterKeyModal = document.getElementById('master-key-modal');
 const masterKeyInput = document.getElementById('master-key-input');
 const masterKeySubmitBtn = document.getElementById('master-key-submit-btn');
@@ -39,10 +39,18 @@ const directChatMessages = document.getElementById('direct-chat-messages');
 const directChatInput = document.getElementById('direct-chat-input');
 const sendDirectMsgBtn = document.getElementById('send-direct-msg-btn');
 
-// --- 1. Master Key Validation (Always Prompts First) ---
+// --- 1. Master Key Validation ---
 window.addEventListener('DOMContentLoaded', () => {
     sessionStorage.removeItem('mk_verified');
     masterKeyModal.classList.remove('hidden');
+    
+    // Restore Saved Theme
+    const savedTheme = localStorage.getItem('app_theme') || 'light';
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.getElementById('theme-icon').className = 'fas fa-sun';
+        document.getElementById('theme-text').textContent = 'Light Mode';
+    }
 });
 
 masterKeySubmitBtn.addEventListener('click', () => {
@@ -66,7 +74,26 @@ function checkAuthentication() {
     }
 }
 
-// --- 2. Auth Flow ---
+// --- 2. Theme Toggle (Dark/Light) ---
+function toggleTheme() {
+    const body = document.body;
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+
+    if (body.classList.contains('dark-theme')) {
+        body.classList.remove('dark-theme');
+        themeIcon.className = 'fas fa-moon';
+        themeText.textContent = 'Dark Mode';
+        localStorage.setItem('app_theme', 'light');
+    } else {
+        body.classList.add('dark-theme');
+        themeIcon.className = 'fas fa-sun';
+        themeText.textContent = 'Light Mode';
+        localStorage.setItem('app_theme', 'dark');
+    }
+}
+
+// --- 3. Auth Flow ---
 authActionBtn.addEventListener('click', () => {
     const username = authUsername.value.trim();
     if (!username) return alert('দয়া করে ইউজারনেম দিন');
@@ -87,7 +114,7 @@ logoutBtn.addEventListener('click', () => {
     location.reload();
 });
 
-// --- 3. Dashboard Initialization ---
+// --- 4. Dashboard & Rooms ---
 function initDashboard() {
     appDashboard.classList.remove('hidden');
     displayUserName.textContent = currentUser.name;
@@ -100,7 +127,6 @@ function initDashboard() {
     }
 }
 
-// Nav Tabs Navigation
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -114,7 +140,6 @@ function switchTab(tabName) {
     }
 }
 
-// --- 4. Room Management ---
 createRoomBtn.addEventListener('click', () => {
     const generatedRoomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     joinRoom(generatedRoomCode);
@@ -175,11 +200,7 @@ socket.on('room-history', (messages) => {
     });
 });
 
-// --- 5. Friends & Direct Messaging System ---
-document.getElementById('add-friend-in-room-btn').addEventListener('click', () => {
-    alert('রুমের অন্য বন্ধুদের কাছে ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে!');
-});
-
+// --- 5. Friends System ---
 socket.on('update-friends-list', (friends) => {
     friendsListContainer.innerHTML = '';
     
@@ -213,10 +234,6 @@ socket.on('update-friends-list', (friends) => {
     });
 });
 
-socket.on('friend-status-change', () => {
-    socket.emit('register-user', currentUser);
-});
-
 function startDirectChat(friendId) {
     directChatUserSpan.textContent = friendId;
     directChatBox.classList.remove('hidden');
@@ -237,11 +254,7 @@ sendDirectMsgBtn.addEventListener('click', () => {
     const text = directChatInput.value.trim();
     if (!text || !currentDirectRoomId) return;
 
-    const messageData = {
-        sender: currentUser.name,
-        text: text
-    };
-
+    const messageData = { sender: currentUser.name, text: text };
     socket.emit('send-direct-message', { directRoomId: currentDirectRoomId, message: messageData });
     directChatInput.value = '';
 });
