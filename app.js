@@ -8,7 +8,7 @@ let currentCall = null;
 let localStream = null;
 let currentCallType = null;
 
-// Audio player element for remote audio streams
+// Remote audio element
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 document.body.appendChild(remoteAudioElement);
@@ -103,7 +103,7 @@ function checkActiveSession() {
     if (savedUser) {
       currentUser = savedUser;
       if (activeRoom) {
-        joinRoom(activeRoom);
+        joinRoom(activeRoom, true); // true পাঠানোর ফলে রিফ্রেশে মেসেজ ডিলিট হবে না
       } else {
         showDashboard();
       }
@@ -218,7 +218,7 @@ joinRoomBtn.addEventListener("click", () => {
   if (code) joinRoom(code);
 });
 
-function joinRoom(code) {
+function joinRoom(code, isRefresh = false) {
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
 
@@ -229,12 +229,21 @@ function joinRoom(code) {
   chatUserName.textContent = currentUser.name;
   chatUserAvatar.src = currentUser.pic;
   chatRoomCode.textContent = "Code: " + code;
+
+  // রিফ্রেশ দিয়ে ঢুকলে আগের মেসেজগুলো উদ্ধার করা হবে
+  if (isRefresh) {
+    restoreMessages();
+  } else {
+    sessionStorage.removeItem("savedChatLogs");
+    chatMessages.innerHTML = "";
+  }
 }
 
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("masterUnlocked");
+  sessionStorage.removeItem("savedChatLogs");
   currentUser = null;
   location.reload();
 });
@@ -292,6 +301,7 @@ socket.on("user-joined-notify", (data) => {
   systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
   chatMessages.appendChild(systemMsg);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  saveMessages();
 });
 
 socket.on("receive-message", (data) => {
@@ -340,6 +350,21 @@ function appendMessage(data, isMe) {
   div.appendChild(contentBox);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  saveMessages();
+}
+
+// মেসেজ সেভ করে রাখার ফিউচার
+function saveMessages() {
+  sessionStorage.setItem("savedChatLogs", chatMessages.innerHTML);
+}
+
+function restoreMessages() {
+  const saved = sessionStorage.getItem("savedChatLogs");
+  if (saved) {
+    chatMessages.innerHTML = saved;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 }
 
 function openFullscreenImage(src) {
@@ -352,7 +377,7 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC (FIXED) -------------------
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
 
 let incomingCallData = null;
 
@@ -414,7 +439,6 @@ socket.on("incoming-call", (data) => {
   acceptCallBtn.style.display = "inline-block";
 });
 
-// রিসিভার কল রিসিভ করলে কটারের UI আপডেট করার জন্য সকেট লিসেনার
 socket.on("call-accepted-by-receiver", (data) => {
   if (currentCallType === "audio") {
     remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
@@ -440,7 +464,6 @@ acceptCallBtn.addEventListener("click", () => {
 
     handleStream(call, isVideo);
 
-    // কলারের কাছে সকেটের মাধ্যমে নিজের প্রোফাইল ডাটা পাঠানো
     socket.emit("accept-call-notify", {
       roomCode: currentRoom,
       receiverName: currentUser.name,
@@ -458,7 +481,6 @@ myPeer.on("call", (call) => {
   handleStream(call, isVideo);
 });
 
-// সাউন্ড এবং স্ট্রিমিং হ্যান্ডেল করার জন্য কমন ফাংশন
 function handleStream(call, isVideo) {
   call.on("stream", (remoteStream) => {
     if (isVideo) {
@@ -495,9 +517,12 @@ function closeCallUI() {
   currentCallType = null;
 }
 
+// রুম ছেড়ে দিলে সেভ করা মেসেজ ক্লিয়ার হবে
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
+  sessionStorage.removeItem("savedChatLogs");
   currentRoom = null;
+  chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
