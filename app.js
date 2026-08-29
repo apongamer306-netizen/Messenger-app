@@ -247,7 +247,7 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// ------------------- MESSAGE SENDING & STATUS TRACKING -------------------
+// ------------------- MESSAGE SENDING & ACCURATE SEEN LOGIC -------------------
 
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
@@ -269,11 +269,11 @@ function sendChatMessage() {
       status: "sending"
     };
 
-    // ১. নিজের মেসেজ হিসেবে UI-তে যুক্ত করা ("Sending..." স্ট্যাটাস সহ)
+    // ১. তাৎক্ষণিক নিজের স্ক্রিনে Sending... দেখাবে
     appendMessage(msgData, true);
     chatMessageInput.value = "";
 
-    // ২. সকেটে সেন্ড করা এবং কনফার্মেশন (Ack) পাওয়া মাত্র স্ট্যাটাস "Sent" করা
+    // ২. সার্ভার মেসেজটি পাওয়ার সাথে সাথেই এটি "Sent" হবে
     socket.emit("send-message", msgData, (ack) => {
       if (ack && ack.success) {
         updateMessageStatus(msgId, "Sent");
@@ -329,10 +329,26 @@ socket.on("user-joined-notify", (data) => {
 socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
+
+  // রিসিভার যদি বর্তমানে স্ক্রিনে অ্যাক্টিভ থাকে, কেবল তখনই সিন নোটিফিকেশন পাঠাবে
+  if (!isMe && data.id && document.hasFocus()) {
+    socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
+  }
+});
+
+// ইউজার চ্যাট উইন্ডোতে ফোকাস করলে অপঠিত মেসেজ সিন হবে
+window.addEventListener("focus", () => {
+  if (currentRoom) {
+    const unreadMessages = document.querySelectorAll(".other-msg");
+    unreadMessages.forEach(msg => {
+      if (msg.id) {
+        socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: msg.id });
+      }
+    });
+  }
 });
 
 function appendMessage(data, isMe) {
-  // ডুপ্লিকেট মেসেজ রোধ
   if (data.id && document.getElementById(data.id)) return;
 
   const div = document.createElement("div");
@@ -373,12 +389,13 @@ function appendMessage(data, isMe) {
     contentBox.appendChild(mediaContainer);
   }
 
-  // নিজের পাঠানো মেসেজ হলে নিচে স্ট্যাটাস ইন্দিকেটর থাকবে
+  // শুধুমাত্র নিজের মেসেজের নিচে স্ট্যাটাস দেখাবে
   if (isMe) {
     const statusSpan = document.createElement("span");
     statusSpan.className = "msg-status";
     statusSpan.style.cssText = "font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 3px;";
     
+    // শুরুতে 'Sending...' বা পরবর্তীতে শুধুমাত্র নির্ধারিত স্ট্যাটাস (Sent / Seen)
     let statusText = "Sending...";
     if (data.status === "sent") statusText = "Sent";
     if (data.status === "seen") statusText = "Seen";
@@ -390,11 +407,6 @@ function appendMessage(data, isMe) {
   div.appendChild(contentBox);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  // অন্যের পাঠানো মেসেজ রিসিভ করার সাথে সাথে সার্ভারকে "Seen" ইনফো পাঠানো
-  if (!isMe && data.id) {
-    socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
-  }
 
   saveMessages();
 }
@@ -410,7 +422,7 @@ function updateMessageStatus(msgId, statusText) {
   saveMessages();
 }
 
-// সকেট লিসেনার: চ্যাটের অপর কেউ মেসেজটি দেখলে এটি ট্রিগার হবে
+// যখন অন্য পাশে ইউজার সিন করবে, তখন এই রিসিভার কাজ করবে
 socket.on("message-seen", (data) => {
   updateMessageStatus(data.msgId, "Seen");
 });
