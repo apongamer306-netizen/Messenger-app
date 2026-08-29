@@ -1,122 +1,176 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const cors = require("cors");
-const path = require("path");
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
 const app = express();
-app.use(cors());
-
-// স্ট্যাটিক ফাইলসমূহ (index.html, style.css, app.js) সার্ভ করার জন্য
-app.use(express.static(path.join(__dirname)));
-
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  maxHttpBufferSize: 1e8 // ৫০ থেকে ১০০ মেগাবাইট পর্যন্ত ফাইল আপলোড সাপোর্ট করার জন্য
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
 
-// হোম রুটে index.html ফাইল লোড করা
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ইউজারের ডেটাবেজ (মেমোরিতে জমা রাখা)
-const users = {};
-// রুমের ফাইল ও মেসেজ ডাটা
-const roomMessages = {};
+// Store data in-memory
+const activeUsers = new Map(); // socket.id -> userData
+const onlineUsers = new Map(); // userId -> socket.id
+const friendsStore = new Map(); // userId -> Set of friendUserIds
+const friendRequests = new Map(); // receiverUserId -> Set of senderUserIds
+const roomMessages = new Map(); // roomId -> array of messages
 
-io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
 
-  // ইউজার রেজিস্টার
-  socket.on("register-user", (userData, callback) => {
-    if (users[userData.phone]) {
-      callback({ success: false, message: "এই নম্বরটি ইতিমধ্যেই নিবন্ধিত!" });
-    } else {
-      users[userData.phone] = userData;
-      callback({ success: true, user: userData });
+    // 1. User Online Status Tracking
+    socket.on('register-user', (user) => {
+        if (!user || !user.id) return;
+        socket.userId = user.id;
+        socket.userData = user;
+        
+        activeUsers.set(socket.id, user);
+        onlineUsers.set(user.id, socket.id);
+
+        if (!friendsStore.has(user.id)) {
+            friendsStore.set(user.id, new Set());
+        }
+        if (!friendRequests.has(user.id)) {
+            friendRequests.set(user.id, new Set());
+        }
+
+        // Notify friends about online status
+        broadcastUserStatus(user.id, 'online');
+        sendFriendsList(socket);
+    });
+
+    // 2. Room Joining & Messaging
+    socket.on('join-room', ({ roomId, user }) => {
+        if (!roomId || !user) return;
+        
+        socket.join(roomId);
+        socket.currentRoom = roomId;
+
+        if (!roomMessages.has(roomId)) {
+            roomMessages.set(roomId, []);
+        }
+
+        // Send existing room history
+        socket.emit('room-history', roomMessages.get(roomId));
+
+        // Notify room members
+        io.to(roomId).emit('user-joined-room', { user, roomId });
+    });
+
+    socket.on('send-room-message', ({ roomId, message }) => {
+        if (!roomId || !message) return;
+        
+        if (!roomMessages.has(roomId)) {
+            roomMessages.set(roomId, []);
+        }
+        
+        const history = roomMessages.get(roomId);
+        history.push(message);
+        if (history.length > 100) history.shift(); // keep last 100
+
+        io.to(roomId).emit('receive-room-message', message);
+    });
+
+    // 3. Friend System Logic
+    socket.on('send-friend-request', ({ targetUserId }) => {
+        const senderId = socket.userId;
+        if (!senderId || !targetUserId || senderId === targetUserId) return;
+
+        if (!friendRequests.has(targetUserId)) {
+            friendRequests.set(targetUserId, new Set());
+        }
+        friendRequests.get(targetUserId).add(senderId);
+
+        const targetSocketId = onlineUsers.get(targetUserId);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('friend-request-received', {
+                fromUser: socket.userData
+            });
+        }
+    });
+
+    socket.on('accept-friend-request', ({ senderId }) => {
+        const userId = socket.userId;
+        if (!userId || !senderId) return;
+
+        // Add to friends lists
+        if (!friendsStore.has(userId)) friendsStore.set(userId, new Set());
+        if (!friendsStore.has(senderId)) friendsStore.set(senderId, new Set());
+
+        friendsStore.get(userId).add(senderId);
+        friendsStore.get(senderId).add(userId);
+
+        if (friendRequests.has(userId)) {
+            friendRequests.get(userId).delete(senderId);
+        }
+
+        // Notify both users
+        sendFriendsList(socket);
+        const senderSocketId = onlineUsers.get(senderId);
+        if (senderSocketId) {
+            const senderSocket = io.sockets.sockets.get(senderSocketId);
+            if (senderSocket) sendFriendsList(senderSocket);
+        }
+    });
+
+    // 4. Direct 1-on-1 Chat
+    socket.on('start-direct-chat', ({ friendId }) => {
+        const userId = socket.userId;
+        if (!userId || !friendId) return;
+
+        const directRoomId = [userId, friendId].sort().join('_direct_');
+        socket.join(directRoomId);
+
+        socket.emit('direct-chat-started', {
+            directRoomId,
+            friendId
+        });
+    });
+
+    socket.on('send-direct-message', ({ directRoomId, message }) => {
+        io.to(directRoomId).emit('receive-direct-message', message);
+    });
+
+    // 5. Disconnect Handler
+    socket.on('disconnect', () => {
+        if (socket.userId) {
+            onlineUsers.delete(socket.userId);
+            broadcastUserStatus(socket.userId, 'offline');
+        }
+        activeUsers.delete(socket.id);
+        console.log('User disconnected:', socket.id);
+    });
+
+    function broadcastUserStatus(userId, status) {
+        const userFriends = friendsStore.get(userId) || new Set();
+        userFriends.forEach(friendId => {
+            const friendSocketId = onlineUsers.get(friendId);
+            if (friendSocketId) {
+                io.to(friendSocketId).emit('friend-status-change', { userId, status });
+            }
+        });
     }
-  });
 
-  // ইউজার লগইন
-  socket.on("login-user", (credentials, callback) => {
-    const user = users[credentials.phone];
-    if (user && user.password === credentials.password) {
-      callback({ success: true, user: user });
-    } else {
-      callback({ success: false, message: "ফোন নম্বর বা পাসওয়ার্ড ভুল!" });
+    function sendFriendsList(userSocket) {
+        const userId = userSocket.userId;
+        const friendIds = Array.from(friendsStore.get(userId) || []);
+        
+        const friendsList = friendIds.map(fId => ({
+            id: fId,
+            isOnline: onlineUsers.has(fId)
+        }));
+
+        userSocket.emit('update-friends-list', friendsList);
     }
-  });
-
-  // রুমে জয়েন করা
-  socket.on("join-room", ({ roomCode, user, peerId }) => {
-    socket.join(roomCode);
-    socket.roomCode = roomCode;
-    socket.userData = user;
-
-    if (!roomMessages[roomCode]) {
-      roomMessages[roomCode] = [];
-    }
-
-    // নোটিফিকেশন পাঠানো
-    socket.to(roomCode).emit("user-joined-notify", { user });
-  });
-
-  // মেসেজ ও ফাইল সেন্ড করা
-  socket.on("send-message", (msgData) => {
-    const roomCode = msgData.roomCode;
-    if (roomMessages[roomCode]) {
-      roomMessages[roomCode].push(msgData);
-    }
-    io.to(roomCode).emit("receive-message", msgData);
-  });
-
-  // কল দেওয়া
-  socket.on("call-user", (data) => {
-    socket.to(data.roomCode).emit("incoming-call", data);
-  });
-
-  // কল কেটে দেওয়া
-  socket.on("end-call", (data) => {
-    socket.to(data.roomCode).emit("call-ended");
-  });
-
-  // রুম থেকে বের হয়ে যাওয়া (Manual Leave)
-  socket.on("leave-room", ({ roomCode }) => {
-    socket.leave(roomCode);
-    checkAndCleanRoom(roomCode);
-  });
-
-  // সকেট ডিসকানেক্ট হলে বা পেজ ক্লোজ করলে
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-    if (socket.roomCode) {
-      checkAndCleanRoom(socket.roomCode);
-    }
-  });
-
-  // রুমে সদস্য সংখ্যা চেক করে ০ হলে ফাইল ও মেসেজ অটো ডিলিট করার ফাংশন
-  function checkAndCleanRoom(roomCode) {
-    const room = io.sockets.adapter.rooms.get(roomCode);
-    const numClients = room ? room.size : 0;
-
-    console.log(`Room ${roomCode} active users: ${numClients}`);
-
-    // যদি রুমে কেউ না থাকে (লোকসংখ্যা 0)
-    if (numClients === 0) {
-      if (roomMessages[roomCode]) {
-        delete roomMessages[roomCode]; // সমস্ত মেসেজ ও ফাইল সার্ভার থেকে অটো ডিলিট
-        console.log(`🧹 Room ${roomCode} empty! All messages & files automatically deleted.`);
-      }
-    }
-  }
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
