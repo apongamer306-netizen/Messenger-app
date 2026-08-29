@@ -1,3 +1,23 @@
+:root {
+    --bg-color: #f4f7f6;
+    --card-bg: #ffffff;
+    --text-color: #333333;
+    --sidebar-bg: #2c3e50;
+    --sidebar-text: #ecf0f1;
+    --border-color: #dddddd;
+    --chat-header-bg: #f8f9fa;
+}
+
+body.dark-theme {
+    --bg-color: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --text-color: #f1f1f1;
+    --sidebar-bg: #111111;
+    --sidebar-text: #ffffff;
+    --border-color: #444444;
+    --chat-header-bg: #242424;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,7 +26,8 @@
 }
 
 body {
-    background-color: #f4f7f6;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     height: 100vh;
     overflow: hidden;
 }
@@ -22,7 +43,7 @@ body {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -30,25 +51,22 @@ body {
 }
 
 .modal-box {
-    background: #fff;
+    background: var(--card-bg);
+    color: var(--text-color);
     padding: 30px;
     border-radius: 12px;
     text-align: center;
     width: 320px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.modal-box h2 {
-    margin-bottom: 10px;
-    color: #333;
 }
 
 .modal-box input {
     width: 100%;
     padding: 10px;
     margin: 15px 0;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
 }
 
 .modal-box button, .auth-box button {
@@ -71,10 +89,10 @@ body {
 }
 
 .auth-box {
-    background: white;
+    background: var(--card-bg);
+    color: var(--text-color);
     padding: 40px;
     border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     width: 350px;
 }
 
@@ -82,14 +100,10 @@ body {
     width: 100%;
     padding: 10px;
     margin-bottom: 15px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color);
     border-radius: 5px;
-}
-
-.toggle-auth {
-    margin-top: 15px;
-    font-size: 14px;
-    text-align: center;
+    background: var(--bg-color);
+    color: var(--text-color);
 }
 
 .toggle-auth span {
@@ -105,8 +119,8 @@ body {
 
 .sidebar {
     width: 250px;
-    background: #2c3e50;
-    color: white;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -114,10 +128,10 @@ body {
 }
 
 .brand {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: bold;
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
 .nav-menu {
@@ -129,7 +143,7 @@ body {
 
 .nav-btn {
     background: transparent;
-    color: #ecf0f1;
+    color: var(--sidebar-text);
     border: none;
     padding: 12px 15px;
     text-align: left;
@@ -139,7 +153,21 @@ body {
 }
 
 .nav-btn.active, .nav-btn:hover {
-    background: #34495e;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.theme-toggle-box {
+    padding: 10px 20px;
+}
+
+.theme-toggle-box button {
+    width: 100%;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--sidebar-text);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
 .user-profile-footer {
@@ -173,7 +201,9 @@ body {
 
 .join-box input {
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-color);
     border-radius: 6px 0 0 6px;
 }
 
@@ -183,18 +213,18 @@ body {
 }
 
 .chat-wrapper {
-    background: white;
+    background: var(--card-bg);
     border-radius: 8px;
     height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
 
 .chat-header {
     padding: 15px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #ddd;
+    background: var(--chat-header-bg);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -211,7 +241,7 @@ body {
 
 .chat-footer {
     padding: 15px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color);
     display: flex;
     gap: 10px;
 }
@@ -219,7 +249,9 @@ body {
 .chat-footer input {
     flex: 1;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-color);
     border-radius: 6px;
 }
 
@@ -235,7 +267,7 @@ body {
     background: #e74c3c !important;
 }
 
-/* Friends Cards with Online Indicator */
+/* Friends Grid & Indicator */
 .friends-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -244,15 +276,14 @@ body {
 }
 
 .friend-card {
-    background: white;
+    background: var(--card-bg);
     padding: 15px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     gap: 12px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     cursor: pointer;
-    position: relative;
+    border: 1px solid var(--border-color);
 }
 
 .profile-avatar {
@@ -264,11 +295,9 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-weight: bold;
     color: white;
 }
 
-/* Online status green dot */
 .status-indicator {
     width: 12px;
     height: 12px;
@@ -286,7 +315,7 @@ body {
 
 .msg-item {
     padding: 8px 12px;
-    background: #e9ecef;
+    background: rgba(0, 123, 255, 0.1);
     border-radius: 6px;
     max-width: 70%;
 }
