@@ -76,17 +76,12 @@ function togglePasswordVisibility(inputId, iconElem) {
 document.addEventListener("DOMContentLoaded", () => {
   const isMasterUnlocked = localStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
-  const savedRoom = localStorage.getItem("currentRoom");
 
   if (isMasterUnlocked === "true") {
     masterKeyScreen.style.display = "none";
     if (savedUser) {
       currentUser = savedUser;
-      if (savedRoom) {
-        joinRoom(savedRoom);
-      } else {
-        showDashboard();
-      }
+      showDashboard();
     } else {
       authScreen.style.display = "block";
     }
@@ -100,14 +95,9 @@ unlockBtn.addEventListener("click", () => {
     localStorage.setItem("masterUnlocked", "true");
     masterKeyScreen.style.display = "none";
     const savedUser = JSON.parse(localStorage.getItem("appUser"));
-    const savedRoom = localStorage.getItem("currentRoom");
     if (savedUser) {
       currentUser = savedUser;
-      if (savedRoom) {
-        joinRoom(savedRoom);
-      } else {
-        showDashboard();
-      }
+      showDashboard();
     } else {
       authScreen.style.display = "block";
     }
@@ -170,7 +160,6 @@ authSubmitBtn.addEventListener("click", () => {
 
 function showDashboard() {
   authScreen.style.display = "none";
-  chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
   dashboardUserName.textContent = currentUser.name;
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
@@ -201,10 +190,8 @@ joinRoomBtn.addEventListener("click", () => {
 
 function joinRoom(code) {
   currentRoom = code;
-  localStorage.setItem("currentRoom", code);
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
   
-  authScreen.style.display = "none";
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
@@ -213,13 +200,8 @@ function joinRoom(code) {
 }
 
 logoutBtn.addEventListener("click", () => {
-  if (currentRoom) {
-    socket.emit("leave-room", { roomCode: currentRoom });
-  }
   localStorage.removeItem("appUser");
-  localStorage.removeItem("currentRoom");
   currentUser = null;
-  currentRoom = null;
   location.reload();
 });
 
@@ -311,20 +293,6 @@ function appendMessage(data, isMe) {
       img.className = "chat-media-preview";
       img.onclick = () => openFullscreenImage(data.file);
       mediaContainer.appendChild(img);
-
-      // ছবি ডাউনলোডের অপশন
-      const downloadBtn = document.createElement("a");
-      downloadBtn.href = data.file;
-      downloadBtn.download = data.fileName || "image.png";
-      downloadBtn.className = "download-btn";
-      downloadBtn.style.display = "inline-block";
-      downloadBtn.style.marginTop = "5px";
-      downloadBtn.style.fontSize = "12px";
-      downloadBtn.style.color = "#fff";
-      downloadBtn.style.textDecoration = "none";
-      downloadBtn.innerHTML = `<i class="fas fa-download"></i> Download`;
-      mediaContainer.appendChild(downloadBtn);
-
     } else if (data.fileType === "video") {
       const vid = document.createElement("video");
       vid.src = data.file;
@@ -437,11 +405,6 @@ function closeCallUI() {
 }
 
 leaveRoomBtn.addEventListener("click", () => {
-  if (currentRoom) {
-    socket.emit("leave-room", { roomCode: currentRoom });
-  }
-  localStorage.removeItem("currentRoom");
-  currentRoom = null;
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
