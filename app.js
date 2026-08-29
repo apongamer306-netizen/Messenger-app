@@ -15,6 +15,7 @@ myPeer.on("open", (id) => {
 
 let currentUser = null;
 let currentRoom = null;
+let currentCallType = null;
 
 // DOM Elements
 const masterKeyScreen = document.getElementById("masterKeyScreen");
@@ -55,8 +56,17 @@ const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 // Call Modal Elements
 const callModal = document.getElementById("callModal");
 const callStatusText = document.getElementById("callStatusText");
+
+const callVideoGrid = document.getElementById("callVideoGrid");
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
+
+const callProfileGrid = document.getElementById("callProfileGrid");
+const localCallAvatar = document.getElementById("localCallAvatar");
+const localCallName = document.getElementById("localCallName");
+const remoteCallAvatar = document.getElementById("remoteCallAvatar");
+const remoteCallName = document.getElementById("remoteCallName");
+
 const acceptCallBtn = document.getElementById("acceptCallBtn");
 const rejectCallBtn = document.getElementById("rejectCallBtn");
 const startAudioCallBtn = document.getElementById("startAudioCallBtn");
@@ -81,7 +91,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ব্রাউজারে সাইট ওপেন করার সময়ে সেশন ভেরিফিকেশন
 function checkActiveSession() {
-  // sessionStorage ব্যবহার করায় লিংক কেটে ঢুকলে প্রতিবার Master Key চাইবে
   const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
   const activeRoom = sessionStorage.getItem("activeRoom");
@@ -99,7 +108,6 @@ function checkActiveSession() {
       authScreen.style.display = "block";
     }
   } else {
-    // Master Key আনলক করা না থাকলে Master Key স্ক্রিন দেখাবে
     masterKeyScreen.style.display = "block";
     authScreen.style.display = "none";
     dashboardScreen.style.display = "none";
@@ -198,7 +206,6 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// নির্দিষ্ট কোড "1430909" জেনারেট হওয়ার অপশন
 createRoomBtn.addEventListener("click", () => {
   const code = "1430909";
   joinRoom(code);
@@ -343,12 +350,31 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+// ------------------- AUDIO / VIDEO CALLING LOGIC (UPDATED) -------------------
 
 let incomingCallData = null;
 
 startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
 startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+
+// হেল্পার ফাংশন: কলের টাইপ অনুযায়ী UI সাজানো
+function setCallUI(type, remoteUser) {
+  currentCallType = type;
+  if (type === "video") {
+    callVideoGrid.style.display = "flex";
+    callProfileGrid.style.display = "none";
+  } else {
+    // অডিও কল হলে প্রোফাইল গ্রিড দেখাবে
+    callVideoGrid.style.display = "none";
+    callProfileGrid.style.display = "flex";
+
+    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
+    localCallName.textContent = currentUser.name || "Me";
+
+    remoteCallAvatar.src = remoteUser ? (remoteUser.pic || "https://via.placeholder.com/100") : "https://via.placeholder.com/100";
+    remoteCallName.textContent = remoteUser ? remoteUser.name : "Incoming...";
+  }
+}
 
 function initiateCall(type) {
   if (!currentRoom) return;
@@ -356,7 +382,11 @@ function initiateCall(type) {
   
   navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
     localStream = stream;
-    localVideo.srcObject = stream;
+    if (isVideo) {
+      localVideo.srcObject = stream;
+    }
+    
+    setCallUI(type, null);
     callModal.style.display = "flex";
     callStatusText.textContent = "Calling...";
     acceptCallBtn.style.display = "none";
@@ -365,6 +395,7 @@ function initiateCall(type) {
       roomCode: currentRoom,
       callerName: currentUser.name,
       callerPeerId: myPeerId,
+      callerPic: currentUser.pic,
       callType: type
     });
   }).catch((err) => alert("Camera & Microphone Access Required!"));
@@ -372,6 +403,7 @@ function initiateCall(type) {
 
 socket.on("incoming-call", (data) => {
   incomingCallData = data;
+  setCallUI(data.callType, { name: data.callerName, pic: data.callerPic });
   callModal.style.display = "flex";
   callStatusText.textContent = `${data.callerName} is ${data.callType} calling...`;
   acceptCallBtn.style.display = "inline-block";
@@ -383,13 +415,19 @@ acceptCallBtn.addEventListener("click", () => {
 
   navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
     localStream = stream;
-    localVideo.srcObject = stream;
+    if (isVideo) {
+      localVideo.srcObject = stream;
+    }
+
+    setCallUI(incomingCallData.callType, { name: incomingCallData.callerName, pic: incomingCallData.callerPic });
 
     const call = myPeer.call(incomingCallData.callerPeerId, stream);
     currentCall = call;
 
     call.on("stream", (remoteStream) => {
-      remoteVideo.srcObject = remoteStream;
+      if (isVideo) {
+        remoteVideo.srcObject = remoteStream;
+      }
       callStatusText.textContent = "Connected";
     });
 
@@ -401,7 +439,9 @@ myPeer.on("call", (call) => {
   currentCall = call;
   call.answer(localStream);
   call.on("stream", (remoteStream) => {
-    remoteVideo.srcObject = remoteStream;
+    if (currentCallType === "video") {
+      remoteVideo.srcObject = remoteStream;
+    }
     callStatusText.textContent = "Connected";
   });
 });
@@ -427,6 +467,7 @@ function closeCallUI() {
   callModal.style.display = "none";
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
+  currentCallType = null;
 }
 
 // রুম ছাড়ার বাটন
