@@ -277,11 +277,11 @@ body {
     bottom: 0;
     right: 0;
     border: 2px solid white;
-    background-color: #bdc3c7; /* Default offline */
+    background-color: #bdc3c7;
 }
 
 .status-indicator.online {
-    background-color: #2ecc71; /* Green online dot */
+    background-color: #2ecc71;
 }
 
 .msg-item {
