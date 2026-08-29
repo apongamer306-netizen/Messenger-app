@@ -110,14 +110,29 @@
       </div>
     </div>
 
-    <!-- Call Overlay Modal -->
+    <!-- Call Overlay Modal (UPDATED) -->
     <div id="callModal" class="call-modal" style="display: none;">
       <div class="call-box">
         <h3 id="callStatusText">Incoming Call...</h3>
-        <div class="video-grid">
+        
+        <!-- Video Grid: Only shown during Video Call -->
+        <div id="callVideoGrid" class="video-grid" style="display: none;">
           <video id="localVideo" autoplay muted playsinline></video>
           <video id="remoteVideo" autoplay playsinline></video>
         </div>
+
+        <!-- Profile Grid: Only shown during Audio Call -->
+        <div id="callProfileGrid" class="call-profile-grid">
+          <div class="call-profile-item">
+            <img id="localCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="My Profile">
+            <span id="localCallName" class="call-username">Me</span>
+          </div>
+          <div class="call-profile-item">
+            <img id="remoteCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="Other Profile">
+            <span id="remoteCallName" class="call-username">Other</span>
+          </div>
+        </div>
+
         <div class="call-controls">
           <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
           <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
