@@ -6,16 +6,20 @@ let myPeer = new Peer();
 let myPeerId = null;
 let currentCall = null;
 let localStream = null;
+let currentCallType = null;
+
+// Audio player element for remote audio streams
+let remoteAudioElement = document.createElement("audio");
+remoteAudioElement.autoplay = true;
+document.body.appendChild(remoteAudioElement);
 
 myPeer.on("open", (id) => {
   myPeerId = id;
-  // Peer ID তৈরি হওয়ার পর সেশন চেক করবে
   checkActiveSession();
 });
 
 let currentUser = null;
 let currentRoom = null;
-let currentCallType = null;
 
 // DOM Elements
 const masterKeyScreen = document.getElementById("masterKeyScreen");
@@ -89,7 +93,6 @@ document.addEventListener("DOMContentLoaded", () => {
   checkActiveSession();
 });
 
-// ব্রাউজারে সাইট ওপেন করার সময়ে সেশন ভেরিফিকেশন
 function checkActiveSession() {
   const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
@@ -115,7 +118,6 @@ function checkActiveSession() {
   }
 }
 
-// Master Key সাবমিট লজিক
 unlockBtn.addEventListener("click", () => {
   if (masterKeyInput.value.trim() === "KT EYAMIN") {
     sessionStorage.setItem("masterUnlocked", "true");
@@ -350,29 +352,32 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC (UPDATED) -------------------
+// ------------------- AUDIO / VIDEO CALLING LOGIC (FIXED) -------------------
 
 let incomingCallData = null;
 
 startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
 startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
 
-// হেল্পার ফাংশন: কলের টাইপ অনুযায়ী UI সাজানো
 function setCallUI(type, remoteUser) {
   currentCallType = type;
   if (type === "video") {
     callVideoGrid.style.display = "flex";
     callProfileGrid.style.display = "none";
   } else {
-    // অডিও কল হলে প্রোফাইল গ্রিড দেখাবে
     callVideoGrid.style.display = "none";
     callProfileGrid.style.display = "flex";
 
     localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
     localCallName.textContent = currentUser.name || "Me";
 
-    remoteCallAvatar.src = remoteUser ? (remoteUser.pic || "https://via.placeholder.com/100") : "https://via.placeholder.com/100";
-    remoteCallName.textContent = remoteUser ? remoteUser.name : "Incoming...";
+    if (remoteUser) {
+      remoteCallAvatar.src = remoteUser.pic || "https://via.placeholder.com/100";
+      remoteCallName.textContent = remoteUser.name || "User";
+    } else {
+      remoteCallAvatar.src = "https://via.placeholder.com/100";
+      remoteCallName.textContent = "Connecting...";
+    }
   }
 }
 
@@ -409,6 +414,15 @@ socket.on("incoming-call", (data) => {
   acceptCallBtn.style.display = "inline-block";
 });
 
+// রিসিভার কল রিসিভ করলে কটারের UI আপডেট করার জন্য সকেট লিসেনার
+socket.on("call-accepted-by-receiver", (data) => {
+  if (currentCallType === "audio") {
+    remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
+    remoteCallName.textContent = data.receiverName || "Connected User";
+  }
+  callStatusText.textContent = "Connected";
+});
+
 acceptCallBtn.addEventListener("click", () => {
   if (!incomingCallData) return;
   const isVideo = incomingCallData.callType === "video";
@@ -424,11 +438,13 @@ acceptCallBtn.addEventListener("click", () => {
     const call = myPeer.call(incomingCallData.callerPeerId, stream);
     currentCall = call;
 
-    call.on("stream", (remoteStream) => {
-      if (isVideo) {
-        remoteVideo.srcObject = remoteStream;
-      }
-      callStatusText.textContent = "Connected";
+    handleStream(call, isVideo);
+
+    // কলারের কাছে সকেটের মাধ্যমে নিজের প্রোফাইল ডাটা পাঠানো
+    socket.emit("accept-call-notify", {
+      roomCode: currentRoom,
+      receiverName: currentUser.name,
+      receiverPic: currentUser.pic
     });
 
     acceptCallBtn.style.display = "none";
@@ -438,13 +454,21 @@ acceptCallBtn.addEventListener("click", () => {
 myPeer.on("call", (call) => {
   currentCall = call;
   call.answer(localStream);
+  const isVideo = currentCallType === "video";
+  handleStream(call, isVideo);
+});
+
+// সাউন্ড এবং স্ট্রিমিং হ্যান্ডেল করার জন্য কমন ফাংশন
+function handleStream(call, isVideo) {
   call.on("stream", (remoteStream) => {
-    if (currentCallType === "video") {
+    if (isVideo) {
       remoteVideo.srcObject = remoteStream;
+    } else {
+      remoteAudioElement.srcObject = remoteStream;
     }
     callStatusText.textContent = "Connected";
   });
-});
+}
 
 rejectCallBtn.addEventListener("click", endCall);
 
@@ -467,10 +491,10 @@ function closeCallUI() {
   callModal.style.display = "none";
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
+  remoteAudioElement.srcObject = null;
   currentCallType = null;
 }
 
-// রুম ছাড়ার বাটন
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   currentRoom = null;
