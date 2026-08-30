@@ -55,6 +55,7 @@ const avatarUpload = document.getElementById("avatarUpload");
 const createRoomBtn = document.getElementById("createRoomBtn");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
+const removePinBtn = document.getElementById("removePinBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
 const chatUserAvatar = document.getElementById("chatUserAvatar");
@@ -127,6 +128,7 @@ function updateMasterScreenUI() {
       directOpenBtn.style.display = "none";
       masterToggleMsg.textContent = "Don't want password?";
       masterToggleLink.textContent = "Open Directly";
+      masterToggleMsg.parentElement.style.display = "block";
     } else {
       masterTitle.textContent = "Welcome";
       masterSubtitle.textContent = "You can enter directly or set a security password";
@@ -135,6 +137,7 @@ function updateMasterScreenUI() {
       directOpenBtn.style.display = "block";
       masterToggleMsg.textContent = "Want extra security?";
       masterToggleLink.textContent = "Create Password";
+      masterToggleMsg.parentElement.style.display = "block";
     }
   }
 }
@@ -210,6 +213,28 @@ function grantAccess() {
   } else {
     authScreen.style.display = "block";
   }
+}
+
+// ------------------- REMOVE SECURITY PIN LOGIC -------------------
+if (removePinBtn) {
+  removePinBtn.addEventListener("click", () => {
+    const savedPin = localStorage.getItem("appMasterPin");
+
+    if (!savedPin) {
+      return alert("বর্তমানে কোনো Security PIN সেট করা নেই!");
+    }
+
+    const enteredPin = prompt("পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি লিখুন:");
+
+    if (enteredPin === null) return; // ইউজার Cancel চাপলে কিছু হবে না
+
+    if (enteredPin.trim() === savedPin) {
+      localStorage.removeItem("appMasterPin");
+      alert("আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
+    } else {
+      alert("ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
+    }
+  });
 }
 
 // ------------------- AUTHENTICATION LOGIC -------------------
