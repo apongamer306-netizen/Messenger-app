@@ -5,6 +5,30 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* =========================================
+   Admin Room Permanent Direct Theme Setup
+   ========================================= */
+body.admin-theme {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+body.admin-theme .chat-container {
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.admin-theme .chat-header,
+body.admin-theme .chat-input-area {
+  background: rgba(15, 23, 42, 0.85) !important;
+}
+/* ========================================= */
+
 body.dark-theme {
   background-color: #0f172a;
   color: #f8fafc;
@@ -255,7 +279,6 @@ body.light-theme .chat-header {
   align-self: flex-start;
 }
 
-/* Messenger Like Small Seen Profile Avatar Icon */
 .msg-status {
   display: flex;
   justify-content: flex-end;
@@ -340,7 +363,6 @@ body.light-theme .chat-input-area input {
   cursor: pointer;
 }
 
-/* Call Modal Overlay */
 .call-modal {
   position: fixed;
   top: 0;
@@ -379,7 +401,6 @@ body.light-theme .chat-input-area input {
   object-fit: cover;
 }
 
-/* Call Profile Grid Styles */
 .call-profile-grid {
   display: flex;
   gap: 20px;
