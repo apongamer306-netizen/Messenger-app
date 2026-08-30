@@ -255,6 +255,24 @@ body.light-theme .chat-header {
   align-self: flex-start;
 }
 
+/* Messenger Like Small Seen Profile Avatar Icon */
+.msg-status {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.seen-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
 .system-notification {
   text-align: center;
   font-size: 0.8rem;
@@ -361,7 +379,7 @@ body.light-theme .chat-input-area input {
   object-fit: cover;
 }
 
-/* Call Profile Grid Styles (NEWLY ADDED) */
+/* Call Profile Grid Styles */
 .call-profile-grid {
   display: flex;
   gap: 20px;
