@@ -11,6 +11,7 @@ let currentCallType = null;
 // Fixed Secret Admin Room Code
 const ADMIN_ROOM_PIN = "1430909";
 
+// রিমোট অডিও চালানোর জন্য গ্লোবাল অডিও এলিমেন্ট
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 remoteAudioElement.style.display = "none";
@@ -71,6 +72,22 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
+// Call Elements
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+const callModal = document.getElementById("callModal");
+const callStatusText = document.getElementById("callStatusText");
+const callVideoGrid = document.getElementById("callVideoGrid");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+const callProfileGrid = document.getElementById("callProfileGrid");
+const localCallAvatar = document.getElementById("localCallAvatar");
+const remoteCallAvatar = document.getElementById("remoteCallAvatar");
+const localCallName = document.getElementById("localCallName");
+const remoteCallName = document.getElementById("remoteCallName");
+const acceptCallBtn = document.getElementById("acceptCallBtn");
+const rejectCallBtn = document.getElementById("rejectCallBtn");
+
 // Custom Modal Elements
 const customModalOverlay = document.getElementById("customModalOverlay");
 const modalTitle = document.getElementById("modalTitle");
@@ -126,17 +143,6 @@ function saveUserToStorage(user) {
   const users = getStoredUsers();
   users[user.phone] = user;
   localStorage.setItem("usersDatabase", JSON.stringify(users));
-}
-
-function togglePasswordVisibility(inputId, iconElem) {
-  const input = document.getElementById(inputId);
-  if (input.type === "password") {
-    input.type = "text";
-    iconElem.classList.replace("fa-eye", "fa-eye-slash");
-  } else {
-    input.type = "password";
-    iconElem.classList.replace("fa-eye-slash", "fa-eye");
-  }
 }
 
 // Custom Popup Modal
@@ -501,7 +507,7 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// CREATE ROOM HANDLER (Instant redirection without waiting for backend callback blocking)
+// CREATE ROOM HANDLER
 createRoomBtn.addEventListener("click", () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
   joinRoom(randomCode);
@@ -514,10 +520,10 @@ joinRoomBtn.addEventListener("click", () => {
   modalInputGroup.style.display = "none";
 
   modalActionContainer.innerHTML = `
-    <button id="optJoinSpecialBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7); color: #fff; width: 100%;">
+    <button id="optJoinSpecialBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7); color: #fff; width: 100%; margin-bottom: 8px;">
       <i class="fa-solid fa-star" style="margin-right: 6px;"></i>Join Special Room
     </button>
-    <button id="optJoinRandomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #198754, #157347); color: #fff; width: 100%;">
+    <button id="optJoinRandomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #198754, #157347); color: #fff; width: 100%; margin-bottom: 8px;">
       <i class="fa-solid fa-shuffle" style="margin-right: 6px;"></i>Join Random Room
     </button>
     <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; width: 100%;">Cancel</button>
@@ -562,7 +568,6 @@ joinRoomBtn.addEventListener("click", () => {
   };
 });
 
-// Join Room Function with Instant UI Switch & Background Socket Sync
 function joinRoom(code, isRefresh = false) {
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
@@ -578,10 +583,7 @@ function joinRoom(code, isRefresh = false) {
     chatRoomCode.textContent = "Code: " + code;
   }
 
-  if (isRefresh) {
-    // restoreMessages if implemented
-  } else {
-    sessionStorage.removeItem("savedChatLogs");
+  if (!isRefresh) {
     chatMessages.innerHTML = "";
   }
 
@@ -592,28 +594,47 @@ function joinRoom(code, isRefresh = false) {
   });
 }
 
-// Leave Room Handler
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   currentRoom = null;
+  socket.emit("leave-room", { roomCode: currentRoom });
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
 
-// Logout Handler
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("masterUnlocked");
-  sessionStorage.removeItem("savedChatLogs");
   currentUser = null;
   location.reload();
 });
 
-// Messaging System
+// Messaging System & File Attachment
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
+});
+
+fileAttachmentInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const fileData = {
+      id: "msg_" + Date.now(),
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic || "https://via.placeholder.com/40",
+      fileType: file.type,
+      fileContent: evt.target.result,
+      fileName: file.name
+    };
+    socket.emit("send-message", fileData);
+    appendChatMessage(fileData);
+  };
+  reader.readAsDataURL(file);
 });
 
 function sendChatMessage() {
@@ -624,7 +645,7 @@ function sendChatMessage() {
       id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
-      senderPic: currentUser.pic,
+      senderPic: currentUser.pic || "https://via.placeholder.com/40",
       text: text
     };
     socket.emit("send-message", msgData);
@@ -641,15 +662,219 @@ function appendChatMessage(msg) {
   const msgDiv = document.createElement("div");
   const isMe = msg.sender === currentUser.name;
   msgDiv.style.display = "flex";
+  msgDiv.style.alignItems = "flex-end";
+  msgDiv.style.gap = "8px";
   msgDiv.style.justifyContent = isMe ? "flex-end" : "flex-start";
   msgDiv.style.marginBottom = "10px";
 
-  msgDiv.innerHTML = `
-    <div style="background: ${isMe ? '#0d6efd' : '#333'}; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word;">
-      <span style="font-size: 11px; opacity: 0.7; display: block; margin-bottom: 2px;">${msg.sender}</span>
-      <span>${msg.text}</span>
-    </div>
-  `;
+  let contentHtml = "";
+  if (msg.fileType) {
+    if (msg.fileType.startsWith("image/")) {
+      contentHtml = `<img src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px;" />`;
+    } else if (msg.fileType.startsWith("video/")) {
+      contentHtml = `<video src="${msg.fileContent}" controls style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px;"></video>`;
+    } else if (msg.fileType.startsWith("audio/")) {
+      contentHtml = `<audio src="${msg.fileContent}" controls style="max-width: 200px; display: block; margin-top: 4px;"></audio>`;
+    } else {
+      contentHtml = `<a href="${msg.fileContent}" download="${msg.fileName}" style="color: #fff; text-decoration: underline;">📁 ${msg.fileName}</a>`;
+    }
+  } else {
+    contentHtml = `<span>${msg.text}</span>`;
+  }
+
+  const avatarImg = `<img src="${msg.senderPic || 'https://via.placeholder.com/40'}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" />`;
+
+  if (isMe) {
+    msgDiv.innerHTML = `
+      <div style="background: #0d6efd; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word; position: relative;">
+        ${contentHtml}
+      </div>
+      ${avatarImg}
+    `;
+  } else {
+    msgDiv.innerHTML = `
+      ${avatarImg}
+      <div style="background: #333; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word; position: relative;">
+        ${contentHtml}
+      </div>
+    `;
+  }
+
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+
+// ================= CORRECTION FOR AUDIO/VIDEO CALLING =================
+
+startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
+startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+
+async function initiateCall(type) {
+  currentCallType = type;
+  try {
+    // অডিও কলের জন্য শুধুমাত্র মাইক্রোফোন, ভিডিও কলের জন্য ক্যামেরা ও অডিও উভয়ই রিকোয়েস্ট করা হচ্ছে
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: type === "video"
+    });
+
+    if (type === "video") {
+      localVideo.srcObject = localStream;
+      callVideoGrid.style.display = "flex";
+      callProfileGrid.style.display = "none";
+    } else {
+      callVideoGrid.style.display = "none";
+      callProfileGrid.style.display = "flex";
+    }
+
+    localCallAvatar.src = currentUser.pic;
+    localCallName.textContent = currentUser.name;
+    callStatusText.textContent = "Calling...";
+    acceptCallBtn.style.display = "none";
+    callModal.style.display = "flex";
+
+    socket.emit("call-user", {
+      roomCode: currentRoom,
+      callerPeerId: myPeerId,
+      callerName: currentUser.name,
+      callerPic: currentUser.pic,
+      callType: type
+    });
+
+  } catch (err) {
+    console.error("Media error:", err);
+    showCustomAlert("Permission Error", "মাইক্রোফোন বা ক্যামেরা পারমিশন দেওয়া হয়নি অথবা ব্রাউজার ব্লক করে রেখেছে!");
+  }
+}
+
+socket.on("incoming-call", (data) => {
+  currentCallType = data.callType;
+  remoteCallName.textContent = data.callerName;
+  remoteCallAvatar.src = data.callerPic;
+  localCallAvatar.src = currentUser.pic;
+  localCallName.textContent = currentUser.name;
+  
+  callStatusText.textContent = `Incoming ${data.callType} call from ${data.callerName}`;
+  acceptCallBtn.style.display = "inline-block";
+  callVideoGrid.style.display = "none";
+  callProfileGrid.style.display = "flex";
+  callModal.style.display = "flex";
+
+  // কল রিসিভ করার ইভেন্ট
+  acceptCallBtn.onclick = async () => {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: currentCallType === "video"
+      });
+
+      if (currentCallType === "video") {
+        localVideo.srcObject = localStream;
+        callVideoGrid.style.display = "flex";
+        callProfileGrid.style.display = "none";
+      } else {
+        callVideoGrid.style.display = "none";
+        callProfileGrid.style.display = "flex";
+      }
+
+      // কলারের কাছে পিয়ার কল ইনিশিয়েট করা
+      const call = myPeer.call(data.callerPeerId, localStream);
+      handleCallConnection(call);
+
+      socket.emit("accept-call-notify", { roomCode: currentRoom });
+      acceptCallBtn.style.display = "none";
+      callStatusText.textContent = "Connected";
+    } catch (err) {
+      console.error("Answer error:", err);
+      showCustomAlert("Error", "কল রিসিভ করার সময় ক্যামেরা/মাইক্রোফোন এক্সেস পাওয়া যায়নি!");
+    }
+  };
+});
+
+// অন্য পাশ থেকে কল আসলে অটোমেটিক অ্যানসার দেওয়া
+myPeer.on("call", async (call) => {
+  currentCallType = call.metadata ? call.metadata.type : currentCallType;
+  try {
+    if (!localStream) {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: currentCallType === "video"
+      });
+    }
+
+    if (currentCallType === "video") {
+      localVideo.srcObject = localStream;
+      callVideoGrid.style.display = "flex";
+      callProfileGrid.style.display = "none";
+    } else {
+      callVideoGrid.style.display = "none";
+      callProfileGrid.style.display = "flex";
+    }
+
+    call.answer(localStream);
+    handleCallConnection(call);
+    callModal.style.display = "flex";
+    callStatusText.textContent = "Connected";
+  } catch (err) {
+    console.error("Auto answer error:", err);
+  }
+});
+
+function handleCallConnection(call) {
+  currentCall = call;
+  
+  call.on("stream", (remoteStream) => {
+    if (currentCallType === "video") {
+      remoteVideo.srcObject = remoteStream;
+    } else {
+      remoteAudioElement.srcObject = remoteStream;
+      remoteAudioElement.play().catch(e => console.log("Audio play deferred:", e));
+    }
+    callStatusText.textContent = "Connected";
+  });
+
+  call.on("close", () => {
+    endCallCleanup();
+  });
+  
+  call.on("error", (err) => {
+    console.error("Call error:", err);
+    endCallCleanup();
+  });
+}
+
+socket.on("call-accepted-by-receiver", () => {
+  callStatusText.textContent = "Connected";
+});
+
+rejectCallBtn.addEventListener("click", () => {
+  socket.emit("end-call", { roomCode: currentRoom });
+  endCallCleanup();
+});
+
+socket.on("call-ended", () => {
+  endCallCleanup();
+});
+
+socket.on("call-directly-ended", () => {
+  endCallCleanup();
+});
+
+function endCallCleanup() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  if (currentCall) {
+    currentCall.close();
+    currentCall = null;
+  }
+  callModal.style.display = "none";
+  callVideoGrid.style.display = "none";
+  callProfileGrid.style.display = "flex";
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
+  remoteAudioElement.srcObject = null;
+  callStatusText.textContent = "Call Ended";
 }
