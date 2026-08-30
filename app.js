@@ -8,8 +8,11 @@ let currentCall = null;
 let localStream = null;
 let currentCallType = null;
 
-// Fixed Secret Admin Room Code
+// Secret Admin Room PIN (এটি তৈরি ও জয়েন উভয়ের জন্য নির্দিষ্ট পাসওয়ার্ড)
 const ADMIN_ROOM_PIN = "1430909";
+
+// Default Profile Image Fallback (ছবি না থাকলে এটি দেখাবে)
+const DEFAULT_AVATAR = "https://ui-avatars.com/api/?background=random&name=";
 
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
@@ -44,6 +47,7 @@ let isCreatingPassword = false;
 const authTitle = document.getElementById("authTitle");
 const signupFields = document.getElementById("signupFields");
 const fullNameInput = document.getElementById("fullNameInput");
+const signupAvatarInput = document.getElementById("signupAvatarInput");
 const phoneInput = document.getElementById("phoneInput");
 const authPasswordInput = document.getElementById("authPasswordInput");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
@@ -276,6 +280,13 @@ function grantAccess() {
     showDashboard();
   } else {
     authScreen.style.display = "block";
+    
+    // Auto fill saved login credentials if available
+    const savedCreds = JSON.parse(localStorage.getItem("savedAccountCredentials"));
+    if (savedCreds) {
+      phoneInput.value = savedCreds.phone || "";
+      authPasswordInput.value = savedCreds.password || "";
+    }
   }
 }
 
@@ -386,6 +397,12 @@ authToggleLink.addEventListener("click", (e) => {
     authSubmitBtn.textContent = "Login";
     authToggleMsg.textContent = "Don't have an account?";
     authToggleLink.textContent = "Sign Up";
+
+    const savedCreds = JSON.parse(localStorage.getItem("savedAccountCredentials"));
+    if (savedCreds) {
+      phoneInput.value = savedCreds.phone || "";
+      authPasswordInput.value = savedCreds.password || "";
+    }
   }
 });
 
@@ -398,26 +415,66 @@ authSubmitBtn.addEventListener("click", async () => {
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
     if (!name) return await showCustomAlert("Input Missing", "আপনার নাম লিখুন");
-    
-    const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
-    socket.emit("register-user", newUser, async (res) => {
-      if (res.success) {
-        currentUser = res.user;
-        localStorage.setItem("appUser", JSON.stringify(currentUser));
-        showDashboard();
-      } else {
-        await showCustomAlert("Error", res.message);
-      }
-    });
+
+    let profilePic = DEFAULT_AVATAR + encodeURIComponent(name);
+    const file = signupAvatarInput.files[0];
+
+    const processRegistration = (picUrl) => {
+      const newUser = { name, phone, password, pic: picUrl };
+      socket.emit("register-user", newUser, async (res) => {
+        if (res.success) {
+          currentUser = res.user;
+          localStorage.setItem("appUser", JSON.stringify(currentUser));
+          localStorage.setItem("savedAccountCredentials", JSON.stringify({ phone, password }));
+          await showCustomAlert("Success", "Account created successfully & password saved!");
+          showDashboard();
+        } else {
+          await showCustomAlert("Error", res.message);
+        }
+      });
+    };
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => processRegistration(evt.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      processRegistration(profilePic);
+    }
 
   } else {
     socket.emit("login-user", { phone, password }, async (res) => {
       if (res.success) {
         currentUser = res.user;
+
+        // Restore image backup if local storage contains it
+        const localSavedUser = JSON.parse(localStorage.getItem("appUser"));
+        if (localSavedUser && localSavedUser.phone === phone && localSavedUser.pic) {
+          currentUser.pic = localSavedUser.pic;
+        }
+
         localStorage.setItem("appUser", JSON.stringify(currentUser));
+        localStorage.setItem("savedAccountCredentials", JSON.stringify({ phone, password }));
         showDashboard();
       } else {
-        await showCustomAlert("Login Failed", res.message);
+        // Fallback for Render restart
+        const localSavedUser = JSON.parse(localStorage.getItem("appUser"));
+        const savedCreds = JSON.parse(localStorage.getItem("savedAccountCredentials"));
+
+        if (savedCreds && savedCreds.phone === phone) {
+          const fallbackName = localSavedUser ? localSavedUser.name : "User";
+          const fallbackPic = localSavedUser ? localSavedUser.pic : DEFAULT_AVATAR + encodeURIComponent(fallbackName);
+
+          socket.emit("register-user", { name: fallbackName, phone, password, pic: fallbackPic }, (regRes) => {
+            if (regRes.success) {
+              currentUser = regRes.user;
+              localStorage.setItem("appUser", JSON.stringify(currentUser));
+              showDashboard();
+            }
+          });
+        } else {
+          await showCustomAlert("Login Failed", res.message);
+        }
       }
     });
   }
@@ -428,7 +485,7 @@ function showDashboard() {
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
   dashboardUserName.textContent = currentUser.name;
-  if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
+  dashboardAvatar.src = currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name));
   updateDashboardPinUI();
 }
 
@@ -535,7 +592,7 @@ function joinRoom(code, isRefresh = false) {
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
-  chatUserAvatar.src = currentUser.pic;
+  chatUserAvatar.src = currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name));
 
   if (code === ADMIN_ROOM_PIN) {
     chatRoomCode.textContent = "Admin Room";
@@ -574,7 +631,7 @@ function sendChatMessage() {
       id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
-      senderPic: currentUser.pic,
+      senderPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name)),
       text: text,
       file: null,
       fileType: null,
@@ -607,7 +664,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
       id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
-      senderPic: currentUser.pic,
+      senderPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name)),
       text: "",
       file: evt.target.result,
       fileType: fType,
@@ -630,7 +687,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
 socket.on("user-joined-notify", (data) => {
   const systemMsg = document.createElement("div");
   systemMsg.className = "system-notification";
-  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
+  systemMsg.innerHTML = `<img src="${data.user.pic || (DEFAULT_AVATAR + encodeURIComponent(data.user.name))}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
   chatMessages.appendChild(systemMsg);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   saveMessages();
@@ -640,12 +697,11 @@ socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
 
-  // Auto trigger Seen signal if receiver is currently viewing the chat
   if (!isMe && data.id) {
     socket.emit("mark-as-seen", { 
       roomCode: currentRoom, 
       msgId: data.id, 
-      seenByPic: currentUser.pic 
+      seenByPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name))
     });
   }
 });
@@ -658,7 +714,7 @@ window.addEventListener("focus", () => {
         socket.emit("mark-as-seen", { 
           roomCode: currentRoom, 
           msgId: msg.id, 
-          seenByPic: currentUser.pic 
+          seenByPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name))
         });
       }
     });
@@ -670,10 +726,10 @@ function appendMessage(data, isMe) {
 
   const div = document.createElement("div");
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
-  if (data.id) div.setAttribute("id", data.id); // Explicit ID binding
+  if (data.id) div.setAttribute("id", data.id);
   
   const userAvatar = document.createElement("img");
-  userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
+  userAvatar.src = data.senderPic || (DEFAULT_AVATAR + encodeURIComponent(data.sender || "User"));
   userAvatar.className = "msg-avatar";
   div.appendChild(userAvatar);
 
@@ -784,14 +840,14 @@ function setCallUI(type, remoteUser) {
     callVideoGrid.style.display = "none";
     callProfileGrid.style.display = "flex";
 
-    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
+    localCallAvatar.src = currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name));
     localCallName.textContent = currentUser.name || "Me";
 
     if (remoteUser) {
-      remoteCallAvatar.src = remoteUser.pic || "https://via.placeholder.com/100";
+      remoteCallAvatar.src = remoteUser.pic || (DEFAULT_AVATAR + encodeURIComponent(remoteUser.name));
       remoteCallName.textContent = remoteUser.name || "User";
     } else {
-      remoteCallAvatar.src = "https://via.placeholder.com/100";
+      remoteCallAvatar.src = DEFAULT_AVATAR + "Connecting";
       remoteCallName.textContent = "Connecting...";
     }
   }
@@ -816,7 +872,7 @@ function initiateCall(type) {
       roomCode: currentRoom,
       callerName: currentUser.name,
       callerPeerId: myPeerId,
-      callerPic: currentUser.pic,
+      callerPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name)),
       callType: type
     });
   }).catch(async () => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
@@ -832,7 +888,7 @@ socket.on("incoming-call", (data) => {
 
 socket.on("call-accepted-by-receiver", (data) => {
   if (currentCallType === "audio") {
-    remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
+    remoteCallAvatar.src = data.receiverPic || (DEFAULT_AVATAR + encodeURIComponent(data.receiverName));
     remoteCallName.textContent = data.receiverName || "Connected User";
   }
   callStatusText.textContent = "Connected";
@@ -858,7 +914,7 @@ acceptCallBtn.addEventListener("click", () => {
     socket.emit("accept-call-notify", {
       roomCode: currentRoom,
       receiverName: currentUser.name,
-      receiverPic: currentUser.pic
+      receiverPic: currentUser.pic || (DEFAULT_AVATAR + encodeURIComponent(currentUser.name))
     });
 
     acceptCallBtn.style.display = "none";
@@ -922,4 +978,10 @@ leaveRoomBtn.addEventListener("click", () => {
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 themeToggleBtn.addEventListener("click", () => {
   document.body.classList.toggle("light-theme");
+  const icon = themeToggleBtn.querySelector("i");
+  if (document.body.classList.contains("light-theme")) {
+    icon.classList.replace("fa-moon", "fa-sun");
+  } else {
+    icon.classList.replace("fa-sun", "fa-moon");
+  }
 });
