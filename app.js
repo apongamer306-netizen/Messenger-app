@@ -188,12 +188,28 @@ function showCustomModal(options) {
   });
 }
 
+// FIXED: Properly resolves promise on confirm for direct room entry
 function showCustomAlert(title, subtitle) {
-  return showCustomModal({
-    title: title,
-    subtitle: subtitle,
-    hasInput: false,
-    hideCancel: true
+  modalTitle.textContent = title;
+  modalSubtitle.textContent = subtitle;
+  modalInputGroup.style.display = "none";
+
+  modalActionContainer.innerHTML = `
+    <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
+      <button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%;">Confirm</button>
+    </div>
+  `;
+
+  const confBtn = document.getElementById("modalConfirmBtn");
+  customModalOverlay.style.display = "flex";
+
+  return new Promise((resolve) => {
+    const handleConfirm = () => {
+      confBtn.removeEventListener("click", handleConfirm);
+      customModalOverlay.style.display = "none";
+      resolve(true);
+    };
+    confBtn.addEventListener("click", handleConfirm);
   });
 }
 
@@ -278,14 +294,14 @@ unlockBtn.addEventListener("click", async () => {
     if (enteredPin === savedPin) {
       grantAccess();
     } else {
-      await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
+      await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
     }
   } else if (isCreatingPassword) {
     if (!enteredPin) {
-      return await showCustomAlert("Input Error", "অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
+      return await showCustomAlert("Input Error", "অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
     }
     localStorage.setItem("appMasterPin", enteredPin);
-    await showCustomAlert("Success", "পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
+    await showCustomAlert("Success", "পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
     grantAccess();
   }
 });
@@ -344,12 +360,12 @@ if (setPinBtn) {
         if (newPin && newPin.trim() !== "") {
           localStorage.setItem("appMasterPin", newPin.trim());
           updateDashboardPinUI();
-          await showCustomAlert("Success", "নতুন Security PIN সফলভাবে সেভ করা হয়েছে!");
+          await showCustomAlert("Success", "নতুন Security PIN সফলভাবে সেভ করা হয়েছে!");
         } else if (newPin !== null) {
           await showCustomAlert("Error", "Security PIN ফাঁকা রাখা যাবে না!");
         }
       } else {
-        await showCustomAlert("Failed", "ভুল Security PIN দিয়েছেন!");
+        await showCustomAlert("Failed", "ভুল Security PIN দিয়েছেন!");
       }
 
     } else {
@@ -363,7 +379,7 @@ if (setPinBtn) {
       if (newPin && newPin.trim() !== "") {
         localStorage.setItem("appMasterPin", newPin.trim());
         updateDashboardPinUI();
-        await showCustomAlert("Success", "Security PIN সফলভাবে সেট করা হয়েছে!");
+        await showCustomAlert("Success", "Security PIN সফলভাবে সেট করা হয়েছে!");
       } else if (newPin !== null) {
         await showCustomAlert("Error", "Security PIN ফাঁকা রাখা যাবে না!");
       }
@@ -381,7 +397,7 @@ if (removePinBtn) {
 
     const enteredPin = await showCustomModal({
       title: "Remove Security PIN",
-      subtitle: "পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি দিন:",
+      subtitle: "পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি দিন:",
       hasInput: true,
       placeholder: "Enter Security PIN"
     });
@@ -391,9 +407,9 @@ if (removePinBtn) {
     if (enteredPin === savedPin) {
       localStorage.removeItem("appMasterPin");
       updateDashboardPinUI();
-      await showCustomAlert("Remove Success", "আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
+      await showCustomAlert("Remove Success", "আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
     } else {
-      await showCustomAlert("Remove Failed", "ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
+      await showCustomAlert("Remove Failed", "ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
     }
   });
 }
@@ -421,7 +437,7 @@ authSubmitBtn.addEventListener("click", async () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
 
-  if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+  if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
   const localUsers = getStoredUsers();
 
@@ -456,7 +472,7 @@ authSubmitBtn.addEventListener("click", async () => {
           localStorage.setItem("appUser", JSON.stringify(currentUser));
           showDashboard();
         } else {
-          await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
+          await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
         }
       });
     }
@@ -489,11 +505,11 @@ avatarUpload.addEventListener("change", (e) => {
 // CREATE ROOM HANDLER (Fixed Direct Redirect on Confirm)
 createRoomBtn.addEventListener("click", async () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-  await showCustomAlert("Room Created!", `আপনার রুম কোড: ${randomCode}\nকোডটি শেয়ার করুন অন্যকে জয়েন করানোর জন্য।`);
+  await showCustomAlert("Room Created!", `আপনার রুম কোড: ${randomCode}\nকোডটি শেয়ার করুন অন্যকে জয়েন করানোর জন্য।`);
   joinRoom(randomCode);
 });
 
-// JOIN ROOM HANDLER (প্রিমিয়াম পপ-আপ মোডাল)
+// JOIN ROOM HANDLER
 joinRoomBtn.addEventListener("click", () => {
   modalTitle.textContent = "Join Room";
   modalSubtitle.textContent = "Select room type to join:";
@@ -511,7 +527,6 @@ joinRoomBtn.addEventListener("click", () => {
 
   customModalOverlay.style.display = "flex";
 
-  // Special Room Option
   document.getElementById("optJoinSpecialBtn").onclick = async () => {
     customModalOverlay.style.display = "none";
     const enteredPin = await showCustomModal({
@@ -526,11 +541,10 @@ joinRoomBtn.addEventListener("click", () => {
     if (enteredPin === ADMIN_ROOM_PIN) {
       joinRoom(ADMIN_ROOM_PIN);
     } else {
-      await showCustomAlert("Access Denied", "ভুল Secret PIN! আপনি স্পেশাল রুমে জয়েন করতে পারবেন না।");
+      await showCustomAlert("Access Denied", "ভুল Secret PIN! আপনি স্পেশাল রুমে জয়েন করতে পারবেন না।");
     }
   };
 
-  // Random Room Option
   document.getElementById("optJoinRandomBtn").onclick = async () => {
     customModalOverlay.style.display = "none";
     const code = await showCustomModal({
@@ -550,7 +564,7 @@ joinRoomBtn.addEventListener("click", () => {
   };
 });
 
-// Join Room With Server Validation (Max 2 Users Check for Special Room)
+// Join Room With Server Validation
 function joinRoom(code, isRefresh = false) {
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, async (response) => {
     
