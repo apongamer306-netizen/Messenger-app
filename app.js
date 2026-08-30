@@ -641,7 +641,11 @@ socket.on("receive-message", (data) => {
   appendMessage(data, isMe);
 
   if (!isMe && data.id && document.hasFocus()) {
-    socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
+    socket.emit("mark-as-seen", { 
+      roomCode: currentRoom, 
+      msgId: data.id, 
+      seenByPic: currentUser.pic 
+    });
   }
 });
 
@@ -650,7 +654,11 @@ window.addEventListener("focus", () => {
     const unreadMessages = document.querySelectorAll(".other-msg");
     unreadMessages.forEach(msg => {
       if (msg.id) {
-        socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: msg.id });
+        socket.emit("mark-as-seen", { 
+          roomCode: currentRoom, 
+          msgId: msg.id, 
+          seenByPic: currentUser.pic 
+        });
       }
     });
   }
@@ -700,13 +708,15 @@ function appendMessage(data, isMe) {
   if (isMe) {
     const statusSpan = document.createElement("span");
     statusSpan.className = "msg-status";
-    statusSpan.style.cssText = "font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 3px;";
     
-    let statusText = "Sending...";
-    if (data.status === "sent") statusText = "Sent";
-    if (data.status === "seen") statusText = "Seen";
+    if (data.status === "seen" && data.seenByPic) {
+      statusSpan.innerHTML = `<img src="${data.seenByPic}" class="seen-avatar" title="Seen"/>`;
+    } else if (data.status === "sent") {
+      statusSpan.textContent = "Sent";
+    } else {
+      statusSpan.textContent = "Sending...";
+    }
     
-    statusSpan.textContent = statusText;
     contentBox.appendChild(statusSpan);
   }
 
@@ -717,19 +727,23 @@ function appendMessage(data, isMe) {
   saveMessages();
 }
 
-function updateMessageStatus(msgId, statusText) {
+function updateMessageStatus(msgId, statusText, seenByPic = null) {
   const msgElem = document.getElementById(msgId);
   if (msgElem) {
     const statusSpan = msgElem.querySelector(".msg-status");
     if (statusSpan) {
-      statusSpan.textContent = statusText;
+      if (statusText === "Seen" && seenByPic) {
+        statusSpan.innerHTML = `<img src="${seenByPic}" class="seen-avatar" title="Seen"/>`;
+      } else {
+        statusSpan.textContent = statusText;
+      }
     }
   }
   saveMessages();
 }
 
 socket.on("message-seen", (data) => {
-  updateMessageStatus(data.msgId, "Seen");
+  updateMessageStatus(data.msgId, "Seen", data.seenByPic);
 });
 
 function saveMessages() {
