@@ -67,6 +67,15 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
+// Custom Modal Elements
+const customModalOverlay = document.getElementById("customModalOverlay");
+const modalTitle = document.getElementById("modalTitle");
+const modalSubtitle = document.getElementById("modalSubtitle");
+const modalInputGroup = document.getElementById("modalInputGroup");
+const modalInput = document.getElementById("modalInput");
+const modalConfirmBtn = document.getElementById("modalConfirmBtn");
+const modalCancelBtn = document.getElementById("modalCancelBtn");
+
 // Call Modal Elements
 const callModal = document.getElementById("callModal");
 const callStatusText = document.getElementById("callStatusText");
@@ -99,6 +108,59 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
+// ------------------- CUSTOM BEAUTIFUL MODAL SYSTEM -------------------
+
+function showCustomModal(options) {
+  modalTitle.textContent = options.title || "Notice";
+  modalSubtitle.textContent = options.subtitle || "";
+  
+  if (options.hasInput) {
+    modalInputGroup.style.display = "block";
+    modalInput.value = "";
+    modalInput.placeholder = options.placeholder || "Enter value";
+  } else {
+    modalInputGroup.style.display = "none";
+  }
+
+  if (options.hideCancel) {
+    modalCancelBtn.style.display = "none";
+  } else {
+    modalCancelBtn.style.display = "inline-block";
+  }
+
+  customModalOverlay.style.display = "flex";
+
+  return new Promise((resolve) => {
+    const handleConfirm = () => {
+      cleanup();
+      resolve(options.hasInput ? modalInput.value.trim() : true);
+    };
+
+    const handleCancel = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    const cleanup = () => {
+      customModalOverlay.style.display = "none";
+      modalConfirmBtn.removeEventListener("click", handleConfirm);
+      modalCancelBtn.removeEventListener("click", handleCancel);
+    };
+
+    modalConfirmBtn.addEventListener("click", handleConfirm);
+    modalCancelBtn.addEventListener("click", handleCancel);
+  });
+}
+
+function showCustomAlert(title, subtitle) {
+  return showCustomModal({
+    title: title,
+    subtitle: subtitle,
+    hasInput: false,
+    hideCancel: true
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   checkActiveSession();
 });
@@ -109,7 +171,6 @@ function updateMasterScreenUI() {
   const savedPin = localStorage.getItem("appMasterPin");
 
   if (savedPin) {
-    // যদি পূর্বে পাসওয়ার্ড সেভ করা থাকে
     masterTitle.textContent = "Enter Security PIN";
     masterSubtitle.textContent = "Please enter your password to proceed";
     passInputGroup.style.display = "block";
@@ -118,7 +179,6 @@ function updateMasterScreenUI() {
     directOpenBtn.style.display = "none";
     masterToggleMsg.parentElement.style.display = "none";
   } else {
-    // যদি পাসওয়ার্ড সেভ না করা থাকে
     if (isCreatingPassword) {
       masterTitle.textContent = "Create Password";
       masterSubtitle.textContent = "Set a password for app security";
@@ -168,7 +228,6 @@ function checkActiveSession() {
   }
 }
 
-// Toggle between Create Password and Direct Open
 masterToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isCreatingPassword = !isCreatingPassword;
@@ -176,8 +235,7 @@ masterToggleLink.addEventListener("click", (e) => {
   updateMasterScreenUI();
 });
 
-// Submit / Unlock button event
-unlockBtn.addEventListener("click", () => {
+unlockBtn.addEventListener("click", async () => {
   const savedPin = localStorage.getItem("appMasterPin");
   const enteredPin = masterKeyInput.value.trim();
 
@@ -185,19 +243,18 @@ unlockBtn.addEventListener("click", () => {
     if (enteredPin === savedPin) {
       grantAccess();
     } else {
-      alert("ভুল Security PIN দিয়েছেন!");
+      await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
     }
   } else if (isCreatingPassword) {
     if (!enteredPin) {
-      return alert("অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
+      return await showCustomAlert("Input Error", "অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
     }
     localStorage.setItem("appMasterPin", enteredPin);
-    alert("পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
+    await showCustomAlert("Success", "পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
     grantAccess();
   }
 });
 
-// Direct Open button event
 directOpenBtn.addEventListener("click", () => {
   grantAccess();
 });
@@ -215,24 +272,29 @@ function grantAccess() {
   }
 }
 
-// ------------------- REMOVE SECURITY PIN LOGIC -------------------
+// ------------------- REMOVE SECURITY PIN LOGIC (WITH NEW UI) -------------------
 if (removePinBtn) {
-  removePinBtn.addEventListener("click", () => {
+  removePinBtn.addEventListener("click", async () => {
     const savedPin = localStorage.getItem("appMasterPin");
 
     if (!savedPin) {
-      return alert("বর্তমানে কোনো Security PIN সেট করা নেই!");
+      return await showCustomAlert("No PIN Found", "বর্তমানে কোনো Security PIN সেট করা নেই!");
     }
 
-    const enteredPin = prompt("পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি লিখুন:");
+    const enteredPin = await showCustomModal({
+      title: "Remove Security PIN",
+      subtitle: "পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি দিন:",
+      hasInput: true,
+      placeholder: "Enter Security PIN"
+    });
 
-    if (enteredPin === null) return; // ইউজার Cancel চাপলে কিছু হবে না
+    if (enteredPin === null) return;
 
-    if (enteredPin.trim() === savedPin) {
+    if (enteredPin === savedPin) {
       localStorage.removeItem("appMasterPin");
-      alert("আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
+      await showCustomAlert("Remove Success", "আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
     } else {
-      alert("ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
+      await showCustomAlert("Remove Failed", "ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
     }
   });
 }
@@ -257,35 +319,35 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-authSubmitBtn.addEventListener("click", () => {
+authSubmitBtn.addEventListener("click", async () => {
   const phone = phoneInput.value.trim();
   const password = authPasswordInput.value.trim();
 
-  if (!phone || !password) return alert("ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+  if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
-    if (!name) return alert("আপনার নাম লিখুন");
+    if (!name) return await showCustomAlert("Input Missing", "আপনার নাম লিখুন");
     
     const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
-    socket.emit("register-user", newUser, (res) => {
+    socket.emit("register-user", newUser, async (res) => {
       if (res.success) {
         currentUser = res.user;
         localStorage.setItem("appUser", JSON.stringify(currentUser));
         showDashboard();
       } else {
-        alert(res.message);
+        await showCustomAlert("Error", res.message);
       }
     });
 
   } else {
-    socket.emit("login-user", { phone, password }, (res) => {
+    socket.emit("login-user", { phone, password }, async (res) => {
       if (res.success) {
         currentUser = res.user;
         localStorage.setItem("appUser", JSON.stringify(currentUser));
         showDashboard();
       } else {
-        alert(res.message);
+        await showCustomAlert("Login Failed", res.message);
       }
     });
   }
@@ -597,7 +659,7 @@ function initiateCall(type) {
       callerPic: currentUser.pic,
       callType: type
     });
-  }).catch((err) => alert("Camera & Microphone Access Required!"));
+  }).catch(async (err) => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
 }
 
 socket.on("incoming-call", (data) => {
