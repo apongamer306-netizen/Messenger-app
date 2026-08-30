@@ -187,12 +187,21 @@ body.light-theme .input-wrapper input {
   overflow: hidden;
 }
 
+body.light-theme .chat-container {
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
 .chat-header {
   padding: 15px;
   background: #2a2a2a;
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+body.light-theme .chat-header {
+  background: #f1f3f5;
 }
 
 .user-info {
@@ -222,6 +231,11 @@ body.light-theme .input-wrapper input {
   cursor: pointer;
 }
 
+body.light-theme .action-btn {
+  background: #dee2e6;
+  color: #333;
+}
+
 .chat-messages {
   flex: 1;
   padding: 15px;
@@ -239,6 +253,10 @@ body.light-theme .input-wrapper input {
   gap: 10px;
 }
 
+body.light-theme .chat-input-area {
+  background: #f1f3f5;
+}
+
 .chat-input-area input {
   flex: 1;
   padding: 10px 15px;
@@ -247,6 +265,12 @@ body.light-theme .input-wrapper input {
   outline: none;
   background: #333;
   color: #fff;
+}
+
+body.light-theme .chat-input-area input {
+  background: #ffffff;
+  border: 1px solid #ced4da;
+  color: #000;
 }
 
 .attach-btn, .send-btn {
