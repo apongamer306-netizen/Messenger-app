@@ -15,7 +15,7 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"]
   },
-  maxHttpBufferSize: 1e8
+  maxHttpBufferSize: 1e8 // ফাইল পাঠানোর সাইজ বড় রাখার জন্য
 });
 
 app.get("/", (req, res) => {
@@ -67,10 +67,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("mark-as-seen", (data) => {
-    socket.to(data.roomCode).emit("message-seen", { msgId: data.msgId });
-  });
-
   socket.on("call-user", (data) => {
     socket.to(data.roomCode).emit("incoming-call", data);
   });
@@ -80,7 +76,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("end-call", (data) => {
-    socket.to(data.roomCode).emit("call-ended");
+    socket.to(data.roomCode).emit("call-directly-ended") || socket.to(data.roomCode).emit("call-ended");
   });
 
   socket.on("leave-room", ({ roomCode }) => {
