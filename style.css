@@ -22,22 +22,14 @@ body {
   box-sizing: border-box;
 }
 
-/* App Main Layout Screens */
-.screen {
-  display: none;
-  width: 100vw;
-  height: 100vh;
-  box-sizing: border-box;
-}
-
 /* Full Screen Responsive Chat Layout */
 #chatScreen {
   display: none;
   flex-direction: column;
   width: 100vw;
-  height: calc(100vh - 60px);
-  position: absolute;
-  top: 60px;
+  height: 100vh;
+  position: fixed;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
@@ -46,20 +38,53 @@ body {
   overflow: hidden;
   margin: 0;
   padding: 0;
-  border-radius: 0;
-  max-width: 100% !important;
+  z-index: 100;
 }
 
 /* Chat Header Area */
-#chatScreen .chat-header {
+#chatScreen .chat-header,
+#chatScreen header, 
+.chat-header-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
+  padding: 10px 20px;
   background-color: var(--header-bg);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   width: 100%;
+  height: 60px;
   box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+/* Header User Profile Info Fix (Small Avatar, Name & Code) */
+#chatScreen .chat-header img,
+#chatScreen .chat-user-img,
+#chatUserAvatar {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  object-fit: cover;
+  margin-right: 12px;
+}
+
+#chatScreen .chat-header .user-info,
+#chatScreen .header-user-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#chatUserName {
+  font-size: 15px;
+  font-weight: bold;
+  margin: 0;
+}
+
+#chatRoomCode {
+  font-size: 12px;
+  opacity: 0.7;
+  margin: 0;
 }
 
 /* Chat Messages Container */
@@ -82,7 +107,9 @@ body {
   background-color: var(--header-bg);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   width: 100%;
+  height: 65px;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 /* Message Input Field */
@@ -95,23 +122,4 @@ body {
   color: inherit;
   outline: none;
   font-size: 14px;
-}
-
-/* General Buttons */
-.btn {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.btn-primary {
-  background-color: #0d6efd;
-  color: #fff;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: #fff;
 }
