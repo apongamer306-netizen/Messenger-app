@@ -100,6 +100,18 @@ const startVideoCallBtn = document.getElementById("startVideoCallBtn");
 
 let isSignUpMode = false;
 
+// LocalStorage Helper Functions
+function getStoredUsers() {
+  const users = localStorage.getItem("usersDatabase");
+  return users ? JSON.parse(users) : {};
+}
+
+function saveUserToStorage(user) {
+  const users = getStoredUsers();
+  users[user.phone] = user;
+  localStorage.setItem("usersDatabase", JSON.stringify(users));
+}
+
 function togglePasswordVisibility(inputId, iconElem) {
   const input = document.getElementById(inputId);
   if (input.type === "password") {
@@ -370,7 +382,7 @@ if (removePinBtn) {
   });
 }
 
-// Authentication Logic
+// Authentication Logic (Updated for LocalStorage Sync)
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -395,31 +407,48 @@ authSubmitBtn.addEventListener("click", async () => {
 
   if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
 
+  const localUsers = getStoredUsers();
+
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
     if (!name) return await showCustomAlert("Input Missing", "আপনার নাম লিখুন");
     
+    if (localUsers[phone]) {
+      return await showCustomAlert("Error", "এই নম্বরটি ইতিমধ্যেই নিবন্ধিত!");
+    }
+
     const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
+    
+    // Local Storage-এ ইউজার সেভ করা 
+    saveUserToStorage(newUser);
+    
+    // সকেট সার্ভারে ব্যাকআপ রেজিস্টার 
     socket.emit("register-user", newUser, async (res) => {
-      if (res.success) {
-        currentUser = res.user;
-        localStorage.setItem("appUser", JSON.stringify(currentUser));
-        showDashboard();
-      } else {
-        await showCustomAlert("Error", res.message);
-      }
+      currentUser = newUser;
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+      showDashboard();
     });
 
   } else {
-    socket.emit("login-user", { phone, password }, async (res) => {
-      if (res.success) {
-        currentUser = res.user;
-        localStorage.setItem("appUser", JSON.stringify(currentUser));
-        showDashboard();
-      } else {
-        await showCustomAlert("Login Failed", res.message);
-      }
-    });
+    // LocalStorage থেকে পাসওয়ার্ড চেক করা
+    const localUser = localUsers[phone];
+    if (localUser && localUser.password === password) {
+      currentUser = localUser;
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+      showDashboard();
+    } else {
+      // ব্যাকএন্ড সার্ভার থেকেও একবার চেষ্টা করার জন্য Fallback
+      socket.emit("login-user", { phone, password }, async (res) => {
+        if (res.success) {
+          currentUser = res.user;
+          saveUserToStorage(currentUser); // লোকাল স্টোরেজে না থাকলে সেভ করে নেয়া
+          localStorage.setItem("appUser", JSON.stringify(currentUser));
+          showDashboard();
+        } else {
+          await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
+        }
+      });
+    }
   }
 });
 
@@ -432,6 +461,7 @@ function showDashboard() {
   updateDashboardPinUI();
 }
 
+// Profile Picture Upload Handler (Base64 সেভ এবং LocalStorage আপডেট)
 avatarUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -439,7 +469,10 @@ avatarUpload.addEventListener("change", (e) => {
     reader.onload = (evt) => {
       currentUser.pic = evt.target.result;
       dashboardAvatar.src = currentUser.pic;
+      
+      // কারেন্ট ইউজার ও ফুল ডাটাবেজে পিকচার আপডেট
       localStorage.setItem("appUser", JSON.stringify(currentUser));
+      saveUserToStorage(currentUser);
     };
     reader.readAsDataURL(file);
   }
@@ -551,6 +584,7 @@ function joinRoom(code, isRefresh = false) {
   }
 }
 
+// Logout Handler (কারেন্ট সেশন মুছে যাবে কিন্তু LocalStorage Database থেকে অ্যাকাউন্ট ডাটা মুছবে না)
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
@@ -575,351 +609,7 @@ function sendChatMessage() {
       roomCode: currentRoom,
       sender: currentUser.name,
       senderPic: currentUser.pic,
-      text: text,
-      file: null,
-      fileType: null,
-      status: "sending"
+      text: text
     };
-
-    appendMessage(msgData, true);
-    chatMessageInput.value = "";
-
-    socket.emit("send-message", msgData, (ack) => {
-      if (ack && ack.success) {
-        updateMessageStatus(msgId, "Sent");
-      }
-    });
   }
 }
-
-fileAttachmentInput.addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file || !currentRoom) return;
-
-  const reader = new FileReader();
-  reader.onload = (evt) => {
-    let fType = "file";
-    if (file.type.startsWith("image/")) fType = "image";
-    else if (file.type.startsWith("video/")) fType = "video";
-
-    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-    const msgData = {
-      id: msgId,
-      roomCode: currentRoom,
-      sender: currentUser.name,
-      senderPic: currentUser.pic,
-      text: "",
-      file: evt.target.result,
-      fileType: fType,
-      fileName: file.name,
-      status: "sending"
-    };
-
-    appendMessage(msgData, true);
-    fileAttachmentInput.value = "";
-
-    socket.emit("send-message", msgData, (ack) => {
-      if (ack && ack.success) {
-        updateMessageStatus(msgId, "Sent");
-      }
-    });
-  };
-  reader.readAsDataURL(file);
-});
-
-socket.on("user-joined-notify", (data) => {
-  const systemMsg = document.createElement("div");
-  systemMsg.className = "system-notification";
-  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
-  chatMessages.appendChild(systemMsg);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  saveMessages();
-});
-
-socket.on("receive-message", (data) => {
-  const isMe = data.sender === currentUser.name;
-  appendMessage(data, isMe);
-
-  // Auto trigger Seen signal if receiver is currently viewing the chat
-  if (!isMe && data.id) {
-    socket.emit("mark-as-seen", { 
-      roomCode: currentRoom, 
-      msgId: data.id, 
-      seenByPic: currentUser.pic 
-    });
-  }
-});
-
-window.addEventListener("focus", () => {
-  if (currentRoom) {
-    const unreadMessages = document.querySelectorAll(".other-msg");
-    unreadMessages.forEach(msg => {
-      if (msg.id) {
-        socket.emit("mark-as-seen", { 
-          roomCode: currentRoom, 
-          msgId: msg.id, 
-          seenByPic: currentUser.pic 
-        });
-      }
-    });
-  }
-});
-
-function appendMessage(data, isMe) {
-  if (data.id && document.getElementById(data.id)) return;
-
-  const div = document.createElement("div");
-  div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
-  if (data.id) div.setAttribute("id", data.id); // Explicit ID binding
-  
-  const userAvatar = document.createElement("img");
-  userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
-  userAvatar.className = "msg-avatar";
-  div.appendChild(userAvatar);
-
-  const contentBox = document.createElement("div");
-  contentBox.className = "msg-content";
-
-  if (data.text) {
-    const textNode = document.createElement("p");
-    textNode.textContent = data.text;
-    contentBox.appendChild(textNode);
-  }
-
-  if (data.file) {
-    const mediaContainer = document.createElement("div");
-    mediaContainer.className = "media-wrapper";
-
-    if (data.fileType === "image") {
-      const img = document.createElement("img");
-      img.src = data.file;
-      img.className = "chat-media-preview";
-      img.onclick = () => openFullscreenImage(data.file);
-      mediaContainer.appendChild(img);
-    } else if (data.fileType === "video") {
-      const vid = document.createElement("video");
-      vid.src = data.file;
-      vid.controls = true;
-      vid.className = "chat-media-preview";
-      mediaContainer.appendChild(vid);
-    }
-    contentBox.appendChild(mediaContainer);
-  }
-
-  if (isMe) {
-    const statusSpan = document.createElement("span");
-    statusSpan.className = "msg-status";
-    
-    if (data.status === "seen" && data.seenByPic) {
-      statusSpan.innerHTML = `<img src="${data.seenByPic}" class="seen-avatar" title="Seen"/>`;
-    } else if (data.status === "sent") {
-      statusSpan.textContent = "Sent";
-    } else {
-      statusSpan.textContent = "Sending...";
-    }
-    
-    contentBox.appendChild(statusSpan);
-  }
-
-  div.appendChild(contentBox);
-  chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  saveMessages();
-}
-
-function updateMessageStatus(msgId, statusText, seenByPic = null) {
-  const msgElem = document.getElementById(msgId);
-  if (msgElem) {
-    const statusSpan = msgElem.querySelector(".msg-status");
-    if (statusSpan) {
-      if (statusText === "Seen" && seenByPic) {
-        statusSpan.innerHTML = `<img src="${seenByPic}" class="seen-avatar" title="Seen"/>`;
-      } else {
-        statusSpan.textContent = statusText;
-      }
-    }
-  }
-  saveMessages();
-}
-
-socket.on("message-seen", (data) => {
-  updateMessageStatus(data.msgId, "Seen", data.seenByPic);
-});
-
-function saveMessages() {
-  sessionStorage.setItem("savedChatLogs", chatMessages.innerHTML);
-}
-
-function restoreMessages() {
-  const saved = sessionStorage.getItem("savedChatLogs");
-  if (saved) {
-    chatMessages.innerHTML = saved;
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-}
-
-function openFullscreenImage(src) {
-  const modal = document.createElement("div");
-  modal.className = "fullscreen-modal";
-  modal.onclick = () => modal.remove();
-  const img = document.createElement("img");
-  img.src = src;
-  modal.appendChild(img);
-  document.body.appendChild(modal);
-}
-
-// Audio / Video Calling Logic
-let incomingCallData = null;
-
-startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
-startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
-
-function setCallUI(type, remoteUser) {
-  currentCallType = type;
-  if (type === "video") {
-    callVideoGrid.style.display = "flex";
-    callProfileGrid.style.display = "none";
-  } else {
-    callVideoGrid.style.display = "none";
-    callProfileGrid.style.display = "flex";
-
-    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
-    localCallName.textContent = currentUser.name || "Me";
-
-    if (remoteUser) {
-      remoteCallAvatar.src = remoteUser.pic || "https://via.placeholder.com/100";
-      remoteCallName.textContent = remoteUser.name || "User";
-    } else {
-      remoteCallAvatar.src = "https://via.placeholder.com/100";
-      remoteCallName.textContent = "Connecting...";
-    }
-  }
-}
-
-function initiateCall(type) {
-  if (!currentRoom) return;
-  const isVideo = type === "video";
-  
-  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
-    localStream = stream;
-    if (isVideo) {
-      localVideo.srcObject = stream;
-    }
-    
-    setCallUI(type, null);
-    callModal.style.display = "flex";
-    callStatusText.textContent = "Calling...";
-    acceptCallBtn.style.display = "none";
-
-    socket.emit("call-user", {
-      roomCode: currentRoom,
-      callerName: currentUser.name,
-      callerPeerId: myPeerId,
-      callerPic: currentUser.pic,
-      callType: type
-    });
-  }).catch(async () => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
-}
-
-socket.on("incoming-call", (data) => {
-  incomingCallData = data;
-  setCallUI(data.callType, { name: data.callerName, pic: data.callerPic });
-  callModal.style.display = "flex";
-  callStatusText.textContent = `${data.callerName} is ${data.callType} calling...`;
-  acceptCallBtn.style.display = "inline-block";
-});
-
-socket.on("call-accepted-by-receiver", (data) => {
-  if (currentCallType === "audio") {
-    remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
-    remoteCallName.textContent = data.receiverName || "Connected User";
-  }
-  callStatusText.textContent = "Connected";
-});
-
-acceptCallBtn.addEventListener("click", () => {
-  if (!incomingCallData) return;
-  const isVideo = incomingCallData.callType === "video";
-
-  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
-    localStream = stream;
-    if (isVideo) {
-      localVideo.srcObject = stream;
-    }
-
-    setCallUI(incomingCallData.callType, { name: incomingCallData.callerName, pic: incomingCallData.callerPic });
-
-    const call = myPeer.call(incomingCallData.callerPeerId, stream);
-    currentCall = call;
-
-    handleStream(call, isVideo);
-
-    socket.emit("accept-call-notify", {
-      roomCode: currentRoom,
-      receiverName: currentUser.name,
-      receiverPic: currentUser.pic
-    });
-
-    acceptCallBtn.style.display = "none";
-  });
-});
-
-myPeer.on("call", (call) => {
-  currentCall = call;
-  call.answer(localStream);
-  const isVideo = currentCallType === "video";
-  handleStream(call, isVideo);
-});
-
-function handleStream(call, isVideo) {
-  call.on("stream", (remoteStream) => {
-    if (isVideo) {
-      remoteVideo.srcObject = remoteStream;
-      remoteVideo.play().catch(e => console.log(e));
-    } else {
-      remoteAudioElement.srcObject = remoteStream;
-      remoteAudioElement.play().catch(e => console.log(e));
-    }
-    callStatusText.textContent = "Connected";
-  });
-}
-
-rejectCallBtn.addEventListener("click", endCall);
-
-socket.on("call-ended", () => {
-  closeCallUI();
-});
-
-function endCall() {
-  if (currentRoom) {
-    socket.emit("end-call", { roomCode: currentRoom });
-  }
-  closeCallUI();
-}
-
-function closeCallUI() {
-  if (currentCall) currentCall.close();
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-  }
-  callModal.style.display = "none";
-  localVideo.srcObject = null;
-  remoteVideo.srcObject = null;
-  remoteAudioElement.srcObject = null;
-  currentCallType = null;
-}
-
-leaveRoomBtn.addEventListener("click", () => {
-  sessionStorage.removeItem("activeRoom");
-  sessionStorage.removeItem("savedChatLogs");
-  currentRoom = null;
-  chatMessages.innerHTML = "";
-  chatScreen.style.display = "none";
-  dashboardScreen.style.display = "block";
-});
-
-const themeToggleBtn = document.getElementById("themeToggleBtn");
-themeToggleBtn.addEventListener("click", () => {
-  document.body.classList.toggle("light-theme");
-});
