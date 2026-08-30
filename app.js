@@ -1,186 +1,833 @@
-<!DOCTYPE html>
-<html lang="bn">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EKT CHATING APP</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+const socket = io("https://ekt-chatter.onrender.com", {
+  transports: ["websocket", "polling"]
+});
+
+let myPeer = new Peer();
+let myPeerId = null;
+let currentCall = null;
+let localStream = null;
+let currentCallType = null;
+
+let remoteAudioElement = document.createElement("audio");
+remoteAudioElement.autoplay = true;
+document.body.appendChild(remoteAudioElement);
+
+myPeer.on("open", (id) => {
+  myPeerId = id;
+  checkActiveSession();
+});
+
+let currentUser = null;
+let currentRoom = null;
+
+// DOM Elements
+const masterKeyScreen = document.getElementById("masterKeyScreen");
+const authScreen = document.getElementById("authScreen");
+const dashboardScreen = document.getElementById("dashboardScreen");
+const chatScreen = document.getElementById("chatScreen");
+
+// Master Key DOM Elements
+const masterTitle = document.getElementById("masterTitle");
+const masterSubtitle = document.getElementById("masterSubtitle");
+const passInputGroup = document.getElementById("passInputGroup");
+const masterKeyInput = document.getElementById("masterKeyInput");
+const unlockBtn = document.getElementById("unlockBtn");
+const directOpenBtn = document.getElementById("directOpenBtn");
+const masterToggleMsg = document.getElementById("masterToggleMsg");
+const masterToggleLink = document.getElementById("masterToggleLink");
+
+let isCreatingPassword = false;
+
+const authTitle = document.getElementById("authTitle");
+const signupFields = document.getElementById("signupFields");
+const fullNameInput = document.getElementById("fullNameInput");
+const phoneInput = document.getElementById("phoneInput");
+const authPasswordInput = document.getElementById("authPasswordInput");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authToggleLink = document.getElementById("authToggleLink");
+const authToggleMsg = document.getElementById("authToggleMsg");
+
+const dashboardAvatar = document.getElementById("dashboardAvatar");
+const dashboardUserName = document.getElementById("dashboardUserName");
+const avatarUpload = document.getElementById("avatarUpload");
+
+const createRoomBtn = document.getElementById("createRoomBtn");
+const roomCodeInput = document.getElementById("roomCodeInput");
+const joinRoomBtn = document.getElementById("joinRoomBtn");
+
+const setPinBtn = document.getElementById("setPinBtn");
+const setPinBtnText = document.getElementById("setPinBtnText");
+const removePinBtn = document.getElementById("removePinBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+const chatUserAvatar = document.getElementById("chatUserAvatar");
+const chatUserName = document.getElementById("chatUserName");
+const chatRoomCode = document.getElementById("chatRoomCode");
+const chatMessages = document.getElementById("chatMessages");
+const chatMessageInput = document.getElementById("chatMessageInput");
+const sendMessageBtn = document.getElementById("sendMessageBtn");
+const fileAttachmentInput = document.getElementById("fileAttachmentInput");
+const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+
+// Custom Modal Elements
+const customModalOverlay = document.getElementById("customModalOverlay");
+const modalTitle = document.getElementById("modalTitle");
+const modalSubtitle = document.getElementById("modalSubtitle");
+const modalInputGroup = document.getElementById("modalInputGroup");
+const modalInput = document.getElementById("modalInput");
+const modalConfirmBtn = document.getElementById("modalConfirmBtn");
+const modalCancelBtn = document.getElementById("modalCancelBtn");
+
+// Call Modal Elements
+const callModal = document.getElementById("callModal");
+const callStatusText = document.getElementById("callStatusText");
+
+const callVideoGrid = document.getElementById("callVideoGrid");
+const localVideo = document.getElementById("localVideo");
+const remoteVideo = document.getElementById("remoteVideo");
+
+const callProfileGrid = document.getElementById("callProfileGrid");
+const localCallAvatar = document.getElementById("localCallAvatar");
+const localCallName = document.getElementById("localCallName");
+const remoteCallAvatar = document.getElementById("remoteCallAvatar");
+const remoteCallName = document.getElementById("remoteCallName");
+
+const acceptCallBtn = document.getElementById("acceptCallBtn");
+const rejectCallBtn = document.getElementById("rejectCallBtn");
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+
+let isSignUpMode = false;
+
+function togglePasswordVisibility(inputId, iconElem) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    iconElem.classList.replace("fa-eye", "fa-eye-slash");
+  } else {
+    input.type = "password";
+    iconElem.classList.replace("fa-eye-slash", "fa-eye");
+  }
+}
+
+// ------------------- CUSTOM BEAUTIFUL MODAL SYSTEM -------------------
+
+function showCustomModal(options) {
+  modalTitle.textContent = options.title || "Notice";
+  modalSubtitle.textContent = options.subtitle || "";
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-</head>
-<body class="dark-theme">
+  if (options.hasInput) {
+    modalInputGroup.style.display = "block";
+    modalInput.value = "";
+    modalInput.placeholder = options.placeholder || "Enter value";
+  } else {
+    modalInputGroup.style.display = "none";
+  }
 
-  <header class="navbar">
-    <div class="logo">EKT CHATING APP</div>
-    <div class="nav-controls">
-      <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
-    </div>
-  </header>
+  if (options.hideCancel) {
+    modalCancelBtn.style.display = "none";
+  } else {
+    modalCancelBtn.style.display = "inline-block";
+  }
 
-  <main class="main-container">
+  customModalOverlay.style.display = "flex";
 
-    <!-- Screen 1: Security / Access Screen -->
-    <div id="masterKeyScreen" class="card-screen">
-      <h2 id="masterTitle">Welcome</h2>
-      <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
+  return new Promise((resolve) => {
+    const handleConfirm = () => {
+      cleanup();
+      resolve(options.hasInput ? modalInput.value.trim() : true);
+    };
 
-      <div class="input-wrapper" id="passInputGroup" style="display: none;">
-        <input type="password" id="masterKeyInput" placeholder="Enter Security PIN">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('masterKeyInput', this)"></i>
-      </div>
+    const handleCancel = () => {
+      cleanup();
+      resolve(null);
+    };
 
-      <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 10px;">
-        <button id="unlockBtn" class="btn btn-primary" style="display: none;">Submit</button>
-        <button id="directOpenBtn" class="btn btn-primary">Direct Open</button>
-      </div>
+    const cleanup = () => {
+      customModalOverlay.style.display = "none";
+      modalConfirmBtn.removeEventListener("click", handleConfirm);
+      modalCancelBtn.removeEventListener("click", handleCancel);
+    };
 
-      <p class="auth-toggle-text" style="margin-top: 15px;">
-        <span id="masterToggleMsg">Want extra security?</span>
-        <a href="#" id="masterToggleLink">Create Password</a>
-      </p>
+    modalConfirmBtn.addEventListener("click", handleConfirm);
+    modalCancelBtn.addEventListener("click", handleCancel);
+  });
+}
 
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
-    </div>
+function showCustomAlert(title, subtitle) {
+  return showCustomModal({
+    title: title,
+    subtitle: subtitle,
+    hasInput: false,
+    hideCancel: true
+  });
+}
 
-    <!-- Screen 2: Auth Screen -->
-    <div id="authScreen" class="card-screen" style="display: none;">
-      <h2 id="authTitle">Login Account</h2>
-      
-      <div id="signupFields" style="display: none;">
-        <div class="input-wrapper">
-          <input type="text" id="fullNameInput" placeholder="Full Name">
-        </div>
-      </div>
+document.addEventListener("DOMContentLoaded", () => {
+  checkActiveSession();
+});
 
-      <div class="input-wrapper">
-        <input type="text" id="phoneInput" placeholder="Phone Number">
-      </div>
+// ------------------- MASTER KEY & SECURITY LOGIC -------------------
 
-      <div class="input-wrapper">
-        <input type="password" id="authPasswordInput" placeholder="Password">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('authPasswordInput', this)"></i>
-      </div>
+function updateMasterScreenUI() {
+  const savedPin = localStorage.getItem("appMasterPin");
 
-      <button id="authSubmitBtn" class="btn btn-primary">Login</button>
+  if (savedPin) {
+    masterTitle.textContent = "Enter Security PIN";
+    masterSubtitle.textContent = "Please enter your password to proceed";
+    passInputGroup.style.display = "block";
+    unlockBtn.style.display = "block";
+    unlockBtn.textContent = "Unlock";
+    directOpenBtn.style.display = "none";
+    masterToggleMsg.parentElement.style.display = "none";
+  } else {
+    if (isCreatingPassword) {
+      masterTitle.textContent = "Create Password";
+      masterSubtitle.textContent = "Set a password for app security";
+      passInputGroup.style.display = "block";
+      unlockBtn.style.display = "block";
+      unlockBtn.textContent = "Save Password";
+      directOpenBtn.style.display = "none";
+      masterToggleMsg.textContent = "Don't want password?";
+      masterToggleLink.textContent = "Open Directly";
+      masterToggleMsg.parentElement.style.display = "block";
+    } else {
+      masterTitle.textContent = "Welcome";
+      masterSubtitle.textContent = "You can enter directly or set a security password";
+      passInputGroup.style.display = "none";
+      unlockBtn.style.display = "none";
+      directOpenBtn.style.display = "block";
+      masterToggleMsg.textContent = "Want extra security?";
+      masterToggleLink.textContent = "Create Password";
+      masterToggleMsg.parentElement.style.display = "block";
+    }
+  }
+}
 
-      <p class="auth-toggle-text">
-        <span id="authToggleMsg">Don't have an account?</span>
-        <a href="#" id="authToggleLink">Sign Up</a>
-      </p>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
-    </div>
+function checkActiveSession() {
+  const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
+  const savedUser = JSON.parse(localStorage.getItem("appUser"));
+  const activeRoom = sessionStorage.getItem("activeRoom");
 
-    <!-- Screen 3: Dashboard -->
-    <div id="dashboardScreen" class="card-screen" style="display: none;">
-      <div class="profile-header">
-        <div class="avatar-container">
-          <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture">
-          <label for="avatarUpload" class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></label>
-          <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
-        </div>
-        <h3 id="dashboardUserName">User Name</h3>
-      </div>
+  if (isMasterUnlocked === "true") {
+    masterKeyScreen.style.display = "none";
+    if (savedUser) {
+      currentUser = savedUser;
+      if (activeRoom) {
+        joinRoom(activeRoom, true);
+      } else {
+        showDashboard();
+      }
+    } else {
+      authScreen.style.display = "block";
+    }
+  } else {
+    masterKeyScreen.style.display = "block";
+    authScreen.style.display = "none";
+    dashboardScreen.style.display = "none";
+    chatScreen.style.display = "none";
+    updateMasterScreenUI();
+  }
+}
 
-      <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
+masterToggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  isCreatingPassword = !isCreatingPassword;
+  masterKeyInput.value = "";
+  updateMasterScreenUI();
+});
 
-      <div class="input-wrapper" style="margin-top: 15px;">
-        <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
-      </div>
+unlockBtn.addEventListener("click", async () => {
+  const savedPin = localStorage.getItem("appMasterPin");
+  const enteredPin = masterKeyInput.value.trim();
 
-      <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-      
-      <!-- Dynamic Set/Change Security PIN Button -->
-      <button id="setPinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #0d6efd; color: #fff;">
-        <i class="fa-solid fa-key" style="margin-right: 6px;"></i><span id="setPinBtnText">Set Security PIN</span>
-      </button>
-      
-      <!-- Remove Security PIN Button -->
-      <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">
-        <i class="fa-solid fa-trash-can" style="margin-right: 6px;"></i>Remove Security PIN
-      </button>
+  if (savedPin) {
+    if (enteredPin === savedPin) {
+      grantAccess();
+    } else {
+      await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
+    }
+  } else if (isCreatingPassword) {
+    if (!enteredPin) {
+      return await showCustomAlert("Input Error", "অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
+    }
+    localStorage.setItem("appMasterPin", enteredPin);
+    await showCustomAlert("Success", "পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
+    grantAccess();
+  }
+});
 
-      <button id="logoutBtn" class="btn btn-danger" style="margin-top: 10px;">Logout</button>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
-    </div>
+directOpenBtn.addEventListener("click", () => {
+  grantAccess();
+});
 
-    <!-- Screen 4: Chat Room -->
-    <div id="chatScreen" class="chat-container" style="display: none;">
-      <div class="chat-header">
-        <div class="user-info">
-          <img id="chatUserAvatar" src="https://via.placeholder.com/40" alt="Avatar">
-          <div>
-            <h4 id="chatUserName">User Name</h4>
-            <span id="chatRoomCode">Code: ------</span>
-          </div>
-        </div>
-        <div class="chat-actions">
-          <button id="startAudioCallBtn" class="action-btn call-audio"><i class="fa-solid fa-phone"></i></button>
-          <button id="startVideoCallBtn" class="action-btn call-video"><i class="fa-solid fa-video"></i></button>
-          <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fa-solid fa-right-from-bracket"></i></button>
-        </div>
-      </div>
+function grantAccess() {
+  sessionStorage.setItem("masterUnlocked", "true");
+  masterKeyScreen.style.display = "none";
+  
+  const savedUser = JSON.parse(localStorage.getItem("appUser"));
+  if (savedUser) {
+    currentUser = savedUser;
+    showDashboard();
+  } else {
+    authScreen.style.display = "block";
+  }
+}
 
-      <div id="chatMessages" class="chat-messages"></div>
+// ------------------- SET & CHANGE SECURITY PIN LOGIC -------------------
+function updateDashboardPinUI() {
+  const savedPin = localStorage.getItem("appMasterPin");
+  if (savedPin) {
+    setPinBtnText.textContent = "Change Security PIN";
+    removePinBtn.style.display = "block";
+  } else {
+    setPinBtnText.textContent = "Set Security PIN";
+    removePinBtn.style.display = "none";
+  }
+}
 
-      <div class="chat-input-area">
-        <label for="fileAttachmentInput" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
-        <input type="file" id="fileAttachmentInput" accept="image/*,video/*,audio/*" style="display: none;">
-        
-        <input type="text" id="chatMessageInput" placeholder="Type a message...">
-        <button id="sendMessageBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-      </div>
-    </div>
+if (setPinBtn) {
+  setPinBtn.addEventListener("click", async () => {
+    const savedPin = localStorage.getItem("appMasterPin");
 
-    <!-- Call Overlay Modal -->
-    <div id="callModal" class="call-modal" style="display: none;">
-      <div class="call-box">
-        <h3 id="callStatusText">Incoming Call...</h3>
-        
-        <div id="callVideoGrid" class="video-grid" style="display: none;">
-          <video id="localVideo" autoplay muted playsinline></video>
-          <video id="remoteVideo" autoplay playsinline></video>
-        </div>
+    if (savedPin) {
+      // পাসওয়ার্ড পরিবর্তন করার লজিক
+      const oldPin = await showCustomModal({
+        title: "Change Security PIN",
+        subtitle: "আপনার বর্তমান Security PIN টি দিন:",
+        hasInput: true,
+        placeholder: "Enter Old PIN"
+      });
 
-        <div id="callProfileGrid" class="call-profile-grid">
-          <div class="call-profile-item">
-            <img id="localCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="My Profile">
-            <span id="localCallName" class="call-username">Me</span>
-          </div>
-          <div class="call-profile-item">
-            <img id="remoteCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="Other Profile">
-            <span id="remoteCallName" class="call-username">Other</span>
-          </div>
-        </div>
+      if (oldPin === null) return;
 
-        <div class="call-controls">
-          <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
-          <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
-        </div>
-      </div>
-    </div>
+      if (oldPin === savedPin) {
+        const newPin = await showCustomModal({
+          title: "New Security PIN",
+          subtitle: "নতুন Security PIN টি সেট করুন:",
+          hasInput: true,
+          placeholder: "Enter New PIN"
+        });
 
-    <!-- Master-Style Custom Modal Interface -->
-    <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
-      <div class="card-screen" style="max-width: 360px; margin: auto;">
-        <h2 id="modalTitle">Security Check</h2>
-        <p id="modalSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">Please confirm your action</p>
+        if (newPin && newPin.trim() !== "") {
+          localStorage.setItem("appMasterPin", newPin.trim());
+          updateDashboardPinUI();
+          await showCustomAlert("Success", "নতুন Security PIN সফলভাবে সেভ করা হয়েছে!");
+        } else if (newPin !== null) {
+          await showCustomAlert("Error", "Security PIN ফাঁকা রাখা যাবে না!");
+        }
+      } else {
+        await showCustomAlert("Failed", "ভুল Security PIN দিয়েছেন!");
+      }
 
-        <div class="input-wrapper" id="modalInputGroup" style="display: none;">
-          <input type="password" id="modalInput" placeholder="Enter Security PIN">
-          <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('modalInput', this)"></i>
-        </div>
+    } else {
+      // নতুন পাসওয়ার্ড সেট করার লজিক
+      const newPin = await showCustomModal({
+        title: "Set Security PIN",
+        subtitle: "আপনার Security PIN টি সেট করুন:",
+        hasInput: true,
+        placeholder: "Enter New PIN"
+      });
 
-        <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
-          <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-          <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
-        </div>
-      </div>
-    </div>
+      if (newPin && newPin.trim() !== "") {
+        localStorage.setItem("appMasterPin", newPin.trim());
+        updateDashboardPinUI();
+        await showCustomAlert("Success", "Security PIN সফলভাবে সেট করা হয়েছে!");
+      } else if (newPin !== null) {
+        await showCustomAlert("Error", "Security PIN ফাঁকা রাখা যাবে না!");
+      }
+    }
+  });
+}
 
-  </main>
+// ------------------- REMOVE SECURITY PIN LOGIC -------------------
+if (removePinBtn) {
+  removePinBtn.addEventListener("click", async () => {
+    const savedPin = localStorage.getItem("appMasterPin");
 
-  <script src="app.js"></script>
-</body>
-</html>
+    if (!savedPin) {
+      return await showCustomAlert("No PIN Found", "বর্তমানে কোনো Security PIN সেট করা নেই!");
+    }
+
+    const enteredPin = await showCustomModal({
+      title: "Remove Security PIN",
+      subtitle: "পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি দিন:",
+      hasInput: true,
+      placeholder: "Enter Security PIN"
+    });
+
+    if (enteredPin === null) return;
+
+    if (enteredPin === savedPin) {
+      localStorage.removeItem("appMasterPin");
+      updateDashboardPinUI();
+      await showCustomAlert("Remove Success", "আপনার Security PIN টি সফলভাবে রিমুভ করা হয়েছে!");
+    } else {
+      await showCustomAlert("Remove Failed", "ভুল Security PIN দিয়েছেন! পাসওয়ার্ড রিমুভ করা সম্ভব হয়নি।");
+    }
+  });
+}
+
+// ------------------- AUTHENTICATION LOGIC -------------------
+
+authToggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  isSignUpMode = !isSignUpMode;
+  if (isSignUpMode) {
+    authTitle.textContent = "Create Account";
+    signupFields.style.display = "block";
+    authSubmitBtn.textContent = "Sign Up";
+    authToggleMsg.textContent = "Already have account?";
+    authToggleLink.textContent = "Login";
+  } else {
+    authTitle.textContent = "Login Account";
+    signupFields.style.display = "none";
+    authSubmitBtn.textContent = "Login";
+    authToggleMsg.textContent = "Don't have an account?";
+    authToggleLink.textContent = "Sign Up";
+  }
+});
+
+authSubmitBtn.addEventListener("click", async () => {
+  const phone = phoneInput.value.trim();
+  const password = authPasswordInput.value.trim();
+
+  if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+
+  if (isSignUpMode) {
+    const name = fullNameInput.value.trim();
+    if (!name) return await showCustomAlert("Input Missing", "আপনার নাম লিখুন");
+    
+    const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
+    socket.emit("register-user", newUser, async (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        await showCustomAlert("Error", res.message);
+      }
+    });
+
+  } else {
+    socket.emit("login-user", { phone, password }, async (res) => {
+      if (res.success) {
+        currentUser = res.user;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        await showCustomAlert("Login Failed", res.message);
+      }
+    });
+  }
+});
+
+function showDashboard() {
+  authScreen.style.display = "none";
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+  dashboardUserName.textContent = currentUser.name;
+  if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
+  updateDashboardPinUI();
+}
+
+avatarUpload.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      currentUser.pic = evt.target.result;
+      dashboardAvatar.src = currentUser.pic;
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+createRoomBtn.addEventListener("click", () => {
+  const code = "1430909";
+  joinRoom(code);
+});
+
+joinRoomBtn.addEventListener("click", () => {
+  const code = roomCodeInput.value.trim().toUpperCase();
+  if (code) joinRoom(code);
+});
+
+function joinRoom(code, isRefresh = false) {
+  currentRoom = code;
+  sessionStorage.setItem("activeRoom", code);
+
+  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
+  
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "flex";
+  chatUserName.textContent = currentUser.name;
+  chatUserAvatar.src = currentUser.pic;
+  chatRoomCode.textContent = "Code: " + code;
+
+  if (isRefresh) {
+    restoreMessages();
+  } else {
+    sessionStorage.removeItem("savedChatLogs");
+    chatMessages.innerHTML = "";
+  }
+}
+
+logoutBtn.addEventListener("click", () => {
+  localStorage.removeItem("appUser");
+  sessionStorage.removeItem("activeRoom");
+  sessionStorage.removeItem("masterUnlocked");
+  sessionStorage.removeItem("savedChatLogs");
+  currentUser = null;
+  location.reload();
+});
+
+// ------------------- MESSAGE SENDING & ACCURATE SEEN LOGIC -------------------
+
+sendMessageBtn.addEventListener("click", sendChatMessage);
+chatMessageInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendChatMessage();
+});
+
+function sendChatMessage() {
+  const text = chatMessageInput.value.trim();
+  if (text && currentRoom) {
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const msgData = {
+      id: msgId,
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic,
+      text: text,
+      file: null,
+      fileType: null,
+      status: "sending"
+    };
+
+    appendMessage(msgData, true);
+    chatMessageInput.value = "";
+
+    socket.emit("send-message", msgData, (ack) => {
+      if (ack && ack.success) {
+        updateMessageStatus(msgId, "Sent");
+      }
+    });
+  }
+}
+
+fileAttachmentInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file || !currentRoom) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    let fType = "file";
+    if (file.type.startsWith("image/")) fType = "image";
+    else if (file.type.startsWith("video/")) fType = "video";
+
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const msgData = {
+      id: msgId,
+      roomCode: currentRoom,
+      sender: currentUser.name,
+      senderPic: currentUser.pic,
+      text: "",
+      file: evt.target.result,
+      fileType: fType,
+      fileName: file.name,
+      status: "sending"
+    };
+
+    appendMessage(msgData, true);
+    fileAttachmentInput.value = "";
+
+    socket.emit("send-message", msgData, (ack) => {
+      if (ack && ack.success) {
+        updateMessageStatus(msgId, "Sent");
+      }
+    });
+  };
+  reader.readAsDataURL(file);
+});
+
+socket.on("user-joined-notify", (data) => {
+  const systemMsg = document.createElement("div");
+  systemMsg.className = "system-notification";
+  systemMsg.innerHTML = `<img src="${data.user.pic}" class="sys-avatar"/> <span><b>${data.user.name}</b> joined the room</span>`;
+  chatMessages.appendChild(systemMsg);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  saveMessages();
+});
+
+socket.on("receive-message", (data) => {
+  const isMe = data.sender === currentUser.name;
+  appendMessage(data, isMe);
+
+  if (!isMe && data.id && document.hasFocus()) {
+    socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
+  }
+});
+
+window.addEventListener("focus", () => {
+  if (currentRoom) {
+    const unreadMessages = document.querySelectorAll(".other-msg");
+    unreadMessages.forEach(msg => {
+      if (msg.id) {
+        socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: msg.id });
+      }
+    });
+  }
+});
+
+function appendMessage(data, isMe) {
+  if (data.id && document.getElementById(data.id)) return;
+
+  const div = document.createElement("div");
+  div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
+  if (data.id) div.id = data.id;
+  
+  const userAvatar = document.createElement("img");
+  userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
+  userAvatar.className = "msg-avatar";
+  div.appendChild(userAvatar);
+
+  const contentBox = document.createElement("div");
+  contentBox.className = "msg-content";
+
+  if (data.text) {
+    const textNode = document.createElement("p");
+    textNode.textContent = data.text;
+    contentBox.appendChild(textNode);
+  }
+
+  if (data.file) {
+    const mediaContainer = document.createElement("div");
+    mediaContainer.className = "media-wrapper";
+
+    if (data.fileType === "image") {
+      const img = document.createElement("img");
+      img.src = data.file;
+      img.className = "chat-media-preview";
+      img.onclick = () => openFullscreenImage(data.file);
+      mediaContainer.appendChild(img);
+    } else if (data.fileType === "video") {
+      const vid = document.createElement("video");
+      vid.src = data.file;
+      vid.controls = true;
+      vid.className = "chat-media-preview";
+      mediaContainer.appendChild(vid);
+    }
+    contentBox.appendChild(mediaContainer);
+  }
+
+  if (isMe) {
+    const statusSpan = document.createElement("span");
+    statusSpan.className = "msg-status";
+    statusSpan.style.cssText = "font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 3px;";
+    
+    let statusText = "Sending...";
+    if (data.status === "sent") statusText = "Sent";
+    if (data.status === "seen") statusText = "Seen";
+    
+    statusSpan.textContent = statusText;
+    contentBox.appendChild(statusSpan);
+  }
+
+  div.appendChild(contentBox);
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  saveMessages();
+}
+
+function updateMessageStatus(msgId, statusText) {
+  const msgElem = document.getElementById(msgId);
+  if (msgElem) {
+    const statusSpan = msgElem.querySelector(".msg-status");
+    if (statusSpan) {
+      statusSpan.textContent = statusText;
+    }
+  }
+  saveMessages();
+}
+
+socket.on("message-seen", (data) => {
+  updateMessageStatus(data.msgId, "Seen");
+});
+
+function saveMessages() {
+  sessionStorage.setItem("savedChatLogs", chatMessages.innerHTML);
+}
+
+function restoreMessages() {
+  const saved = sessionStorage.getItem("savedChatLogs");
+  if (saved) {
+    chatMessages.innerHTML = saved;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+function openFullscreenImage(src) {
+  const modal = document.createElement("div");
+  modal.className = "fullscreen-modal";
+  modal.onclick = () => modal.remove();
+  const img = document.createElement("img");
+  img.src = src;
+  modal.appendChild(img);
+  document.body.appendChild(modal);
+}
+
+// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
+
+let incomingCallData = null;
+
+startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
+startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+
+function setCallUI(type, remoteUser) {
+  currentCallType = type;
+  if (type === "video") {
+    callVideoGrid.style.display = "flex";
+    callProfileGrid.style.display = "none";
+  } else {
+    callVideoGrid.style.display = "none";
+    callProfileGrid.style.display = "flex";
+
+    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
+    localCallName.textContent = currentUser.name || "Me";
+
+    if (remoteUser) {
+      remoteCallAvatar.src = remoteUser.pic || "https://via.placeholder.com/100";
+      remoteCallName.textContent = remoteUser.name || "User";
+    } else {
+      remoteCallAvatar.src = "https://via.placeholder.com/100";
+      remoteCallName.textContent = "Connecting...";
+    }
+  }
+}
+
+function initiateCall(type) {
+  if (!currentRoom) return;
+  const isVideo = type === "video";
+  
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    if (isVideo) {
+      localVideo.srcObject = stream;
+    }
+    
+    setCallUI(type, null);
+    callModal.style.display = "flex";
+    callStatusText.textContent = "Calling...";
+    acceptCallBtn.style.display = "none";
+
+    socket.emit("call-user", {
+      roomCode: currentRoom,
+      callerName: currentUser.name,
+      callerPeerId: myPeerId,
+      callerPic: currentUser.pic,
+      callType: type
+    });
+  }).catch(async (err) => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
+}
+
+socket.on("incoming-call", (data) => {
+  incomingCallData = data;
+  setCallUI(data.callType, { name: data.callerName, pic: data.callerPic });
+  callModal.style.display = "flex";
+  callStatusText.textContent = `${data.callerName} is ${data.callType} calling...`;
+  acceptCallBtn.style.display = "inline-block";
+});
+
+socket.on("call-accepted-by-receiver", (data) => {
+  if (currentCallType === "audio") {
+    remoteCallAvatar.src = data.receiverPic || "https://via.placeholder.com/100";
+    remoteCallName.textContent = data.receiverName || "Connected User";
+  }
+  callStatusText.textContent = "Connected";
+});
+
+acceptCallBtn.addEventListener("click", () => {
+  if (!incomingCallData) return;
+  const isVideo = incomingCallData.callType === "video";
+
+  navigator.mediaDevices.getUserMedia({ video: isVideo, audio: true }).then((stream) => {
+    localStream = stream;
+    if (isVideo) {
+      localVideo.srcObject = stream;
+    }
+
+    setCallUI(incomingCallData.callType, { name: incomingCallData.callerName, pic: incomingCallData.callerPic });
+
+    const call = myPeer.call(incomingCallData.callerPeerId, stream);
+    currentCall = call;
+
+    handleStream(call, isVideo);
+
+    socket.emit("accept-call-notify", {
+      roomCode: currentRoom,
+      receiverName: currentUser.name,
+      receiverPic: currentUser.pic
+    });
+
+    acceptCallBtn.style.display = "none";
+  });
+});
+
+myPeer.on("call", (call) => {
+  currentCall = call;
+  call.answer(localStream);
+  const isVideo = currentCallType === "video";
+  handleStream(call, isVideo);
+});
+
+function handleStream(call, isVideo) {
+  call.on("stream", (remoteStream) => {
+    if (isVideo) {
+      remoteVideo.srcObject = remoteStream;
+    } else {
+      remoteAudioElement.srcObject = remoteStream;
+    }
+    callStatusText.textContent = "Connected";
+  });
+}
+
+rejectCallBtn.addEventListener("click", endCall);
+
+socket.on("call-ended", () => {
+  closeCallUI();
+});
+
+function endCall() {
+  if (currentRoom) {
+    socket.emit("end-call", { roomCode: currentRoom });
+  }
+  closeCallUI();
+}
+
+function closeCallUI() {
+  if (currentCall) currentCall.close();
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+  }
+  callModal.style.display = "none";
+  localVideo.srcObject = null;
+  remoteVideo.srcObject = null;
+  remoteAudioElement.srcObject = null;
+  currentCallType = null;
+}
+
+leaveRoomBtn.addEventListener("click", () => {
+  sessionStorage.removeItem("activeRoom");
+  sessionStorage.removeItem("savedChatLogs");
+  currentRoom = null;
+  chatMessages.innerHTML = "";
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+});
+
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+themeToggleBtn.addEventListener("click", () => {
+  document.body.classList.toggle("light-theme");
+});
