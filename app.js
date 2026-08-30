@@ -79,25 +79,6 @@ const modalInputGroup = document.getElementById("modalInputGroup");
 const modalInput = document.getElementById("modalInput");
 const modalActionContainer = document.getElementById("modalActionContainer");
 
-// Call Modal Elements
-const callModal = document.getElementById("callModal");
-const callStatusText = document.getElementById("callStatusText");
-
-const callVideoGrid = document.getElementById("callVideoGrid");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
-
-const callProfileGrid = document.getElementById("callProfileGrid");
-const localCallAvatar = document.getElementById("localCallAvatar");
-const localCallName = document.getElementById("localCallName");
-const remoteCallAvatar = document.getElementById("remoteCallAvatar");
-const remoteCallName = document.getElementById("remoteCallName");
-
-const acceptCallBtn = document.getElementById("acceptCallBtn");
-const rejectCallBtn = document.getElementById("rejectCallBtn");
-const startAudioCallBtn = document.getElementById("startAudioCallBtn");
-const startVideoCallBtn = document.getElementById("startVideoCallBtn");
-
 let isSignUpMode = false;
 
 // LocalStorage Helper Functions
@@ -123,7 +104,7 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
-// Custom Modal System
+// Custom Popup Modal
 function showCustomModal(options) {
   modalTitle.textContent = options.title || "Notice";
   modalSubtitle.textContent = options.subtitle || "";
@@ -382,7 +363,7 @@ if (removePinBtn) {
   });
 }
 
-// Authentication Logic (Updated for LocalStorage Sync)
+// Authentication Logic
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -418,11 +399,8 @@ authSubmitBtn.addEventListener("click", async () => {
     }
 
     const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
-    
-    // Local Storage-এ ইউজার সেভ করা 
     saveUserToStorage(newUser);
     
-    // সকেট সার্ভারে ব্যাকআপ রেজিস্টার 
     socket.emit("register-user", newUser, async (res) => {
       currentUser = newUser;
       localStorage.setItem("appUser", JSON.stringify(currentUser));
@@ -430,18 +408,16 @@ authSubmitBtn.addEventListener("click", async () => {
     });
 
   } else {
-    // LocalStorage থেকে পাসওয়ার্ড চেক করা
     const localUser = localUsers[phone];
     if (localUser && localUser.password === password) {
       currentUser = localUser;
       localStorage.setItem("appUser", JSON.stringify(currentUser));
       showDashboard();
     } else {
-      // ব্যাকএন্ড সার্ভার থেকেও একবার চেষ্টা করার জন্য Fallback
       socket.emit("login-user", { phone, password }, async (res) => {
         if (res.success) {
           currentUser = res.user;
-          saveUserToStorage(currentUser); // লোকাল স্টোরেজে না থাকলে সেভ করে নেয়া
+          saveUserToStorage(currentUser);
           localStorage.setItem("appUser", JSON.stringify(currentUser));
           showDashboard();
         } else {
@@ -461,7 +437,6 @@ function showDashboard() {
   updateDashboardPinUI();
 }
 
-// Profile Picture Upload Handler (Base64 সেভ এবং LocalStorage আপডেট)
 avatarUpload.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -469,8 +444,6 @@ avatarUpload.addEventListener("change", (e) => {
     reader.onload = (evt) => {
       currentUser.pic = evt.target.result;
       dashboardAvatar.src = currentUser.pic;
-      
-      // কারেন্ট ইউজার ও ফুল ডাটাবেজে পিকচার আপডেট
       localStorage.setItem("appUser", JSON.stringify(currentUser));
       saveUserToStorage(currentUser);
     };
@@ -478,55 +451,37 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// Create Room Buttons
-createRoomBtn.addEventListener("click", () => {
-  modalTitle.textContent = "Create Room";
-  modalSubtitle.textContent = "Select room type to create:";
-  modalInputGroup.style.display = "none";
-
-  modalActionContainer.innerHTML = `
-    <button id="optAdminRoomBtn" class="btn btn-primary" style="background-color: #0d6efd; color: #fff;">Admin Room</button>
-    <button id="optOwnRoomBtn" class="btn btn-primary" style="background-color: #198754; color: #fff; margin-top: 5px;">Own Room (Random Code)</button>
-    <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; margin-top: 5px;">Cancel</button>
-  `;
-
-  customModalOverlay.style.display = "flex";
-
-  document.getElementById("optAdminRoomBtn").onclick = () => {
-    customModalOverlay.style.display = "none";
-    joinRoom(ADMIN_ROOM_PIN);
-  };
-
-  document.getElementById("optOwnRoomBtn").onclick = () => {
-    customModalOverlay.style.display = "none";
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    joinRoom(randomCode);
-  };
-
-  document.getElementById("optCancelBtn").onclick = () => {
-    customModalOverlay.style.display = "none";
-  };
+// CREATE ROOM HANDLER (অটো ৬ ডিজিটের রেন্ডম কোড)
+createRoomBtn.addEventListener("click", async () => {
+  const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+  await showCustomAlert("Room Created!", `আপনার রুম কোড: ${randomCode}\nকোডটি শেয়ার করুন অন্যকে জয়েন করানোর জন্য।`);
+  joinRoom(randomCode);
 });
 
-// Join Room Buttons
+// JOIN ROOM HANDLER (প্রিমিয়াম পপ-আপ মোডাল)
 joinRoomBtn.addEventListener("click", () => {
   modalTitle.textContent = "Join Room";
   modalSubtitle.textContent = "Select room type to join:";
   modalInputGroup.style.display = "none";
 
   modalActionContainer.innerHTML = `
-    <button id="optJoinAdminBtn" class="btn btn-primary" style="background-color: #0d6efd; color: #fff;">Admin Room Join</button>
-    <button id="optJoinRandomBtn" class="btn btn-primary" style="background-color: #198754; color: #fff; margin-top: 5px;">Random Room Join</button>
-    <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; margin-top: 5px;">Cancel</button>
+    <button id="optJoinSpecialBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7); color: #fff; width: 100%;">
+      <i class="fa-solid fa-star" style="margin-right: 6px;"></i>Join Special Room
+    </button>
+    <button id="optJoinRandomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #198754, #157347); color: #fff; width: 100%;">
+      <i class="fa-solid fa-shuffle" style="margin-right: 6px;"></i>Join Random Room
+    </button>
+    <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; width: 100%;">Cancel</button>
   `;
 
   customModalOverlay.style.display = "flex";
 
-  document.getElementById("optJoinAdminBtn").onclick = async () => {
+  // Special Room Option
+  document.getElementById("optJoinSpecialBtn").onclick = async () => {
     customModalOverlay.style.display = "none";
     const enteredPin = await showCustomModal({
-      title: "Admin Room Access",
-      subtitle: "অ্যাডমিন রুমে প্রবেশ করতে Secret PIN লিখুন:",
+      title: "Special Room Access",
+      subtitle: "স্পেশাল রুমে প্রবেশ করতে Secret PIN টি লিখুন:",
       hasInput: true,
       placeholder: "Enter Secret PIN"
     });
@@ -536,15 +491,16 @@ joinRoomBtn.addEventListener("click", () => {
     if (enteredPin === ADMIN_ROOM_PIN) {
       joinRoom(ADMIN_ROOM_PIN);
     } else {
-      await showCustomAlert("Access Denied", "ভুল Secret PIN! আপনি অ্যাডমিন রুমে জয়েন করতে পারবেন না।");
+      await showCustomAlert("Access Denied", "ভুল Secret PIN! আপনি স্পেশাল রুমে জয়েন করতে পারবেন না।");
     }
   };
 
+  // Random Room Option
   document.getElementById("optJoinRandomBtn").onclick = async () => {
     customModalOverlay.style.display = "none";
     const code = await showCustomModal({
       title: "Join Random Room",
-      subtitle: "আপনার রুম কোডটি লিখুন:",
+      subtitle: "৬ ডিজিটের রুম কোডটি লিখুন:",
       hasInput: true,
       placeholder: "Enter 6 Digit Code"
     });
@@ -559,32 +515,47 @@ joinRoomBtn.addEventListener("click", () => {
   };
 });
 
+// Join Room With Server Validation (Max 2 Users Check for Special Room)
 function joinRoom(code, isRefresh = false) {
-  currentRoom = code;
-  sessionStorage.setItem("activeRoom", code);
+  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, async (response) => {
+    
+    if (response && !response.success) {
+      await showCustomAlert("Room Access Denied", response.message || "You cannot join this room.");
+      return;
+    }
 
-  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
-  
-  dashboardScreen.style.display = "none";
-  chatScreen.style.display = "flex";
-  chatUserName.textContent = currentUser.name;
-  chatUserAvatar.src = currentUser.pic;
+    currentRoom = code;
+    sessionStorage.setItem("activeRoom", code);
 
-  if (code === ADMIN_ROOM_PIN) {
-    chatRoomCode.textContent = "Admin Room";
-  } else {
-    chatRoomCode.textContent = "Code: " + code;
-  }
+    dashboardScreen.style.display = "none";
+    chatScreen.style.display = "flex";
+    chatUserName.textContent = currentUser.name;
+    chatUserAvatar.src = currentUser.pic;
 
-  if (isRefresh) {
-    restoreMessages();
-  } else {
-    sessionStorage.removeItem("savedChatLogs");
-    chatMessages.innerHTML = "";
-  }
+    if (code === ADMIN_ROOM_PIN) {
+      chatRoomCode.textContent = "Special Room";
+    } else {
+      chatRoomCode.textContent = "Code: " + code;
+    }
+
+    if (isRefresh) {
+      restoreMessages();
+    } else {
+      sessionStorage.removeItem("savedChatLogs");
+      chatMessages.innerHTML = "";
+    }
+  });
 }
 
-// Logout Handler (কারেন্ট সেশন মুছে যাবে কিন্তু LocalStorage Database থেকে অ্যাকাউন্ট ডাটা মুছবে না)
+// Leave Room Handler
+leaveRoomBtn.addEventListener("click", () => {
+  sessionStorage.removeItem("activeRoom");
+  currentRoom = null;
+  chatScreen.style.display = "none";
+  dashboardScreen.style.display = "block";
+});
+
+// Logout Handler
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
@@ -611,5 +582,28 @@ function sendChatMessage() {
       senderPic: currentUser.pic,
       text: text
     };
+    socket.emit("send-message", msgData);
+    chatMessageInput.value = "";
   }
+}
+
+socket.on("receive-message", (msg) => {
+  appendChatMessage(msg);
+});
+
+function appendChatMessage(msg) {
+  const msgDiv = document.createElement("div");
+  const isMe = msg.sender === currentUser.name;
+  msgDiv.style.display = "flex";
+  msgDiv.style.justifyContent = isMe ? "flex-end" : "flex-start";
+  msgDiv.style.marginBottom = "10px";
+
+  msgDiv.innerHTML = `
+    <div style="background: ${isMe ? '#0d6efd' : '#333'}; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word;">
+      <span style="font-size: 11px; opacity: 0.7; display: block; margin-bottom: 2px;">${msg.sender}</span>
+      <span>${msg.text}</span>
+    </div>
+  `;
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
