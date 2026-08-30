@@ -27,8 +27,17 @@ const authScreen = document.getElementById("authScreen");
 const dashboardScreen = document.getElementById("dashboardScreen");
 const chatScreen = document.getElementById("chatScreen");
 
+// Master Key DOM Elements
+const masterTitle = document.getElementById("masterTitle");
+const masterSubtitle = document.getElementById("masterSubtitle");
+const passInputGroup = document.getElementById("passInputGroup");
 const masterKeyInput = document.getElementById("masterKeyInput");
 const unlockBtn = document.getElementById("unlockBtn");
+const directOpenBtn = document.getElementById("directOpenBtn");
+const masterToggleMsg = document.getElementById("masterToggleMsg");
+const masterToggleLink = document.getElementById("masterToggleLink");
+
+let isCreatingPassword = false;
 
 const authTitle = document.getElementById("authTitle");
 const signupFields = document.getElementById("signupFields");
@@ -93,6 +102,43 @@ document.addEventListener("DOMContentLoaded", () => {
   checkActiveSession();
 });
 
+// ------------------- MASTER KEY & SECURITY LOGIC -------------------
+
+function updateMasterScreenUI() {
+  const savedPin = localStorage.getItem("appMasterPin");
+
+  if (savedPin) {
+    // যদি পূর্বে পাসওয়ার্ড সেভ করা থাকে
+    masterTitle.textContent = "Enter Security PIN";
+    masterSubtitle.textContent = "Please enter your password to proceed";
+    passInputGroup.style.display = "block";
+    unlockBtn.style.display = "block";
+    unlockBtn.textContent = "Unlock";
+    directOpenBtn.style.display = "none";
+    masterToggleMsg.parentElement.style.display = "none";
+  } else {
+    // যদি পাসওয়ার্ড সেভ না করা থাকে
+    if (isCreatingPassword) {
+      masterTitle.textContent = "Create Password";
+      masterSubtitle.textContent = "Set a password for app security";
+      passInputGroup.style.display = "block";
+      unlockBtn.style.display = "block";
+      unlockBtn.textContent = "Save Password";
+      directOpenBtn.style.display = "none";
+      masterToggleMsg.textContent = "Don't want password?";
+      masterToggleLink.textContent = "Open Directly";
+    } else {
+      masterTitle.textContent = "Welcome";
+      masterSubtitle.textContent = "You can enter directly or set a security password";
+      passInputGroup.style.display = "none";
+      unlockBtn.style.display = "none";
+      directOpenBtn.style.display = "block";
+      masterToggleMsg.textContent = "Want extra security?";
+      masterToggleLink.textContent = "Create Password";
+    }
+  }
+}
+
 function checkActiveSession() {
   const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
@@ -115,25 +161,58 @@ function checkActiveSession() {
     authScreen.style.display = "none";
     dashboardScreen.style.display = "none";
     chatScreen.style.display = "none";
+    updateMasterScreenUI();
   }
 }
 
+// Toggle between Create Password and Direct Open
+masterToggleLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  isCreatingPassword = !isCreatingPassword;
+  masterKeyInput.value = "";
+  updateMasterScreenUI();
+});
+
+// Submit / Unlock button event
 unlockBtn.addEventListener("click", () => {
-  if (masterKeyInput.value.trim() === "KT EYAMIN") {
-    sessionStorage.setItem("masterUnlocked", "true");
-    masterKeyScreen.style.display = "none";
-    
-    const savedUser = JSON.parse(localStorage.getItem("appUser"));
-    if (savedUser) {
-      currentUser = savedUser;
-      showDashboard();
+  const savedPin = localStorage.getItem("appMasterPin");
+  const enteredPin = masterKeyInput.value.trim();
+
+  if (savedPin) {
+    if (enteredPin === savedPin) {
+      grantAccess();
     } else {
-      authScreen.style.display = "block";
+      alert("ভুল Security PIN দিয়েছেন!");
     }
-  } else {
-    alert("ভুল Master Key দেওয়া হয়েছে!");
+  } else if (isCreatingPassword) {
+    if (!enteredPin) {
+      return alert("অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
+    }
+    localStorage.setItem("appMasterPin", enteredPin);
+    alert("পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
+    grantAccess();
   }
 });
+
+// Direct Open button event
+directOpenBtn.addEventListener("click", () => {
+  grantAccess();
+});
+
+function grantAccess() {
+  sessionStorage.setItem("masterUnlocked", "true");
+  masterKeyScreen.style.display = "none";
+  
+  const savedUser = JSON.parse(localStorage.getItem("appUser"));
+  if (savedUser) {
+    currentUser = savedUser;
+    showDashboard();
+  } else {
+    authScreen.style.display = "block";
+  }
+}
+
+// ------------------- AUTHENTICATION LOGIC -------------------
 
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
@@ -269,11 +348,9 @@ function sendChatMessage() {
       status: "sending"
     };
 
-    // ১. তাৎক্ষণিক নিজের স্ক্রিনে Sending... দেখাবে
     appendMessage(msgData, true);
     chatMessageInput.value = "";
 
-    // ২. সার্ভার মেসেজটি পাওয়ার সাথে সাথেই এটি "Sent" হবে
     socket.emit("send-message", msgData, (ack) => {
       if (ack && ack.success) {
         updateMessageStatus(msgId, "Sent");
@@ -330,13 +407,11 @@ socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
 
-  // রিসিভার যদি বর্তমানে স্ক্রিনে অ্যাক্টিভ থাকে, কেবল তখনই সিন নোটিফিকেশন পাঠাবে
   if (!isMe && data.id && document.hasFocus()) {
     socket.emit("mark-as-seen", { roomCode: currentRoom, msgId: data.id });
   }
 });
 
-// ইউজার চ্যাট উইন্ডোতে ফোকাস করলে অপঠিত মেসেজ সিন হবে
 window.addEventListener("focus", () => {
   if (currentRoom) {
     const unreadMessages = document.querySelectorAll(".other-msg");
@@ -389,13 +464,11 @@ function appendMessage(data, isMe) {
     contentBox.appendChild(mediaContainer);
   }
 
-  // শুধুমাত্র নিজের মেসেজের নিচে স্ট্যাটাস দেখাবে
   if (isMe) {
     const statusSpan = document.createElement("span");
     statusSpan.className = "msg-status";
     statusSpan.style.cssText = "font-size: 10px; opacity: 0.7; display: block; text-align: right; margin-top: 3px;";
     
-    // শুরুতে 'Sending...' বা পরবর্তীতে শুধুমাত্র নির্ধারিত স্ট্যাটাস (Sent / Seen)
     let statusText = "Sending...";
     if (data.status === "sent") statusText = "Sent";
     if (data.status === "seen") statusText = "Seen";
@@ -422,7 +495,6 @@ function updateMessageStatus(msgId, statusText) {
   saveMessages();
 }
 
-// যখন অন্য পাশে ইউজার সিন করবে, তখন এই রিসিভার কাজ করবে
 socket.on("message-seen", (data) => {
   updateMessageStatus(data.msgId, "Seen");
 });
