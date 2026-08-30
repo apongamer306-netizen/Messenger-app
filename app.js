@@ -501,7 +501,7 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// CREATE ROOM HANDLER (Directly enters room without popup)
+// CREATE ROOM HANDLER (Instant redirection without waiting for backend callback blocking)
 createRoomBtn.addEventListener("click", () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
   joinRoom(randomCode);
@@ -562,34 +562,32 @@ joinRoomBtn.addEventListener("click", () => {
   };
 });
 
-// Join Room With Server Validation
+// Join Room Function with Instant UI Switch & Background Socket Sync
 function joinRoom(code, isRefresh = false) {
-  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, async (response) => {
-    
+  currentRoom = code;
+  sessionStorage.setItem("activeRoom", code);
+
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "flex";
+  chatUserName.textContent = currentUser.name;
+  chatUserAvatar.src = currentUser.pic;
+
+  if (code === ADMIN_ROOM_PIN) {
+    chatRoomCode.textContent = "Special Room";
+  } else {
+    chatRoomCode.textContent = "Code: " + code;
+  }
+
+  if (isRefresh) {
+    // restoreMessages if implemented
+  } else {
+    sessionStorage.removeItem("savedChatLogs");
+    chatMessages.innerHTML = "";
+  }
+
+  socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, (response) => {
     if (response && !response.success) {
-      await showCustomAlert("Room Access Denied", response.message || "You cannot join this room.");
-      return;
-    }
-
-    currentRoom = code;
-    sessionStorage.setItem("activeRoom", code);
-
-    dashboardScreen.style.display = "none";
-    chatScreen.style.display = "flex";
-    chatUserName.textContent = currentUser.name;
-    chatUserAvatar.src = currentUser.pic;
-
-    if (code === ADMIN_ROOM_PIN) {
-      chatRoomCode.textContent = "Special Room";
-    } else {
-      chatRoomCode.textContent = "Code: " + code;
-    }
-
-    if (isRefresh) {
-      // restoreMessages if implemented
-    } else {
-      sessionStorage.removeItem("savedChatLogs");
-      chatMessages.innerHTML = "";
+      console.warn("Server room notice:", response.message);
     }
   });
 }
@@ -604,7 +602,6 @@ leaveRoomBtn.addEventListener("click", () => {
 
 // Logout Handler
 logoutBtn.addEventListener("click", () => {
-  localStorage.getItem("appUser");
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("masterUnlocked");
