@@ -13,6 +13,7 @@ const ADMIN_ROOM_PIN = "1430909";
 
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
+remoteAudioElement.style.display = "none";
 document.body.appendChild(remoteAudioElement);
 
 myPeer.on("open", (id) => {
@@ -536,7 +537,6 @@ function joinRoom(code, isRefresh = false) {
   chatUserName.textContent = currentUser.name;
   chatUserAvatar.src = currentUser.pic;
 
-  // Secret Admin Check - Hidden from header
   if (code === ADMIN_ROOM_PIN) {
     chatRoomCode.textContent = "Admin Room";
   } else {
@@ -640,7 +640,8 @@ socket.on("receive-message", (data) => {
   const isMe = data.sender === currentUser.name;
   appendMessage(data, isMe);
 
-  if (!isMe && data.id && document.hasFocus()) {
+  // Auto trigger Seen signal if receiver is currently viewing the chat
+  if (!isMe && data.id) {
     socket.emit("mark-as-seen", { 
       roomCode: currentRoom, 
       msgId: data.id, 
@@ -669,7 +670,7 @@ function appendMessage(data, isMe) {
 
   const div = document.createElement("div");
   div.classList.add("message-bubble", isMe ? "my-msg" : "other-msg");
-  if (data.id) div.id = data.id;
+  if (data.id) div.setAttribute("id", data.id); // Explicit ID binding
   
   const userAvatar = document.createElement("img");
   userAvatar.src = data.senderPic || "https://via.placeholder.com/40";
@@ -875,8 +876,10 @@ function handleStream(call, isVideo) {
   call.on("stream", (remoteStream) => {
     if (isVideo) {
       remoteVideo.srcObject = remoteStream;
+      remoteVideo.play().catch(e => console.log(e));
     } else {
       remoteAudioElement.srcObject = remoteStream;
+      remoteAudioElement.play().catch(e => console.log(e));
     }
     callStatusText.textContent = "Connected";
   });
