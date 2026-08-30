@@ -153,6 +153,24 @@
       </div>
     </div>
 
+    <!-- NEW: Master-Style Universal Custom Modal Interface -->
+    <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
+      <div class="card-screen" style="max-width: 360px; margin: auto;">
+        <h2 id="modalTitle">Security Check</h2>
+        <p id="modalSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">Please confirm your action</p>
+
+        <div class="input-wrapper" id="modalInputGroup" style="display: none;">
+          <input type="password" id="modalInput" placeholder="Enter Security PIN">
+          <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('modalInput', this)"></i>
+        </div>
+
+        <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
+          <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
+          <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script src="app.js"></script>
