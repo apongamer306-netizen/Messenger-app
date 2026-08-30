@@ -21,7 +21,7 @@
 
   <main class="main-container">
 
-    <!-- Screen 1: Security / Access Screen -->
+    <!-- Screen 1: Master Key / Access Screen -->
     <div id="masterKeyScreen" class="card-screen">
       <h2 id="masterTitle">Welcome</h2>
       <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
@@ -72,7 +72,7 @@
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 3: Dashboard -->
+    <!-- Screen 3: Premium Clean Dashboard Screen -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="profile-header">
         <div class="avatar-container">
@@ -83,25 +83,29 @@
         <h3 id="dashboardUserName">User Name</h3>
       </div>
 
-      <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
+      <!-- Action Buttons Section -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 15px;">
+        <button id="createRoomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7);">
+          <i class="fa-solid fa-plus-circle" style="margin-right: 8px;"></i>Create Room
+        </button>
 
-      <div class="input-wrapper" style="margin-top: 15px;">
-        <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
+        <button id="joinRoomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #198754, #157347);">
+          <i class="fa-solid fa-right-to-bracket" style="margin-right: 8px;"></i>Join Room
+        </button>
+        
+        <button id="setPinBtn" class="btn btn-secondary" style="background-color: #343a40; color: #fff;">
+          <i class="fa-solid fa-key" style="margin-right: 8px;"></i><span id="setPinBtnText">Set Security PIN</span>
+        </button>
+        
+        <button id="removePinBtn" class="btn btn-secondary" style="background-color: #495057; color: #fff;">
+          <i class="fa-solid fa-trash-can" style="margin-right: 8px;"></i>Remove Security PIN
+        </button>
+
+        <button id="logoutBtn" class="btn btn-danger" style="margin-top: 5px;">
+          <i class="fa-solid fa-power-off" style="margin-right: 8px;"></i>Logout
+        </button>
       </div>
 
-      <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-      
-      <!-- Dynamic Set/Change Security PIN Button -->
-      <button id="setPinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #0d6efd; color: #fff;">
-        <i class="fa-solid fa-key" style="margin-right: 6px;"></i><span id="setPinBtnText">Set Security PIN</span>
-      </button>
-      
-      <!-- Remove Security PIN Button -->
-      <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">
-        <i class="fa-solid fa-trash-can" style="margin-right: 6px;"></i>Remove Security PIN
-      </button>
-
-      <button id="logoutBtn" class="btn btn-danger" style="margin-top: 10px;">Logout</button>
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
@@ -133,7 +137,7 @@
       </div>
     </div>
 
-    <!-- Call Overlay Modal -->
+    <!-- Dynamic Call Overlay Modal -->
     <div id="callModal" class="call-modal" style="display: none;">
       <div class="call-box">
         <h3 id="callStatusText">Incoming Call...</h3>
@@ -161,7 +165,7 @@
       </div>
     </div>
 
-    <!-- Master-Style Custom Modal Interface -->
+    <!-- Dynamic Custom Popup Modal Interface -->
     <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
       <div class="card-screen" style="max-width: 360px; margin: auto;">
         <h2 id="modalTitle">Security Check</h2>
@@ -172,7 +176,7 @@
           <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('modalInput', this)"></i>
         </div>
 
-        <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
+        <div id="modalActionContainer" style="display: flex; flex-direction: column; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
           <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
           <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
         </div>
