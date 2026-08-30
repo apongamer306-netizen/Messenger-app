@@ -501,10 +501,9 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// CREATE ROOM HANDLER (Fixed: Generates code and directly enters room)
-createRoomBtn.addEventListener("click", async () => {
+// CREATE ROOM HANDLER (Directly enters room without popup)
+createRoomBtn.addEventListener("click", () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-  await showCustomAlert("Room Created!", `আপনার রুম কোড: ${randomCode}\nকোডটি শেয়ার করুন অন্যকে জয়েন করানোর জন্য।`);
   joinRoom(randomCode);
 });
 
@@ -633,7 +632,7 @@ function sendChatMessage() {
     };
     socket.emit("send-message", msgData);
     chatMessageInput.value = "";
-    appendChatMessage(msgData); // নিজের মেসেজ নিজের চ্যাট বক্সে দেখানোর জন্য
+    appendChatMessage(msgData);
   }
 }
 
