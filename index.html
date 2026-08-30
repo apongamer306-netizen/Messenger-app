@@ -21,7 +21,7 @@
 
   <main class="main-container">
 
-    <!-- Screen 1: Security / Access Screen -->
+    <!-- Screen 1: Security Screen -->
     <div id="masterKeyScreen" class="card-screen">
       <h2 id="masterTitle">Welcome</h2>
       <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
@@ -84,19 +84,12 @@
       </div>
 
       <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
-
-      <div class="input-wrapper" style="margin-top: 15px;">
-        <input type="text" id="roomCodeInput" placeholder="Enter Room Code">
-      </div>
-
-      <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
+      <button id="joinRoomBtn" class="btn btn-primary" style="margin-top: 10px;">Join Room</button>
       
-      <!-- Dynamic Set/Change Security PIN Button -->
       <button id="setPinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #0d6efd; color: #fff;">
         <i class="fa-solid fa-key" style="margin-right: 6px;"></i><span id="setPinBtnText">Set Security PIN</span>
       </button>
       
-      <!-- Remove Security PIN Button -->
       <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">
         <i class="fa-solid fa-trash-can" style="margin-right: 6px;"></i>Remove Security PIN
       </button>
@@ -161,7 +154,7 @@
       </div>
     </div>
 
-    <!-- Master-Style Custom Modal Interface -->
+    <!-- Dynamic Custom Modal System -->
     <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
       <div class="card-screen" style="max-width: 360px; margin: auto;">
         <h2 id="modalTitle">Security Check</h2>
@@ -172,9 +165,11 @@
           <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('modalInput', this)"></i>
         </div>
 
-        <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
-          <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-          <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+        <div id="modalActionContainer" style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 15px;">
+          <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
+            <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
+            <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
