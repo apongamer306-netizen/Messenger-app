@@ -7,7 +7,6 @@ const path = require("path");
 const app = express();
 app.use(cors());
 
-// স্ট্যাটিক ফাইলসমূহ (index.html, style.css, app.js) সার্ভ করার জন্য
 app.use(express.static(path.join(__dirname)));
 
 const server = http.createServer(app);
@@ -16,33 +15,26 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"]
   },
-  maxHttpBufferSize: 1e8 // ৫০ থেকে ১০০ মেগাবাইট পর্যন্ত ফাইল আপলোড সাপোর্ট করার জন্য
+  maxHttpBufferSize: 1e8
 });
 
-// হোম রুটে index.html ফাইল লোড করা
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// ইউজারের ডেটাবেজ (মেমোরিতে জমা রাখা)
 const users = {};
-// রুমের ফাইল ও মেসেজ ডাটা
 const roomMessages = {};
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  // ইউজার রেজিস্টার
   socket.on("register-user", (userData, callback) => {
-    if (users[userData.phone]) {
-      callback({ success: false, message: "এই নম্বরটি ইতিমধ্যেই নিবন্ধিত!" });
-    } else {
-      users[userData.phone] = userData;
+    users[userData.phone] = userData;
+    if (typeof callback === "function") {
       callback({ success: true, user: userData });
     }
   });
 
-  // ইউজার লগইন
   socket.on("login-user", (credentials, callback) => {
     const user = users[credentials.phone];
     if (user && user.password === credentials.password) {
@@ -52,7 +44,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // রুমে জয়েন করা
   socket.on("join-room", ({ roomCode, user, peerId }) => {
     socket.join(roomCode);
     socket.roomCode = roomCode;
@@ -61,53 +52,42 @@ io.on("connection", (socket) => {
     if (!roomMessages[roomCode]) {
       roomMessages[roomCode] = [];
     }
-
-    // নোটিফিকেশন পাঠানো
     socket.to(roomCode).emit("user-joined-notify", { user });
   });
 
-  // মেসেজ ও ফাইল সেন্ড করা (কলব্যাক যোগ করা হয়েছে Sent স্ট্যাটাসের জন্য)
   socket.on("send-message", (msgData, callback) => {
     const roomCode = msgData.roomCode;
     if (roomMessages[roomCode]) {
       roomMessages[roomCode].push(msgData);
     }
-    // রুমের বাকিদের মেসেজ পাঠানো
     socket.to(roomCode).emit("receive-message", msgData);
 
-    // মেসেজ সেন্ডারের কাছে কনফার্মেশন পাঠানো (Sent স্ট্যাটাস দেখানোর জন্য)
     if (typeof callback === "function") {
       callback({ success: true });
     }
   });
 
-  // মেসেজ "Seen" হলে সিগন্যাল বাকিদের পাঠানো
   socket.on("mark-as-seen", (data) => {
     socket.to(data.roomCode).emit("message-seen", { msgId: data.msgId });
   });
 
-  // কল দেওয়া
   socket.on("call-user", (data) => {
     socket.to(data.roomCode).emit("incoming-call", data);
   });
 
-  // কল একসেপ্ট নোটিফিকেশন
   socket.on("accept-call-notify", (data) => {
     socket.to(data.roomCode).emit("call-accepted-by-receiver", data);
   });
 
-  // কল কেটে দেওয়া
   socket.on("end-call", (data) => {
     socket.to(data.roomCode).emit("call-ended");
   });
 
-  // রুম থেকে বের হয়ে যাওয়া (Manual Leave)
   socket.on("leave-room", ({ roomCode }) => {
     socket.leave(roomCode);
     checkAndCleanRoom(roomCode);
   });
 
-  // সকেট ডিসকানেক্ট হলে বা পেজ ক্লোজ করলে
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
     if (socket.roomCode) {
@@ -115,18 +95,13 @@ io.on("connection", (socket) => {
     }
   });
 
-  // রুমে সদস্য সংখ্যা চেক করে ০ হলে ফাইল ও মেসেজ অটো ডিলিট করার ফাংশন
   function checkAndCleanRoom(roomCode) {
     const room = io.sockets.adapter.rooms.get(roomCode);
     const numClients = room ? room.size : 0;
 
-    console.log(`Room ${roomCode} active users: ${numClients}`);
-
-    // যদি রুমে কেউ না থাকে (লোকসংখ্যা 0)
     if (numClients === 0) {
       if (roomMessages[roomCode]) {
-        delete roomMessages[roomCode]; // সমস্ত মেসেজ ও ফাইল সার্ভার থেকে অটো ডিলিট
-        console.log(`🧹 Room ${roomCode} empty! All messages & files automatically deleted.`);
+        delete roomMessages[roomCode];
       }
     }
   }
