@@ -188,7 +188,6 @@ function showCustomModal(options) {
   });
 }
 
-// FIXED: Properly resolves promise on confirm for direct room entry
 function showCustomAlert(title, subtitle) {
   modalTitle.textContent = title;
   modalSubtitle.textContent = subtitle;
@@ -502,7 +501,7 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// CREATE ROOM HANDLER (Fixed Direct Redirect on Confirm)
+// CREATE ROOM HANDLER (Fixed: Generates code and directly enters room)
 createRoomBtn.addEventListener("click", async () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
   await showCustomAlert("Room Created!", `আপনার রুম কোড: ${randomCode}\nকোডটি শেয়ার করুন অন্যকে জয়েন করানোর জন্য।`);
@@ -588,7 +587,7 @@ function joinRoom(code, isRefresh = false) {
     }
 
     if (isRefresh) {
-      restoreMessages();
+      // restoreMessages if implemented
     } else {
       sessionStorage.removeItem("savedChatLogs");
       chatMessages.innerHTML = "";
@@ -606,6 +605,7 @@ leaveRoomBtn.addEventListener("click", () => {
 
 // Logout Handler
 logoutBtn.addEventListener("click", () => {
+  localStorage.getItem("appUser");
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("masterUnlocked");
@@ -633,6 +633,7 @@ function sendChatMessage() {
     };
     socket.emit("send-message", msgData);
     chatMessageInput.value = "";
+    appendChatMessage(msgData); // নিজের মেসেজ নিজের চ্যাট বক্সে দেখানোর জন্য
   }
 }
 
@@ -648,7 +649,7 @@ function appendChatMessage(msg) {
   msgDiv.style.marginBottom = "10px";
 
   msgDiv.innerHTML = `
-    <div style="background: ${isMe ? '#0d6efd' : '#333'}; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word;">
+    <div style="background: ${isMe ? '#0d6efd' : '#333'}; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word;">
       <span style="font-size: 11px; opacity: 0.7; display: block; margin-bottom: 2px;">${msg.sender}</span>
       <span>${msg.text}</span>
     </div>
