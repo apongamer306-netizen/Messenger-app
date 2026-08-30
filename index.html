@@ -90,8 +90,18 @@
       </div>
 
       <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
-      <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">Remove Security PIN</button>
-      <button id="logoutBtn" class="btn btn-danger">Logout</button>
+      
+      <!-- Dynamic Set/Change Security PIN Button -->
+      <button id="setPinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #0d6efd; color: #fff;">
+        <i class="fa-solid fa-key" style="margin-right: 6px;"></i><span id="setPinBtnText">Set Security PIN</span>
+      </button>
+      
+      <!-- Remove Security PIN Button -->
+      <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">
+        <i class="fa-solid fa-trash-can" style="margin-right: 6px;"></i>Remove Security PIN
+      </button>
+
+      <button id="logoutBtn" class="btn btn-danger" style="margin-top: 10px;">Logout</button>
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
@@ -128,13 +138,11 @@
       <div class="call-box">
         <h3 id="callStatusText">Incoming Call...</h3>
         
-        <!-- Video Grid: Only shown during Video Call -->
         <div id="callVideoGrid" class="video-grid" style="display: none;">
           <video id="localVideo" autoplay muted playsinline></video>
           <video id="remoteVideo" autoplay playsinline></video>
         </div>
 
-        <!-- Profile Grid: Only shown during Audio Call -->
         <div id="callProfileGrid" class="call-profile-grid">
           <div class="call-profile-item">
             <img id="localCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="My Profile">
@@ -153,7 +161,7 @@
       </div>
     </div>
 
-    <!-- NEW: Master-Style Universal Custom Modal Interface -->
+    <!-- Master-Style Custom Modal Interface -->
     <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
       <div class="card-screen" style="max-width: 360px; margin: auto;">
         <h2 id="modalTitle">Security Check</h2>
