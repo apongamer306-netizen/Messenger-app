@@ -1,56 +1,54 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EKT CHATING APP</title>
-  <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body class="dark-theme">
+<body class="dark-theme admin-theme">
 
-  <header class="navbar">
+  <!-- Navbar -->
+  <nav class="navbar">
     <div class="logo">EKT CHATING APP</div>
-    <div class="nav-controls">
-      <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
-    </div>
-  </header>
+    <button id="themeToggleBtn" class="icon-btn"><i class="fas fa-moon"></i></button>
+  </nav>
 
-  <main class="main-container">
+  <!-- Main Container -->
+  <div class="main-container">
 
-    <!-- Screen 1: Security Screen -->
-    <div id="masterKeyScreen" class="card-screen">
-      <h2 id="masterTitle">Welcome</h2>
-      <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
-
-      <div class="input-wrapper" id="passInputGroup" style="display: none;">
+    <!-- 1. Master Key Screen -->
+    <div id="masterKeyScreen" class="card-screen" style="display: none;">
+      <h2 id="masterTitle">Security Lock</h2>
+      <p id="masterSubtitle" style="color: #94a3b8; margin-bottom: 15px; font-size: 0.9rem;"></p>
+      
+      <div id="passInputGroup" class="input-wrapper">
         <input type="password" id="masterKeyInput" placeholder="Enter Security PIN">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('masterKeyInput', this)"></i>
+        <i class="fas fa-eye toggle-eye" onclick="togglePasswordVisibility('masterKeyInput', this)"></i>
       </div>
 
-      <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 10px;">
-        <button id="unlockBtn" class="btn btn-primary" style="display: none;">Submit</button>
-        <button id="directOpenBtn" class="btn btn-primary">Direct Open</button>
-      </div>
+      <button id="unlockBtn" class="btn btn-primary">Unlock</button>
+      <button id="directOpenBtn" class="btn btn-primary" style="display: none; background-color: #10b981;">Open Directly</button>
 
-      <p class="auth-toggle-text" style="margin-top: 15px;">
-        <span id="masterToggleMsg">Want extra security?</span>
-        <a href="#" id="masterToggleLink">Create Password</a>
+      <p class="auth-toggle-text">
+        <span id="masterToggleMsg"></span> 
+        <a href="#" id="masterToggleLink"></a>
       </p>
-
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 2: Auth Screen -->
+    <!-- 2. Authentication Screen (Login / Sign Up) -->
     <div id="authScreen" class="card-screen" style="display: none;">
       <h2 id="authTitle">Login Account</h2>
       
       <div id="signupFields" style="display: none;">
         <div class="input-wrapper">
           <input type="text" id="fullNameInput" placeholder="Full Name">
+        </div>
+        <!-- Sign Up Profile Picture Upload -->
+        <div class="input-wrapper">
+          <label style="color: #94a3b8; font-size: 0.85rem; display: block; text-align: left; margin-bottom: 5px;">Profile Picture:</label>
+          <input type="file" id="signupAvatarInput" accept="image/*" style="padding: 8px;">
         </div>
       </div>
 
@@ -60,122 +58,115 @@
 
       <div class="input-wrapper">
         <input type="password" id="authPasswordInput" placeholder="Password">
-        <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('authPasswordInput', this)"></i>
+        <i class="fas fa-eye toggle-eye" onclick="togglePasswordVisibility('authPasswordInput', this)"></i>
       </div>
 
       <button id="authSubmitBtn" class="btn btn-primary">Login</button>
 
       <p class="auth-toggle-text">
-        <span id="authToggleMsg">Don't have an account?</span>
+        <span id="authToggleMsg">Don't have an account?</span> 
         <a href="#" id="authToggleLink">Sign Up</a>
       </p>
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 3: Dashboard -->
+    <!-- 3. Dashboard Screen -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="profile-header">
         <div class="avatar-container">
-          <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture">
-          <label for="avatarUpload" class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></label>
+          <img id="dashboardAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="Profile">
+          <label for="avatarUpload" class="avatar-edit-badge">
+            <i class="fas fa-camera"></i>
+          </label>
           <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
         </div>
         <h3 id="dashboardUserName">User Name</h3>
       </div>
 
-      <button id="createRoomBtn" class="btn btn-primary">Create Room</button>
-      <button id="joinRoomBtn" class="btn btn-primary" style="margin-top: 10px;">Join Room</button>
+      <button id="createRoomBtn" class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create Room</button>
+      <button id="joinRoomBtn" class="btn btn-primary" style="background-color: #10b981; margin-top: 10px;"><i class="fas fa-sign-in-alt"></i> Join Room</button>
       
-      <button id="setPinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #0d6efd; color: #fff;">
-        <i class="fa-solid fa-key" style="margin-right: 6px;"></i><span id="setPinBtnText">Set Security PIN</span>
-      </button>
-      
-      <button id="removePinBtn" class="btn btn-secondary" style="margin-top: 10px; background-color: #6c757d; color: #fff;">
-        <i class="fa-solid fa-trash-can" style="margin-right: 6px;"></i>Remove Security PIN
-      </button>
-
-      <button id="logoutBtn" class="btn btn-danger" style="margin-top: 10px;">Logout</button>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
+      <div style="margin-top: 20px; border-top: 1px solid #334155; padding-top: 15px;">
+        <button id="setPinBtn" class="btn btn-primary" style="background-color: #6366f1;"><i class="fas fa-key"></i> <span id="setPinBtnText">Set Security PIN</span></button>
+        <button id="removePinBtn" class="btn btn-danger" style="margin-top: 5px; display: none;"><i class="fas fa-trash"></i> Remove Security PIN</button>
+        <button id="logoutBtn" class="btn btn-danger" style="margin-top: 10px;"><i class="fas fa-power-off"></i> Logout</button>
+      </div>
     </div>
 
-    <!-- Screen 4: Chat Room -->
+    <!-- 4. Chat Screen -->
     <div id="chatScreen" class="chat-container" style="display: none;">
       <div class="chat-header">
         <div class="user-info">
-          <img id="chatUserAvatar" src="https://via.placeholder.com/40" alt="Avatar">
+          <img id="chatUserAvatar" src="https://ui-avatars.com/api/?name=User&background=random" alt="User">
           <div>
             <h4 id="chatUserName">User Name</h4>
-            <span id="chatRoomCode">Code: ------</span>
+            <span id="chatRoomCode" style="font-size: 0.75rem; color: #94a3b8;">Code: ------</span>
           </div>
         </div>
-        <div class="chat-actions">
-          <button id="startAudioCallBtn" class="action-btn call-audio"><i class="fa-solid fa-phone"></i></button>
-          <button id="startVideoCallBtn" class="action-btn call-video"><i class="fa-solid fa-video"></i></button>
-          <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fa-solid fa-right-from-bracket"></i></button>
+        <div>
+          <button id="startAudioCallBtn" class="action-btn"><i class="fas fa-phone"></i></button>
+          <button id="startVideoCallBtn" class="action-btn"><i class="fas fa-video"></i></button>
+          <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fas fa-sign-out-alt"></i></button>
         </div>
       </div>
 
       <div id="chatMessages" class="chat-messages"></div>
 
       <div class="chat-input-area">
-        <label for="fileAttachmentInput" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
-        <input type="file" id="fileAttachmentInput" accept="image/*,video/*,audio/*" style="display: none;">
-        
+        <label for="fileAttachmentInput" class="attach-btn"><i class="fas fa-paperclip"></i></label>
+        <input type="file" id="fileAttachmentInput" style="display: none;">
         <input type="text" id="chatMessageInput" placeholder="Type a message...">
-        <button id="sendMessageBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+        <button id="sendMessageBtn" class="send-btn"><i class="fas fa-paper-plane"></i></button>
       </div>
     </div>
 
-    <!-- Call Overlay Modal -->
-    <div id="callModal" class="call-modal" style="display: none;">
-      <div class="call-box">
-        <h3 id="callStatusText">Incoming Call...</h3>
-        
-        <div id="callVideoGrid" class="video-grid" style="display: none;">
-          <video id="localVideo" autoplay muted playsinline></video>
-          <video id="remoteVideo" autoplay playsinline></video>
-        </div>
+  </div>
 
-        <div id="callProfileGrid" class="call-profile-grid">
-          <div class="call-profile-item">
-            <img id="localCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="My Profile">
-            <span id="localCallName" class="call-username">Me</span>
-          </div>
-          <div class="call-profile-item">
-            <img id="remoteCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="Other Profile">
-            <span id="remoteCallName" class="call-username">Other</span>
-          </div>
-        </div>
+  <!-- Custom Alert/Prompt Modal Overlay -->
+  <div id="customModalOverlay" class="call-modal" style="display: none;">
+    <div class="call-box">
+      <h3 id="modalTitle">Notice</h3>
+      <p id="modalSubtitle" style="color: #94a3b8; margin: 10px 0; font-size: 0.9rem;"></p>
+      <div id="modalInputGroup" class="input-wrapper" style="display: none;">
+        <input type="text" id="modalInput">
+      </div>
+      <div id="modalActionContainer" style="margin-top: 15px;"></div>
+    </div>
+  </div>
 
-        <div class="call-controls">
-          <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
-          <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
+  <!-- Call Modal Overlay -->
+  <div id="callModal" class="call-modal" style="display: none;">
+    <div class="call-box">
+      <h3 id="callStatusText">Calling...</h3>
+      
+      <!-- Video Grid -->
+      <div id="callVideoGrid" class="video-grid" style="display: none;">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+
+      <!-- Audio Call Profile Grid -->
+      <div id="callProfileGrid" class="call-profile-grid">
+        <div class="call-profile-item">
+          <img id="localCallAvatar" class="call-avatar" src="https://ui-avatars.com/api/?name=Me&background=random">
+          <span id="localCallName" class="call-username">Me</span>
+        </div>
+        <div class="call-profile-item">
+          <img id="remoteCallAvatar" class="call-avatar" src="https://ui-avatars.com/api/?name=User&background=random">
+          <span id="remoteCallName" class="call-username">User</span>
         </div>
       </div>
-    </div>
 
-    <!-- Dynamic Custom Modal System -->
-    <div id="customModalOverlay" class="call-modal" style="display: none; z-index: 99999;">
-      <div class="card-screen" style="max-width: 360px; margin: auto;">
-        <h2 id="modalTitle">Security Check</h2>
-        <p id="modalSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">Please confirm your action</p>
-
-        <div class="input-wrapper" id="modalInputGroup" style="display: none;">
-          <input type="password" id="modalInput" placeholder="Enter Security PIN">
-          <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('modalInput', this)"></i>
-        </div>
-
-        <div id="modalActionContainer" style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 15px;">
-          <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
-            <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-            <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
-          </div>
-        </div>
+      <div class="call-controls">
+        <button id="acceptCallBtn" class="btn-call accept"><i class="fas fa-phone"></i> Accept</button>
+        <button id="rejectCallBtn" class="btn-call reject"><i class="fas fa-phone-slash"></i> End</button>
       </div>
     </div>
+  </div>
 
-  </main>
-
+  <!-- Socket.io & PeerJS Dependencies -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
