@@ -5,10 +5,10 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* Page Base Setup */
 body {
   background-color: #0f172a;
   color: #f8fafc;
+  min-height: 100vh;
 }
 
 /* Navbar */
@@ -44,7 +44,7 @@ body {
   padding: 20px;
 }
 
-/* Card Screen */
+/* Dashboard Card Screen */
 .card-screen {
   background-color: rgba(30, 41, 59, 0.95);
   backdrop-filter: blur(10px);
@@ -126,7 +126,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 
-  /* শুধুমাত্র অ্যাডমিন চ্যাট বক্সে আপনার পিকচার শো করবে */
+  /* শুধুমাত্র চ্যাট বক্সের ভেতর ব্যাকগ্রাউন্ড ইমেজ */
   background-image: linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.75)), 
                     url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg');
   background-position: center;
@@ -173,7 +173,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: transparent; /* ব্যাকগ্রাউন্ড ইমেজ স্পষ্টভাবে দেখার জন্য */
+  background: transparent;
 }
 
 .message-bubble {
@@ -229,4 +229,43 @@ body {
   font-size: 1.2rem;
   background: none;
   border: none;
+}
+
+/* ---------------------------------------------------- */
+/* Centered Floating Modal Overlay */
+/* ---------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.modal-box {
+  background-color: #1e293b;
+  padding: 25px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-box h3 {
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.modal-box p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-bottom: 20px;
 }
