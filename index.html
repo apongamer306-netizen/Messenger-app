@@ -21,14 +21,26 @@
 
   <main class="main-container">
 
-    <!-- Screen 1: Master Key -->
+    <!-- Screen 1: Security / Access Screen (UPDATED) -->
     <div id="masterKeyScreen" class="card-screen">
-      <h2>Master Key প্রবেশ করান</h2>
-      <div class="input-wrapper">
-        <input type="password" id="masterKeyInput" placeholder="Enter Site Password">
+      <h2 id="masterTitle">Welcome</h2>
+      <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
+
+      <div class="input-wrapper" id="passInputGroup" style="display: none;">
+        <input type="password" id="masterKeyInput" placeholder="Enter Security PIN">
         <i class="fa-solid fa-eye toggle-eye" onclick="togglePasswordVisibility('masterKeyInput', this)"></i>
       </div>
-      <button id="unlockBtn" class="btn btn-primary">Unlock</button>
+
+      <div style="display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 10px;">
+        <button id="unlockBtn" class="btn btn-primary" style="display: none;">Submit</button>
+        <button id="directOpenBtn" class="btn btn-primary">Direct Open</button>
+      </div>
+
+      <p class="auth-toggle-text" style="margin-top: 15px;">
+        <span id="masterToggleMsg">Want extra security?</span>
+        <a href="#" id="masterToggleLink">Create Password</a>
+      </p>
+
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
@@ -110,7 +122,7 @@
       </div>
     </div>
 
-    <!-- Call Overlay Modal (UPDATED) -->
+    <!-- Call Overlay Modal -->
     <div id="callModal" class="call-modal" style="display: none;">
       <div class="call-box">
         <h3 id="callStatusText">Incoming Call...</h3>
