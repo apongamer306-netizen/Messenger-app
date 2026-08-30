@@ -8,6 +8,9 @@ let currentCall = null;
 let localStream = null;
 let currentCallType = null;
 
+// Fixed Secret Admin Room Code
+const ADMIN_ROOM_PIN = "1430909";
+
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 document.body.appendChild(remoteAudioElement);
@@ -26,7 +29,6 @@ const authScreen = document.getElementById("authScreen");
 const dashboardScreen = document.getElementById("dashboardScreen");
 const chatScreen = document.getElementById("chatScreen");
 
-// Master Key DOM Elements
 const masterTitle = document.getElementById("masterTitle");
 const masterSubtitle = document.getElementById("masterSubtitle");
 const passInputGroup = document.getElementById("passInputGroup");
@@ -52,7 +54,6 @@ const dashboardUserName = document.getElementById("dashboardUserName");
 const avatarUpload = document.getElementById("avatarUpload");
 
 const createRoomBtn = document.getElementById("createRoomBtn");
-const roomCodeInput = document.getElementById("roomCodeInput");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
 
 const setPinBtn = document.getElementById("setPinBtn");
@@ -75,8 +76,7 @@ const modalTitle = document.getElementById("modalTitle");
 const modalSubtitle = document.getElementById("modalSubtitle");
 const modalInputGroup = document.getElementById("modalInputGroup");
 const modalInput = document.getElementById("modalInput");
-const modalConfirmBtn = document.getElementById("modalConfirmBtn");
-const modalCancelBtn = document.getElementById("modalCancelBtn");
+const modalActionContainer = document.getElementById("modalActionContainer");
 
 // Call Modal Elements
 const callModal = document.getElementById("callModal");
@@ -110,8 +110,7 @@ function togglePasswordVisibility(inputId, iconElem) {
   }
 }
 
-// ------------------- CUSTOM BEAUTIFUL MODAL SYSTEM -------------------
-
+// Custom Modal System
 function showCustomModal(options) {
   modalTitle.textContent = options.title || "Notice";
   modalSubtitle.textContent = options.subtitle || "";
@@ -124,10 +123,18 @@ function showCustomModal(options) {
     modalInputGroup.style.display = "none";
   }
 
+  modalActionContainer.innerHTML = `
+    <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
+      <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
+      <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+    </div>
+  `;
+
+  const confBtn = document.getElementById("modalConfirmBtn");
+  const cancBtn = document.getElementById("modalCancelBtn");
+
   if (options.hideCancel) {
-    modalCancelBtn.style.display = "none";
-  } else {
-    modalCancelBtn.style.display = "inline-block";
+    cancBtn.style.display = "none";
   }
 
   customModalOverlay.style.display = "flex";
@@ -145,12 +152,10 @@ function showCustomModal(options) {
 
     const cleanup = () => {
       customModalOverlay.style.display = "none";
-      modalConfirmBtn.removeEventListener("click", handleConfirm);
-      modalCancelBtn.removeEventListener("click", handleCancel);
     };
 
-    modalConfirmBtn.addEventListener("click", handleConfirm);
-    modalCancelBtn.addEventListener("click", handleCancel);
+    confBtn.addEventListener("click", handleConfirm);
+    cancBtn.addEventListener("click", handleCancel);
   });
 }
 
@@ -167,8 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkActiveSession();
 });
 
-// ------------------- MASTER KEY & SECURITY LOGIC -------------------
-
+// Master Screen Logic
 function updateMasterScreenUI() {
   const savedPin = localStorage.getItem("appMasterPin");
 
@@ -274,7 +278,7 @@ function grantAccess() {
   }
 }
 
-// ------------------- SET & CHANGE SECURITY PIN LOGIC -------------------
+// Security PIN Management
 function updateDashboardPinUI() {
   const savedPin = localStorage.getItem("appMasterPin");
   if (savedPin) {
@@ -291,7 +295,6 @@ if (setPinBtn) {
     const savedPin = localStorage.getItem("appMasterPin");
 
     if (savedPin) {
-      // পাসওয়ার্ড পরিবর্তন করার লজিক
       const oldPin = await showCustomModal({
         title: "Change Security PIN",
         subtitle: "আপনার বর্তমান Security PIN টি দিন:",
@@ -321,7 +324,6 @@ if (setPinBtn) {
       }
 
     } else {
-      // নতুন পাসওয়ার্ড সেট করার লজিক
       const newPin = await showCustomModal({
         title: "Set Security PIN",
         subtitle: "আপনার Security PIN টি সেট করুন:",
@@ -340,7 +342,6 @@ if (setPinBtn) {
   });
 }
 
-// ------------------- REMOVE SECURITY PIN LOGIC -------------------
 if (removePinBtn) {
   removePinBtn.addEventListener("click", async () => {
     const savedPin = localStorage.getItem("appMasterPin");
@@ -368,8 +369,7 @@ if (removePinBtn) {
   });
 }
 
-// ------------------- AUTHENTICATION LOGIC -------------------
-
+// Authentication Logic
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -444,14 +444,85 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
+// Create Room Buttons
 createRoomBtn.addEventListener("click", () => {
-  const code = "1430909";
-  joinRoom(code);
+  modalTitle.textContent = "Create Room";
+  modalSubtitle.textContent = "Select room type to create:";
+  modalInputGroup.style.display = "none";
+
+  modalActionContainer.innerHTML = `
+    <button id="optAdminRoomBtn" class="btn btn-primary" style="background-color: #0d6efd; color: #fff;">Admin Room</button>
+    <button id="optOwnRoomBtn" class="btn btn-primary" style="background-color: #198754; color: #fff; margin-top: 5px;">Own Room (Random Code)</button>
+    <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; margin-top: 5px;">Cancel</button>
+  `;
+
+  customModalOverlay.style.display = "flex";
+
+  document.getElementById("optAdminRoomBtn").onclick = () => {
+    customModalOverlay.style.display = "none";
+    joinRoom(ADMIN_ROOM_PIN);
+  };
+
+  document.getElementById("optOwnRoomBtn").onclick = () => {
+    customModalOverlay.style.display = "none";
+    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    joinRoom(randomCode);
+  };
+
+  document.getElementById("optCancelBtn").onclick = () => {
+    customModalOverlay.style.display = "none";
+  };
 });
 
+// Join Room Buttons
 joinRoomBtn.addEventListener("click", () => {
-  const code = roomCodeInput.value.trim().toUpperCase();
-  if (code) joinRoom(code);
+  modalTitle.textContent = "Join Room";
+  modalSubtitle.textContent = "Select room type to join:";
+  modalInputGroup.style.display = "none";
+
+  modalActionContainer.innerHTML = `
+    <button id="optJoinAdminBtn" class="btn btn-primary" style="background-color: #0d6efd; color: #fff;">Admin Room Join</button>
+    <button id="optJoinRandomBtn" class="btn btn-primary" style="background-color: #198754; color: #fff; margin-top: 5px;">Random Room Join</button>
+    <button id="optCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff; margin-top: 5px;">Cancel</button>
+  `;
+
+  customModalOverlay.style.display = "flex";
+
+  document.getElementById("optJoinAdminBtn").onclick = async () => {
+    customModalOverlay.style.display = "none";
+    const enteredPin = await showCustomModal({
+      title: "Admin Room Access",
+      subtitle: "অ্যাডমিন রুমে প্রবেশ করতে Secret PIN লিখুন:",
+      hasInput: true,
+      placeholder: "Enter Secret PIN"
+    });
+
+    if (enteredPin === null) return;
+
+    if (enteredPin === ADMIN_ROOM_PIN) {
+      joinRoom(ADMIN_ROOM_PIN);
+    } else {
+      await showCustomAlert("Access Denied", "ভুল Secret PIN! আপনি অ্যাডমিন রুমে জয়েন করতে পারবেন না।");
+    }
+  };
+
+  document.getElementById("optJoinRandomBtn").onclick = async () => {
+    customModalOverlay.style.display = "none";
+    const code = await showCustomModal({
+      title: "Join Random Room",
+      subtitle: "আপনার রুম কোডটি লিখুন:",
+      hasInput: true,
+      placeholder: "Enter 6 Digit Code"
+    });
+
+    if (code && code.trim() !== "") {
+      joinRoom(code.trim().toUpperCase());
+    }
+  };
+
+  document.getElementById("optCancelBtn").onclick = () => {
+    customModalOverlay.style.display = "none";
+  };
 });
 
 function joinRoom(code, isRefresh = false) {
@@ -464,7 +535,13 @@ function joinRoom(code, isRefresh = false) {
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
   chatUserAvatar.src = currentUser.pic;
-  chatRoomCode.textContent = "Code: " + code;
+
+  // Secret Admin Check - Hidden from header
+  if (code === ADMIN_ROOM_PIN) {
+    chatRoomCode.textContent = "Admin Room";
+  } else {
+    chatRoomCode.textContent = "Code: " + code;
+  }
 
   if (isRefresh) {
     restoreMessages();
@@ -483,8 +560,7 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// ------------------- MESSAGE SENDING & ACCURATE SEEN LOGIC -------------------
-
+// Messaging System
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -678,8 +754,7 @@ function openFullscreenImage(src) {
   document.body.appendChild(modal);
 }
 
-// ------------------- AUDIO / VIDEO CALLING LOGIC -------------------
-
+// Audio / Video Calling Logic
 let incomingCallData = null;
 
 startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
@@ -729,7 +804,7 @@ function initiateCall(type) {
       callerPic: currentUser.pic,
       callType: type
     });
-  }).catch(async (err) => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
+  }).catch(async () => await showCustomAlert("Permission Error", "Camera & Microphone Access Required!"));
 }
 
 socket.on("incoming-call", (data) => {
