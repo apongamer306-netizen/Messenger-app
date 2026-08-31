@@ -579,30 +579,36 @@ function joinRoom(code, isRefresh = false) {
 
   if (code === ADMIN_ROOM_PIN) {
     chatRoomCode.textContent = "Special Room";
-    // স্পেশাল রুমে গেলে ব্যাকগ্রাউন্ড ছবি আসার ক্লাস যোগ করা হবে
     chatScreen.classList.add("special-room-chat");
   } else {
     chatRoomCode.textContent = "Code: " + code;
-    // সাধারণ রুম হলে ক্লাসটি রিমুভ থাকবে
     chatScreen.classList.remove("special-room-chat");
   }
 
-  if (!isRefresh) {
-    chatMessages.innerHTML = "";
-  }
-
+  // সোকেটের মাধ্যমে রুমে জয়েন করা
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, (response) => {
     if (response && !response.success) {
       console.warn("Server room notice:", response.message);
     }
   });
+
+  // পেজ রিফ্রেশ বা পুনরায় প্রবেশ করলে সার্ভার থেকে আগের চ্যাট হিস্ট্রি ফিরিয়ে আনা[cite: 3]
+  chatMessages.innerHTML = "";
+  socket.emit("get-room-history", code, (historyMessages) => {
+    if (historyMessages && Array.isArray(historyMessages)) {
+      historyMessages.forEach((msgData) => {
+        appendChatMessage(msgData);
+      });
+    }
+  });
 }
 
 leaveRoomBtn.addEventListener("click", () => {
+  socket.emit("leave-room", { roomCode: currentRoom });
   sessionStorage.removeItem("activeRoom");
   currentRoom = null;
   chatScreen.classList.remove("special-room-chat");
-  socket.emit("leave-room", { roomCode: currentRoom });
+  chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
 });
@@ -661,6 +667,20 @@ function sendChatMessage() {
 
 socket.on("receive-message", (msg) => {
   appendChatMessage(msg);
+});
+
+// রুমে নতুন ইউজার জয়েন করলে সিস্টেম নোটিফিকেশন দেখানো[cite: 3]
+socket.on("user-joined-notify", (data) => {
+  if (data && data.user) {
+    const notificationDiv = document.createElement("div");
+    notificationDiv.style.textAlign = "center";
+    notificationDiv.style.margin = "10px 0";
+    notificationDiv.style.color = "gray";
+    notificationDiv.style.fontSize = "13px";
+    notificationDiv.innerHTML = `<span>${data.user.name} রুমে প্রবেশ করেছেন।</span>`;
+    chatMessages.appendChild(notificationDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 });
 
 function appendChatMessage(msg) {
