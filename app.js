@@ -611,26 +611,16 @@ function joinRoom(code, isRefresh = false) {
     }
   });
 
-  // রিলোড দিলে বা জয়েন করলে লোকাল স্টোরেজ থেকে বা সার্ভার থেকে হিস্ট্রি লোড করা
+  // সার্ভার থেকে রুম হিস্ট্রি নিয়ে আসা (ডুপ্লিকেট এড়ানোর জন্য আগের চ্যাট ক্লিয়ার করে ফ্রেশ রেন্ডার)
   chatMessages.innerHTML = "";
-  const localHistoryKey = "chat_history_" + code;
-  const savedLocalMessages = JSON.parse(localStorage.getItem(localHistoryKey)) || [];
-
-  if (savedLocalMessages.length > 0) {
-    savedLocalMessages.forEach((msgData) => {
-      appendChatMessage(msgData, false); // false মানে লোকাল স্টোরেজে নতুন করে ডুপ্লিকেট সেভ হবে না
-    });
-  }
-
-  // সার্ভার থেকেও সিঙ্ক করে নেওয়া যাতে অন্য ইউজারের পাঠানো মেসেজও মিস না হয়
   socket.emit("get-room-history", code, (historyMessages) => {
     if (historyMessages && Array.isArray(historyMessages)) {
-      // লোকাল স্টোরেজ আপডেট করে সার্ভারের ডাটা দিয়ে সিঙ্ক করে নেওয়া
-      localStorage.setItem(localHistoryKey, JSON.stringify(historyMessages));
       chatMessages.innerHTML = "";
       historyMessages.forEach((msgData) => {
         appendChatMessage(msgData, false);
       });
+      // রুমে প্রবেশ করার পর নিজের মেসেজগুলো সার্ভারের মাধ্যমে রিড বা সিন স্ট্যাটাসে আপডেট করা
+      socket.emit("mark-room-seen", { roomCode: code, userName: currentUser.name, userPic: currentUser.pic });
     }
   });
 }
@@ -665,8 +655,9 @@ fileAttachmentInput.addEventListener("change", (e) => {
 
   const reader = new FileReader();
   reader.onload = function(evt) {
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
     const fileData = {
-      id: "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+      id: msgId,
       roomCode: currentRoom,
       sender: currentUser.name,
       senderPic: currentUser.pic || "https://via.placeholder.com/40",
@@ -674,8 +665,18 @@ fileAttachmentInput.addEventListener("change", (e) => {
       fileContent: evt.target.result,
       fileName: file.name
     };
-    socket.emit("send-message", fileData);
-    appendChatMessage(fileData, true); // true মানে লোকাল স্টোরেজে সেভ হবে
+    
+    // প্রথমে লোকাল স্ক্রিনে Sending স্ট্যাটাসসহ মেসেজ দেখাবো
+    appendChatMessage(fileData, true, "Sending...");
+
+    // সার্ভারে পাঠাবো
+    socket.emit("send-message", fileData, (ack) => {
+      // সার্ভার থেকে কনফার্মেশন পেলে Sending স্ট্যাটাস আপডেট করে Sent করব
+      updateMessageStatus(msgId, "Sent");
+    });
+
+    // ফাইল ইনপুট রিসেট করা যাতে একই ভিডিও বা ছবি বারবার সিলেক্ট করা যায়
+    fileAttachmentInput.value = "";
   };
   reader.readAsDataURL(file);
 });
@@ -691,14 +692,34 @@ function sendChatMessage() {
       senderPic: currentUser.pic || "https://via.placeholder.com/40",
       text: text
     };
-    socket.emit("send-message", msgData);
+
+    // প্রথমে লোকাল স্ক্রিনে Sending স্ট্যাটাসসহ দেখাবো
+    appendChatMessage(msgData, true, "Sending...");
     chatMessageInput.value = "";
-    appendChatMessage(msgData, true); // true মানে লোকাল স্টোরেজে সেভ হবে
+
+    // সার্ভারে পাঠাবো
+    socket.emit("send-message", msgData, (ack) => {
+      updateMessageStatus(msgId, "Sent");
+    });
   }
 }
 
 socket.on("receive-message", (msg) => {
-  appendChatMessage(msg, true); // অন্য ইউজারের থেকে আসা মেসেজও লোকাল স্টোরেজে সেভ হবে
+  appendChatMessage(msg, false, "");
+  // রিসিভ করার সাথে সাথে সার্ভারকে জানিয়ে দেবো যে মেসেজ দেখা হয়ে গেছে (Seen)
+  socket.emit("mark-message-seen", { messageId: msg.id, roomCode: currentRoom, userPic: currentUser.pic });
+});
+
+// যখন অন্য কেউ মেসেজ সিন করবে তখন এই ইভেন্ট ট্রিগার হবে
+socket.on("message-seen-update", (data) => {
+  const msgEl = document.getElementById(data.messageId);
+  if (msgEl) {
+    const statusContainer = msgEl.querySelector(".msg-status-container");
+    if (statusContainer) {
+      // Sending বা Sent লেখা মুছে দিয়ে সেখানে ছোট অবতার বা Seen স্ট্যাটাস দেখাবে
+      statusContainer.innerHTML = `<img src="${data.userPic}" title="Seen" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-left: 4px;" />`;
+    }
+  }
 });
 
 // রুমে নতুন ইউজার জয়েন করলে সিস্টেম নোটিফিকেশন দেখানো
@@ -715,23 +736,12 @@ socket.on("user-joined-notify", (data) => {
   }
 });
 
-function appendChatMessage(msg, saveToLocal = false) {
-  // ডুপ্লিকেট মেসেজ চেক করার জন্য আইডি দিয়ে যাচাই করা
-  const existingMsg = document.getElementById(msg.id);
-  if (existingMsg) return; // যদি অলরেডি স্ক্রিনে থাকে, তবে আবার রেন্ডার বা সেন্ড হবে না
-
-  if (saveToLocal && currentRoom) {
-    const localHistoryKey = "chat_history_" + currentRoom;
-    let savedLocalMessages = JSON.parse(localStorage.getItem(localHistoryKey)) || [];
-    // চেক করা যে এই আইডি অলরেডি লোকাল স্টোরেজে আছে কিনা
-    if (!savedLocalMessages.some(m => m.id === msg.id)) {
-      savedLocalMessages.push(msg);
-      localStorage.setItem(localHistoryKey, JSON.stringify(savedLocalMessages));
-    }
-  }
+function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
+  // ডুপ্লিকেট মেসেজ প্রিভেন্ট করার জন্য চেক
+  if (document.getElementById(msg.id)) return;
 
   const msgDiv = document.createElement("div");
-  msgDiv.id = msg.id || ("msg_" + Date.now());
+  msgDiv.id = msg.id;
   const isMe = msg.sender === currentUser.name;
   msgDiv.style.display = "flex";
   msgDiv.style.alignItems = "flex-end";
@@ -754,20 +764,31 @@ function appendChatMessage(msg, saveToLocal = false) {
     contentHtml = `<span>${msg.text}</span>`;
   }
 
+  // নিজের মেসেজের নিচে Sending/Sent এবং অন্য ইউজারের ক্ষেত্রে নরমাল ভিউ
+  let statusHtml = "";
+  if (isMe) {
+    statusHtml = `<div class="msg-status-container" style="font-size: 10px; text-align: right; color: #bbb; margin-top: 2px;">${initialStatus}</div>`;
+  }
+
   const avatarImg = `<img src="${msg.senderPic || 'https://via.placeholder.com/40'}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" />`;
 
   if (isMe) {
     msgDiv.innerHTML = `
-      <div style="background: #0d6efd; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word; position: relative;">
-        ${contentHtml}
+      <div style="display: flex; flex-direction: column; max-width: 70%;">
+        <div style="background: #0d6efd; color: #fff; padding: 10px 14px; border-radius: 12px; word-break: break-word;">
+          ${contentHtml}
+        </div>
+        ${statusHtml}
       </div>
       ${avatarImg}
     `;
   } else {
     msgDiv.innerHTML = `
       ${avatarImg}
-      <div style="background: #333; color: #fff; padding: 10px 14px; border-radius: 12px; max-width: 70%; word-break: break-word; position: relative;">
-        ${contentHtml}
+      <div style="display: flex; flex-direction: column; max-width: 70%;">
+        <div style="background: #333; color: #fff; padding: 10px 14px; border-radius: 12px; word-break: break-word;">
+          ${contentHtml}
+        </div>
       </div>
     `;
   }
@@ -775,7 +796,7 @@ function appendChatMessage(msg, saveToLocal = false) {
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  // ছবি বা ভিডিওতে ক্লিক করলে ফুল স্ক্রিন প্রিভিউ এবং ডাউনলোড অপশন ওপেন হওয়া
+  // মিডিয়া প্রিভিউ এবং ডাউনলোড মোডাল হ্যান্ডলার
   const mediaElement = msgDiv.querySelector(".previewable-media");
   if (mediaElement) {
     mediaElement.addEventListener("click", () => {
@@ -796,6 +817,16 @@ function appendChatMessage(msg, saveToLocal = false) {
 
       mediaPreviewModal.style.display = "flex";
     });
+  }
+}
+
+function updateMessageStatus(msgId, statusText) {
+  const msgEl = document.getElementById(msgId);
+  if (msgEl) {
+    const statusContainer = msgEl.querySelector(".msg-status-container");
+    if (statusContainer && statusContainer.innerHTML.includes("Sending...")) {
+      statusContainer.textContent = statusText;
+    }
   }
 }
 
