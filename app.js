@@ -96,6 +96,26 @@ const modalInputGroup = document.getElementById("modalInputGroup");
 const modalInput = document.getElementById("modalInput");
 const modalActionContainer = document.getElementById("modalActionContainer");
 
+// Media Preview Modal Elements (Full Screen Viewer)
+const mediaPreviewModal = document.createElement("div");
+mediaPreviewModal.id = "mediaPreviewModal";
+mediaPreviewModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center; flex-direction:column;";
+mediaPreviewModal.innerHTML = `
+  <div style="position:absolute; top:20px; right:20px; cursor:pointer; color:#fff; font-size:30px;" id="closeMediaPreview">&times;</div>
+  <div id="mediaPreviewContent" style="max-width:90%; max-height:85%; display:flex; justify-content:center; align-items:center;"></div>
+  <a id="mediaDownloadBtn" class="btn btn-primary" style="margin-top:15px; display:none; text-decoration:none; color:#fff;" download>Download</a>
+`;
+document.body.appendChild(mediaPreviewModal);
+
+const closeMediaPreview = document.getElementById("closeMediaPreview");
+const mediaPreviewContent = document.getElementById("mediaPreviewContent");
+const mediaDownloadBtn = document.getElementById("mediaDownloadBtn");
+
+closeMediaPreview.addEventListener("click", () => {
+  mediaPreviewModal.style.display = "none";
+  mediaPreviewContent.innerHTML = "";
+});
+
 // Theme Toggle Elements
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const bodyElement = document.body;
@@ -585,19 +605,31 @@ function joinRoom(code, isRefresh = false) {
     chatScreen.classList.remove("special-room-chat");
   }
 
-  // সোকেটের মাধ্যমে রুমে জয়েন করা
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId }, (response) => {
     if (response && !response.success) {
       console.warn("Server room notice:", response.message);
     }
   });
 
-  // পেজ রিফ্রেশ বা পুনরায় প্রবেশ করলে সার্ভার থেকে আগের চ্যাট হিস্ট্রি ফিরিয়ে আনা[cite: 3]
+  // রিলোড দিলে বা জয়েন করলে লোকাল স্টোরেজ থেকে বা সার্ভার থেকে হিস্ট্রি লোড করা
   chatMessages.innerHTML = "";
+  const localHistoryKey = "chat_history_" + code;
+  const savedLocalMessages = JSON.parse(localStorage.getItem(localHistoryKey)) || [];
+
+  if (savedLocalMessages.length > 0) {
+    savedLocalMessages.forEach((msgData) => {
+      appendChatMessage(msgData, false); // false মানে লোকাল স্টোরেজে নতুন করে ডুপ্লিকেট সেভ হবে না
+    });
+  }
+
+  // সার্ভার থেকেও সিঙ্ক করে নেওয়া যাতে অন্য ইউজারের পাঠানো মেসেজও মিস না হয়
   socket.emit("get-room-history", code, (historyMessages) => {
     if (historyMessages && Array.isArray(historyMessages)) {
+      // লোকাল স্টোরেজ আপডেট করে সার্ভারের ডাটা দিয়ে সিঙ্ক করে নেওয়া
+      localStorage.setItem(localHistoryKey, JSON.stringify(historyMessages));
+      chatMessages.innerHTML = "";
       historyMessages.forEach((msgData) => {
-        appendChatMessage(msgData);
+        appendChatMessage(msgData, false);
       });
     }
   });
@@ -634,7 +666,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
   const reader = new FileReader();
   reader.onload = function(evt) {
     const fileData = {
-      id: "msg_" + Date.now(),
+      id: "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
       roomCode: currentRoom,
       sender: currentUser.name,
       senderPic: currentUser.pic || "https://via.placeholder.com/40",
@@ -643,7 +675,7 @@ fileAttachmentInput.addEventListener("change", (e) => {
       fileName: file.name
     };
     socket.emit("send-message", fileData);
-    appendChatMessage(fileData);
+    appendChatMessage(fileData, true); // true মানে লোকাল স্টোরেজে সেভ হবে
   };
   reader.readAsDataURL(file);
 });
@@ -661,15 +693,15 @@ function sendChatMessage() {
     };
     socket.emit("send-message", msgData);
     chatMessageInput.value = "";
-    appendChatMessage(msgData);
+    appendChatMessage(msgData, true); // true মানে লোকাল স্টোরেজে সেভ হবে
   }
 }
 
 socket.on("receive-message", (msg) => {
-  appendChatMessage(msg);
+  appendChatMessage(msg, true); // অন্য ইউজারের থেকে আসা মেসেজও লোকাল স্টোরেজে সেভ হবে
 });
 
-// রুমে নতুন ইউজার জয়েন করলে সিস্টেম নোটিফিকেশন দেখানো[cite: 3]
+// রুমে নতুন ইউজার জয়েন করলে সিস্টেম নোটিফিকেশন দেখানো
 socket.on("user-joined-notify", (data) => {
   if (data && data.user) {
     const notificationDiv = document.createElement("div");
@@ -683,8 +715,23 @@ socket.on("user-joined-notify", (data) => {
   }
 });
 
-function appendChatMessage(msg) {
+function appendChatMessage(msg, saveToLocal = false) {
+  // ডুপ্লিকেট মেসেজ চেক করার জন্য আইডি দিয়ে যাচাই করা
+  const existingMsg = document.getElementById(msg.id);
+  if (existingMsg) return; // যদি অলরেডি স্ক্রিনে থাকে, তবে আবার রেন্ডার বা সেন্ড হবে না
+
+  if (saveToLocal && currentRoom) {
+    const localHistoryKey = "chat_history_" + currentRoom;
+    let savedLocalMessages = JSON.parse(localStorage.getItem(localHistoryKey)) || [];
+    // চেক করা যে এই আইডি অলরেডি লোকাল স্টোরেজে আছে কিনা
+    if (!savedLocalMessages.some(m => m.id === msg.id)) {
+      savedLocalMessages.push(msg);
+      localStorage.setItem(localHistoryKey, JSON.stringify(savedLocalMessages));
+    }
+  }
+
   const msgDiv = document.createElement("div");
+  msgDiv.id = msg.id || ("msg_" + Date.now());
   const isMe = msg.sender === currentUser.name;
   msgDiv.style.display = "flex";
   msgDiv.style.alignItems = "flex-end";
@@ -695,9 +742,9 @@ function appendChatMessage(msg) {
   let contentHtml = "";
   if (msg.fileType) {
     if (msg.fileType.startsWith("image/")) {
-      contentHtml = `<img src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px;" />`;
+      contentHtml = `<img src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px; cursor: pointer;" class="previewable-media" data-type="image" data-src="${msg.fileContent}" data-name="${msg.fileName || 'image.png'}" />`;
     } else if (msg.fileType.startsWith("video/")) {
-      contentHtml = `<video src="${msg.fileContent}" controls style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px;"></video>`;
+      contentHtml = `<video src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px; cursor: pointer;" class="previewable-media" data-type="video" data-src="${msg.fileContent}" data-name="${msg.fileName || 'video.mp4'}"></video>`;
     } else if (msg.fileType.startsWith("audio/")) {
       contentHtml = `<audio src="${msg.fileContent}" controls style="max-width: 200px; display: block; margin-top: 4px;"></audio>`;
     } else {
@@ -727,10 +774,33 @@ function appendChatMessage(msg) {
 
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  // ছবি বা ভিডিওতে ক্লিক করলে ফুল স্ক্রিন প্রিভিউ এবং ডাউনলোড অপশন ওপেন হওয়া
+  const mediaElement = msgDiv.querySelector(".previewable-media");
+  if (mediaElement) {
+    mediaElement.addEventListener("click", () => {
+      const type = mediaElement.getAttribute("data-type");
+      const src = mediaElement.getAttribute("data-src");
+      const name = mediaElement.getAttribute("data-name");
+
+      mediaPreviewContent.innerHTML = "";
+      mediaDownloadBtn.style.display = "inline-block";
+      mediaDownloadBtn.href = src;
+      mediaDownloadBtn.download = name;
+
+      if (type === "image") {
+        mediaPreviewContent.innerHTML = `<img src="${src}" style="max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;" />`;
+      } else if (type === "video") {
+        mediaPreviewContent.innerHTML = `<video src="${src}" controls autoplay style="max-width: 100%; max-height: 80vh; border-radius: 8px;"></video>`;
+      }
+
+      mediaPreviewModal.style.display = "flex";
+    });
+  }
 }
 
 
-// ================= CORRECTION FOR AUDIO/VIDEO CALLING =================
+// ================= AUDIO/VIDEO CALLING =================
 
 startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
 startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
