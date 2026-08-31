@@ -52,14 +52,26 @@ io.on("connection", (socket) => {
     if (!roomMessages[roomCode]) {
       roomMessages[roomCode] = [];
     }
+    // রুমে অন্য ইউজারদের নোটিফিকেশন পাঠানো
     socket.to(roomCode).emit("user-joined-notify", { user });
+  });
+
+  // পেজ রিফ্রেশ বা পুনরায় যুক্ত হলে আগের চ্যাট হিস্ট্রি ফিরিয়ে দেওয়ার হ্যান্ডলার
+  socket.on("get-room-history", (roomCode, callback) => {
+    if (roomMessages[roomCode]) {
+      callback(roomMessages[roomCode]);
+    } else {
+      callback([]);
+    }
   });
 
   socket.on("send-message", (msgData, callback) => {
     const roomCode = msgData.roomCode;
-    if (roomMessages[roomCode]) {
-      roomMessages[roomCode].push(msgData);
+    if (!roomMessages[roomCode]) {
+      roomMessages[roomCode] = [];
     }
+    roomMessages[roomCode].push(msgData);
+    
     socket.to(roomCode).emit("receive-message", msgData);
 
     if (typeof callback === "function") {
