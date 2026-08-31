@@ -192,6 +192,14 @@ body.light-theme .chat-container {
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
+/* --- স্পেশাল রুমের জন্য ব্যাকগ্রাউন্ড পিকচার (শুধুমাত্র স্পেশাল রুমে কাজ করবে) --- */
+.chat-container.special-room-chat .chat-messages {
+  background-image: url('https://i.ibb.co.com/SDYb61CB/Whats-App-Image-2026-08-27-at-10-51-00-AM-1.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
 .chat-header {
   padding: 15px;
   background: #2a2a2a;
@@ -243,14 +251,6 @@ body.light-theme .action-btn {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-/* --- স্পেশাল রুমের জন্য ব্যাকগ্রাউন্ড পিকচার (অন্য কোথাও প্রভাব ফেলবে না) --- */
-.special-room-chat .chat-messages {
-  background-image: url('https://i.ibb.co.com/SDYb61CB/Whats-App-Image-2026-08-27-at-10-51-00-AM-1.jpg') !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
 }
 
 .chat-input-area {
