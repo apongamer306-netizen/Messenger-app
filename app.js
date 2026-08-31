@@ -81,18 +81,42 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-// ================= TOP SLIM LOADING BAR / SPINNER =================
-// পুরো স্ক্রিন জুড়ে নয়, একদম ওপরের দিকে হালকা একটি প্রোগ্রেস/লোডিং ইন্ডিকেটর যা ব্রাউজার রিফ্রেশের সাথে সাথে মিলিয়ে যাবে
+// Call Action Buttons
+const startAudioCallBtn = document.getElementById("startAudioCallBtn");
+const startVideoCallBtn = document.getElementById("startVideoCallBtn");
+
+// ================= TOP SLIM LOADING BAR & STYLES =================
 const topLoadingBar = document.createElement("div");
 topLoadingBar.id = "topLoadingBar";
 topLoadingBar.style.cssText = "position:fixed; top:0; left:0; width:100%; height:3px; background:transparent; z-index:99999; overflow:hidden;";
 topLoadingBar.innerHTML = `<div style="width:100%; height:100%; background:#0d6efd; animation: indeterminate 1.2s infinite linear; transform-origin: left;"></div>`;
+
 document.head.insertAdjacentHTML("beforeend", `
   <style>
     @keyframes indeterminate {
       0% { transform: translateX(-100%); }
       50% { transform: translateX(0%); }
       100% { transform: translateX(100%); }
+    }
+    /* ডার্ক থিমে ইনপুট বক্স ও পাসওয়ার্ড চোখের আইকন ফিক্স */
+    body.dark-theme input.form-control, 
+    body.dark-theme #modalInput,
+    body.dark-theme input[type="text"],
+    body.dark-theme input[type="password"] {
+      color: #ffffff !important;
+      background-color: #2b2b2b !important;
+    }
+    body.dark-theme input::placeholder {
+      color: #aaaaaa !important;
+    }
+    .password-toggle-icon {
+      cursor: pointer;
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      color: #6c757d;
     }
   </style>
 `);
@@ -200,6 +224,34 @@ function saveUserToStorage(user) {
   localStorage.setItem("usersDatabase", JSON.stringify(users));
 }
 
+// অটোমেটিক পাসওয়ার্ড ফিল্ডগুলোতে চোখের (Eye) টগল আইকন যুক্ত করার ফাংশন
+function attachPasswordToggle(inputElement) {
+  if (!inputElement) return;
+  let parent = inputElement.parentNode;
+  if (parent.style.position !== "relative") {
+    parent.style.position = "relative";
+  }
+  if (!parent.querySelector(".password-toggle-icon")) {
+    const toggleIcon = document.createElement("i");
+    toggleIcon.className = "fa-solid fa-eye password-toggle-icon";
+    toggleIcon.onclick = () => {
+      if (inputElement.type === "password") {
+        inputElement.type = "text";
+        toggleIcon.className = "fa-solid fa-eye-slash password-toggle-icon";
+      } else {
+        inputElement.type = "password";
+        toggleIcon.className = "fa-solid fa-eye password-toggle-icon";
+      }
+    };
+    parent.appendChild(toggleIcon);
+  }
+}
+
+// ইনপুট ফিল্ডগুলোতে চোখের আইকন বাইন্ড করা
+attachPasswordToggle(masterKeyInput);
+attachPasswordToggle(authPasswordInput);
+attachPasswordToggle(modalInput);
+
 function showCustomModal(options) {
   modalTitle.textContent = options.title || "Notice";
   modalSubtitle.textContent = options.subtitle || "";
@@ -208,6 +260,13 @@ function showCustomModal(options) {
     modalInputGroup.style.display = "block";
     modalInput.value = "";
     modalInput.placeholder = options.placeholder || "Enter value";
+    // যদি পাসওয়ার্ড টাইপ ইনপুট হয়
+    if (options.isPassword) {
+      modalInput.type = "password";
+    } else {
+      modalInput.type = "text";
+    }
+    attachPasswordToggle(modalInput);
   } else {
     modalInputGroup.style.display = "none";
   }
@@ -243,8 +302,8 @@ function showCustomModal(options) {
       customModalOverlay.style.display = "none";
     };
 
-    confBtn.addEventListener("click", handleConfirm);
-    cancBtn.addEventListener("click", handleCancel);
+    confBtn.onclick = handleConfirm;
+    cancBtn.onclick = handleCancel;
   });
 }
 
@@ -264,16 +323,15 @@ function showCustomAlert(title, subtitle) {
 
   return new Promise((resolve) => {
     const handleConfirm = () => {
-      confBtn.removeEventListener("click", handleConfirm);
+      confBtn.onclick = null;
       customModalOverlay.style.display = "none";
       resolve(true);
     };
-    confBtn.addEventListener("click", handleConfirm);
+    confBtn.onclick = handleConfirm;
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // কোনো প্রকার ফ্ল্যাশ বা ডিলে ছাড়াই ইনস্ট্যান্ট স্টেট চেক করে সঠিক স্ক্রিন ফিক্স করা হবে
   checkActiveSession();
 });
 
@@ -317,7 +375,6 @@ function checkActiveSession() {
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
   const activeRoom = sessionStorage.getItem("activeRoom");
 
-  // শুরুতেই সব স্ক্রিন হাইড রেখে তাৎক্ষণিক সঠিক পেজ নির্ধারণ করা হবে (কোনো ফ্ল্যাশ ছাড়াই)
   masterKeyScreen.style.display = "none";
   authScreen.style.display = "none";
   dashboardScreen.style.display = "none";
@@ -339,7 +396,6 @@ function checkActiveSession() {
     updateMasterScreenUI();
   }
 
-  // ব্রাউজার লোড হওয়া শেষ হওয়ামাত্র ওপরের চিকন লোডিং বারটি মিলিয়ে যাবে
   topLoadingBar.style.display = "none";
 }
 
@@ -407,7 +463,8 @@ if (setPinBtn) {
         title: "Change Security PIN",
         subtitle: "আপনার বর্তমান Security PIN টি দিন:",
         hasInput: true,
-        placeholder: "Enter Old PIN"
+        placeholder: "Enter Old PIN",
+        isPassword: true
       });
 
       if (oldPin === null) return;
@@ -417,7 +474,8 @@ if (setPinBtn) {
           title: "New Security PIN",
           subtitle: "নতুন Security PIN টি সেট করুন:",
           hasInput: true,
-          placeholder: "Enter New PIN"
+          placeholder: "Enter New PIN",
+          isPassword: true
         });
 
         if (newPin && newPin.trim() !== "") {
@@ -436,7 +494,8 @@ if (setPinBtn) {
         title: "Set Security PIN",
         subtitle: "আপনার Security PIN টি সেট করুন:",
         hasInput: true,
-        placeholder: "Enter New PIN"
+        placeholder: "Enter New PIN",
+        isPassword: true
       });
 
       if (newPin && newPin.trim() !== "") {
@@ -462,7 +521,8 @@ if (removePinBtn) {
       title: "Remove Security PIN",
       subtitle: "পাসওয়ার্ড রিমুভ করতে আপনার বর্তমান Security PIN টি দিন:",
       hasInput: true,
-      placeholder: "Enter Security PIN"
+      placeholder: "Enter Security PIN",
+      isPassword: true
     });
 
     if (enteredPin === null) return;
@@ -556,7 +616,6 @@ function showDashboard() {
   updateDashboardPinUI();
 }
 
-// নাম পরিবর্তনের এডিট হ্যান্ডলার
 if (editNameBtn) {
   editNameBtn.addEventListener("click", async () => {
     const newName = await showCustomModal({
@@ -618,7 +677,8 @@ joinRoomBtn.addEventListener("click", () => {
       title: "Special Room Access",
       subtitle: "স্পেশাল রুমে প্রবেশ করতে Secret PIN টি লিখুন:",
       hasInput: true,
-      placeholder: "Enter Secret PIN"
+      placeholder: "Enter Secret PIN",
+      isPassword: true
     });
 
     if (enteredPin === null) return;
@@ -850,7 +910,7 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
 
   const mediaElement = msgDiv.querySelector(".previewable-media");
   if (mediaElement) {
-    mediaElement.addEventListener("click", () => {
+    mediaElement.onclick = () => {
       const type = mediaElement.getAttribute("data-type");
       const src = mediaElement.getAttribute("data-src");
       const name = mediaElement.getAttribute("data-name");
@@ -867,7 +927,7 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
       }
 
       mediaPreviewModal.style.display = "flex";
-    });
+    };
   }
 }
 
@@ -883,8 +943,8 @@ function updateMessageStatus(msgId, statusText) {
 
 // ================= AUDIO/VIDEO CALLING =================
 
-startAudioCallBtn.addEventListener("click", () => initiateCall("audio"));
-startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
+if (startAudioCallBtn) startAudioCallBtn.onclick = () => initiateCall("audio");
+if (startVideoCallBtn) startVideoCallBtn.onclick = () => initiateCall("video");
 
 async function initiateCall(type) {
   currentCallType = type;
@@ -1020,10 +1080,10 @@ socket.on("call-accepted-by-receiver", () => {
   callStatusText.textContent = "Connected";
 });
 
-rejectCallBtn.addEventListener("click", () => {
+rejectCallBtn.onclick = () => {
   socket.emit("end-call", { roomCode: currentRoom });
   endCallCleanup();
-});
+};
 
 socket.on("call-ended", () => {
   endCallCleanup();
