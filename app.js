@@ -81,24 +81,30 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-// ================= GLOBAL APP LOADING SPINNER =================
-// রিফ্রেশ করার সময় পুরো স্ক্রিন বা চ্যাটবক্সে যাতে কালো দাগ না হয়ে ফেসবুকের মতো সুন্দর লোডিং স্পিনার থাকে
-const globalLoadingOverlay = document.createElement("div");
-globalLoadingOverlay.id = "globalLoadingOverlay";
-globalLoadingOverlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:#121212; z-index:99999; display:flex; justify-content:center; align-items:center; flex-direction:column; transition: opacity 0.3s ease;";
-globalLoadingOverlay.innerHTML = `
-  <div class="spinner-border text-primary" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
-  <span style="color: #fff; margin-top: 15px; font-size: 15px; font-weight: 500;">লোড হচ্ছে...</span>
-`;
-document.body.appendChild(globalLoadingOverlay);
+// ================= TOP SLIM LOADING BAR / SPINNER =================
+// পুরো স্ক্রিন জুড়ে নয়, একদম ওপরের দিকে হালকা একটি প্রোগ্রেস/লোডিং ইন্ডিকেটর যা ব্রাউজার রিফ্রেশের সাথে সাথে মিলিয়ে যাবে
+const topLoadingBar = document.createElement("div");
+topLoadingBar.id = "topLoadingBar";
+topLoadingBar.style.cssText = "position:fixed; top:0; left:0; width:100%; height:3px; background:transparent; z-index:99999; overflow:hidden;";
+topLoadingBar.innerHTML = `<div style="width:100%; height:100%; background:#0d6efd; animation: indeterminate 1.2s infinite linear; transform-origin: left;"></div>`;
+document.head.insertAdjacentHTML("beforeend", `
+  <style>
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(0%); }
+      100% { transform: translateX(100%); }
+    }
+  </style>
+`);
+document.body.appendChild(topLoadingBar);
 
-// চ্যাট বক্সের ভেতরের লোডিং ওভারলে
+// চ্যাট বক্সের ভেতরের ছোট লোডিং ওভারলে
 const chatLoadingOverlay = document.createElement("div");
 chatLoadingOverlay.id = "chatLoadingOverlay";
-chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.9); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
+chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.85); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
 chatLoadingOverlay.innerHTML = `
-  <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
-  <span style="color: #fff; margin-top: 10px; font-size: 14px;">চ্যাট লোড হচ্ছে...</span>
+  <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
+  <span style="color: #fff; margin-top: 8px; font-size: 13px;">চ্যাট লোড হচ্ছে...</span>
 `;
 if (chatMessages && chatMessages.parentNode) {
   chatMessages.parentNode.style.position = "relative";
@@ -267,7 +273,7 @@ function showCustomAlert(title, subtitle) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // পেজ লোড হওয়ার সাথে সাথে সমস্ত স্টেট চেক করে সঠিক স্ক্রিন ফিক্স করে লোডিং স্পিনার সল্ভ করা হবে
+  // কোনো প্রকার ফ্ল্যাশ বা ডিলে ছাড়াই ইনস্ট্যান্ট স্টেট চেক করে সঠিক স্ক্রিন ফিক্স করা হবে
   checkActiveSession();
 });
 
@@ -311,36 +317,30 @@ function checkActiveSession() {
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
   const activeRoom = sessionStorage.getItem("activeRoom");
 
-  // ডিফল্টভাবে সব স্ক্রিন হাইড করে রাখা হবে যাতে ফ্ল্যাশ না করে
+  // শুরুতেই সব স্ক্রিন হাইড রেখে তাৎক্ষণিক সঠিক পেজ নির্ধারণ করা হবে (কোনো ফ্ল্যাশ ছাড়াই)
   masterKeyScreen.style.display = "none";
   authScreen.style.display = "none";
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "none";
 
-  setTimeout(() => {
-    if (isMasterUnlocked === "true") {
-      if (savedUser) {
-        currentUser = savedUser;
-        if (activeRoom) {
-          joinRoom(activeRoom, true);
-        } else {
-          showDashboard();
-        }
+  if (isMasterUnlocked === "true") {
+    if (savedUser) {
+      currentUser = savedUser;
+      if (activeRoom) {
+        joinRoom(activeRoom, true);
       } else {
-        authScreen.style.display = "block";
+        showDashboard();
       }
     } else {
-      masterKeyScreen.style.display = "block";
-      updateMasterScreenUI();
+      authScreen.style.display = "block";
     }
-    
-    // সবকিছু প্রসেস হওয়ার পর গ্লোবাল লোডিং স্পিনার স্মুথলি ফেড আউট হয়ে ডাসবোর্ড বা চ্যাট দেখাবে
-    globalLoadingOverlay.style.opacity = "0";
-    setTimeout(() => {
-      globalLoadingOverlay.style.display = "none";
-    }, 300);
+  } else {
+    masterKeyScreen.style.display = "block";
+    updateMasterScreenUI();
+  }
 
-  }, 150); // সামান্য ডিলে দিয়ে ব্যাকগ্রাউন্ড প্রসেস ফিক্স করা হলো
+  // ব্রাউজার লোড হওয়া শেষ হওয়ামাত্র ওপরের চিকন লোডিং বারটি মিলিয়ে যাবে
+  topLoadingBar.style.display = "none";
 }
 
 masterToggleLink.addEventListener("click", (e) => {
