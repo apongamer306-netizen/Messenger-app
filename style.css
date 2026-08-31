@@ -192,12 +192,20 @@ body.light-theme .chat-container {
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
-/* --- স্পেশাল রুমের জন্য নতুন ব্যাকগ্রাউন্ড পিকচার এবং প্রপার ফিটিং --- */
+/* --- স্পেশাল রুমের ব্যাকগ্রাউন্ড (ল্যাপটপ এবং ফোনের জন্য রেসপন্সিভ ফিটিং) --- */
 .chat-container.special-room-chat .chat-messages {
-  background-image: url('https://i.ibb.co.com/hFHf3jV2/Whats-App-Image-2026-08-23-at-8-18-13-PM-removebg-preview.png') !important;
-  background-size: 100% 100% !important;
-  background-position: center !important;
+  background-image: url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
   background-repeat: no-repeat !important;
+  background-position: center !important;
+  /* ল্যাপটপ বা বড় স্ক্রিনের জন্য ডিফল্ট */
+  background-size: cover !important; 
+}
+
+/* মোবাইলের স্ক্রিনের জন্য (৭৬৮ পিক্সেল বা এর কম চওড়া স্ক্রিন) */
+@media screen and (max-width: 768px) {
+  .chat-container.special-room-chat .chat-messages {
+    background-size: 100% 100% !important; /* ফোনে পুরো বক্স জুড়ে ফিক্সড থাকবে */
+  }
 }
 
 .chat-header {
