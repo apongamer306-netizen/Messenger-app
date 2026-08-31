@@ -579,8 +579,12 @@ function joinRoom(code, isRefresh = false) {
 
   if (code === ADMIN_ROOM_PIN) {
     chatRoomCode.textContent = "Special Room";
+    // স্পেশাল রুমে গেলে ব্যাকগ্রাউন্ড ছবি আসার ক্লাস যোগ করা হবে
+    chatScreen.classList.add("special-room-chat");
   } else {
     chatRoomCode.textContent = "Code: " + code;
+    // সাধারণ রুম হলে ক্লাসটি রিমুভ থাকবে
+    chatScreen.classList.remove("special-room-chat");
   }
 
   if (!isRefresh) {
@@ -597,6 +601,7 @@ function joinRoom(code, isRefresh = false) {
 leaveRoomBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   currentRoom = null;
+  chatScreen.classList.remove("special-room-chat");
   socket.emit("leave-room", { roomCode: currentRoom });
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
@@ -713,7 +718,6 @@ startVideoCallBtn.addEventListener("click", () => initiateCall("video"));
 async function initiateCall(type) {
   currentCallType = type;
   try {
-    // অডিও কলের জন্য শুধুমাত্র মাইক্রোফোন, ভিডিও কলের জন্য ক্যামেরা ও অডিও উভয়ই রিকোয়েস্ট করা হচ্ছে
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: type === "video"
@@ -761,7 +765,6 @@ socket.on("incoming-call", (data) => {
   callProfileGrid.style.display = "flex";
   callModal.style.display = "flex";
 
-  // কল রিসিভ করার ইভেন্ট
   acceptCallBtn.onclick = async () => {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
@@ -778,7 +781,6 @@ socket.on("incoming-call", (data) => {
         callProfileGrid.style.display = "flex";
       }
 
-      // কলারের কাছে পিয়ার কল ইনিশিয়েট করা
       const call = myPeer.call(data.callerPeerId, localStream);
       handleCallConnection(call);
 
@@ -792,7 +794,6 @@ socket.on("incoming-call", (data) => {
   };
 });
 
-// অন্য পাশ থেকে কল আসলে অটোমেটিক অ্যানসার দেওয়া
 myPeer.on("call", async (call) => {
   currentCallType = call.metadata ? call.metadata.type : currentCallType;
   try {
