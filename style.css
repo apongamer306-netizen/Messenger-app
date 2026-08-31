@@ -48,7 +48,7 @@ body.light-theme .navbar {
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 60px);
-  padding: 20px;
+  padding: 10px;
 }
 
 .card-screen {
@@ -179,7 +179,7 @@ body.light-theme .input-wrapper input {
 .chat-container {
   width: 100%;
   max-width: 500px;
-  height: 80vh;
+  height: 92vh; /* চ্যাট বক্সের উচ্চতা বাড়িয়ে ফাঁকা জায়গা ফিলাপ করা হলো */
   background: #1e1e1e;
   border-radius: 16px;
   display: flex;
@@ -192,19 +192,17 @@ body.light-theme .chat-container {
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
-/* --- স্পেশাল রুমের ব্যাকগ্রাউন্ড (ল্যাপটপ এবং ফোনের জন্য রেসপন্সিভ ফিটিং) --- */
+/* --- স্পেশাল রুমের ব্যাকগ্রাউন্ড ফিটিং --- */
 .chat-container.special-room-chat .chat-messages {
   background-image: url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
-  /* ল্যাপটপ বা বড় স্ক্রিনের জন্য ডিফল্ট */
   background-size: cover !important; 
 }
 
-/* মোবাইলের স্ক্রিনের জন্য (৭৬৮ পিক্সেল বা এর কম চওড়া স্ক্রিন) */
 @media screen and (max-width: 768px) {
   .chat-container.special-room-chat .chat-messages {
-    background-size: 100% 100% !important; /* ফোনে পুরো বক্স জুড়ে ফিক্সড থাকবে */
+    background-size: 100% 100% !important; 
   }
 }
 
