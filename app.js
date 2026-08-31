@@ -55,6 +55,16 @@ const dashboardAvatar = document.getElementById("dashboardAvatar");
 const dashboardUserName = document.getElementById("dashboardUserName");
 const avatarUpload = document.getElementById("avatarUpload");
 
+// ড্যাশবোর্ডে নাম পরিবর্তনের জন্য এডিট বাটন যুক্ত করার এলিমেন্ট হ্যান্ডেলিং
+let editNameBtn = document.getElementById("editNameBtn");
+if (!editNameBtn && dashboardUserName) {
+  editNameBtn = document.createElement("i");
+  editNameBtn.id = "editNameBtn";
+  editNameBtn.className = "fa-solid fa-pen-to-square";
+  editNameBtn.style.cssText = "margin-left: 8px; cursor: pointer; color: #0d6efd; font-size: 14px;";
+  dashboardUserName.parentNode.appendChild(editNameBtn);
+}
+
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
 
@@ -72,9 +82,20 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
+// চ্যাট বক্সে ফেসবুকের মতো লোডিং স্পিনারের জন্য এলিমেন্ট তৈরি
+const chatLoadingOverlay = document.createElement("div");
+chatLoadingOverlay.id = "chatLoadingOverlay";
+chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.85); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
+chatLoadingOverlay.innerHTML = `
+  <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+  <span style="color: #fff; margin-top: 10px; font-size: 14px;">লোড হচ্ছে...</span>
+`;
+if (chatMessages && chatMessages.parentNode) {
+  chatMessages.parentNode.style.position = "relative";
+  chatMessages.parentNode.appendChild(chatLoadingOverlay);
+}
+
 // Call Elements
-const startAudioCallBtn = document.getElementById("startAudioCallBtn");
-const startVideoCallBtn = document.getElementById("startVideoCallBtn");
 const callModal = document.getElementById("callModal");
 const callStatusText = document.getElementById("callStatusText");
 const callVideoGrid = document.getElementById("callVideoGrid");
@@ -120,7 +141,6 @@ closeMediaPreview.addEventListener("click", () => {
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const bodyElement = document.body;
 
-// Load Saved Theme
 const savedTheme = localStorage.getItem("appTheme") || "dark-theme";
 bodyElement.className = savedTheme;
 updateThemeIcon(savedTheme);
@@ -153,7 +173,6 @@ function updateThemeIcon(theme) {
 
 let isSignUpMode = false;
 
-// LocalStorage Helper Functions
 function getStoredUsers() {
   const users = localStorage.getItem("usersDatabase");
   return users ? JSON.parse(users) : {};
@@ -165,7 +184,6 @@ function saveUserToStorage(user) {
   localStorage.setItem("usersDatabase", JSON.stringify(users));
 }
 
-// Custom Popup Modal
 function showCustomModal(options) {
   modalTitle.textContent = options.title || "Notice";
   modalSubtitle.textContent = options.subtitle || "";
@@ -242,7 +260,6 @@ document.addEventListener("DOMContentLoaded", () => {
   checkActiveSession();
 });
 
-// Master Screen Logic
 function updateMasterScreenUI() {
   const savedPin = localStorage.getItem("appMasterPin");
 
@@ -348,7 +365,6 @@ function grantAccess() {
   }
 }
 
-// Security PIN Management
 function updateDashboardPinUI() {
   const savedPin = localStorage.getItem("appMasterPin");
   if (savedPin) {
@@ -439,7 +455,6 @@ if (removePinBtn) {
   });
 }
 
-// Authentication Logic
 authToggleLink.addEventListener("click", (e) => {
   e.preventDefault();
   isSignUpMode = !isSignUpMode;
@@ -508,9 +523,34 @@ function showDashboard() {
   authScreen.style.display = "none";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
+  
+  // লেটেস্ট ডাটা রিলোড নিশ্চিত করতে লোকাল স্টোরেজ থেকে রিফ্রেশ করা হলো
+  const latestUser = JSON.parse(localStorage.getItem("appUser"));
+  if (latestUser) currentUser = latestUser;
+
   dashboardUserName.textContent = currentUser.name;
   if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
   updateDashboardPinUI();
+}
+
+// নাম পরিবর্তনের জন্য এডিট আইকনে ক্লিক ইভেন্ট
+if (editNameBtn) {
+  editNameBtn.addEventListener("click", async () => {
+    const newName = await showCustomModal({
+      title: "Change Username",
+      subtitle: "আপনার নতুন ইউজারনেমটি লিখুন:",
+      hasInput: true,
+      placeholder: currentUser.name
+    });
+
+    if (newName && newName.trim() !== "") {
+      currentUser.name = newName.trim();
+      localStorage.setItem("appUser", JSON.stringify(currentUser));
+      saveUserToStorage(currentUser);
+      dashboardUserName.textContent = currentUser.name;
+      await showCustomAlert("Success", "ইউজারনেম সফলভাবে পরিবর্তন করা হয়েছে!");
+    }
+  });
 }
 
 avatarUpload.addEventListener("change", (e) => {
@@ -527,13 +567,11 @@ avatarUpload.addEventListener("change", (e) => {
   }
 });
 
-// CREATE ROOM HANDLER
 createRoomBtn.addEventListener("click", () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
   joinRoom(randomCode);
 });
 
-// JOIN ROOM HANDLER
 joinRoomBtn.addEventListener("click", () => {
   modalTitle.textContent = "Join Room";
   modalSubtitle.textContent = "Select room type to join:";
@@ -592,10 +630,14 @@ function joinRoom(code, isRefresh = false) {
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
 
+  // ইউজার ডাটা সবসময় লেটেস্ট রাখার জন্য রিফ্রেশ করা হলো
+  const latestUser = JSON.parse(localStorage.getItem("appUser"));
+  if (latestUser) currentUser = latestUser;
+
   dashboardScreen.style.display = "none";
   chatScreen.style.display = "flex";
   chatUserName.textContent = currentUser.name;
-  chatUserAvatar.src = currentUser.pic;
+  if (currentUser.pic) chatUserAvatar.src = currentUser.pic;
 
   if (code === ADMIN_ROOM_PIN) {
     chatRoomCode.textContent = "Special Room";
@@ -611,8 +653,12 @@ function joinRoom(code, isRefresh = false) {
     }
   });
 
+  // চ্যাটবক্স কালো হয়ে থাকা রোধ করে মাঝখানে লোডিং স্পিনার দেখানোর ব্যবস্থা
   chatMessages.innerHTML = "";
+  chatLoadingOverlay.style.display = "flex";
+
   socket.emit("get-room-history", code, (historyMessages) => {
+    chatLoadingOverlay.style.display = "none"; // লোডিং শেষ হলে স্পিনার হাইড হবে
     if (historyMessages && Array.isArray(historyMessages)) {
       chatMessages.innerHTML = "";
       historyMessages.forEach((msgData) => {
@@ -630,7 +676,7 @@ leaveRoomBtn.addEventListener("click", () => {
   chatScreen.classList.remove("special-room-chat");
   chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
-  dashboardScreen.style.display = "block";
+  showDashboard(); // অটো ড্যাশবোর্ডে ফিরে গিয়ে সব রিলোড নিশ্চিত করবে
 });
 
 logoutBtn.addEventListener("click", () => {
@@ -641,7 +687,6 @@ logoutBtn.addEventListener("click", () => {
   location.reload();
 });
 
-// Messaging System & File Attachment
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") sendChatMessage();
@@ -701,7 +746,6 @@ socket.on("receive-message", (msg) => {
   socket.emit("mark-message-seen", { messageId: msg.id, roomCode: currentRoom, userPic: currentUser.pic });
 });
 
-// যখন অন্য কেউ মেসেজ সিন করবে তখন সিন করা ইউজারের প্রোফাইল পিক মেসেজের নিচে ডান থেকে বামে শো করবে
 socket.on("message-seen-update", (data) => {
   const msgEl = document.getElementById(data.messageId);
   if (msgEl) {
@@ -752,7 +796,6 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
     contentHtml = `<span>${msg.text}</span>`;
   }
 
-  // এখানে মার্জিন এবং ফ্লেক্স ডিরেকশন সাজানো হয়েছে যাতে সিন প্রোফাইল পিকটি লেখার নিচের বাম পাশে আসে
   let statusHtml = "";
   if (isMe) {
     statusHtml = `<div class="msg-status-container" style="font-size: 10px; text-align: right; color: #bbb; margin-top: 2px; display: flex; justify-content: flex-end; align-items: center;">${initialStatus}</div>`;
@@ -816,7 +859,6 @@ function updateMessageStatus(msgId, statusText) {
     }
   }
 }
-
 
 // ================= AUDIO/VIDEO CALLING =================
 
