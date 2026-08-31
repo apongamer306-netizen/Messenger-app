@@ -611,7 +611,6 @@ function joinRoom(code, isRefresh = false) {
     }
   });
 
-  // সার্ভার থেকে রুম হিস্ট্রি নিয়ে আসা (ডুপ্লিকেট এড়ানোর জন্য আগের চ্যাট ক্লিয়ার করে ফ্রেশ রেন্ডার)
   chatMessages.innerHTML = "";
   socket.emit("get-room-history", code, (historyMessages) => {
     if (historyMessages && Array.isArray(historyMessages)) {
@@ -619,7 +618,6 @@ function joinRoom(code, isRefresh = false) {
       historyMessages.forEach((msgData) => {
         appendChatMessage(msgData, false);
       });
-      // রুমে প্রবেশ করার পর নিজের মেসেজগুলো সার্ভারের মাধ্যমে রিড বা সিন স্ট্যাটাসে আপডেট করা
       socket.emit("mark-room-seen", { roomCode: code, userName: currentUser.name, userPic: currentUser.pic });
     }
   });
@@ -666,16 +664,12 @@ fileAttachmentInput.addEventListener("change", (e) => {
       fileName: file.name
     };
     
-    // প্রথমে লোকাল স্ক্রিনে Sending স্ট্যাটাসসহ মেসেজ দেখাবো
     appendChatMessage(fileData, true, "Sending...");
 
-    // সার্ভারে পাঠাবো
     socket.emit("send-message", fileData, (ack) => {
-      // সার্ভার থেকে কনফার্মেশন পেলে Sending স্ট্যাটাস আপডেট করে Sent করব
       updateMessageStatus(msgId, "Sent");
     });
 
-    // ফাইল ইনপুট রিসেট করা যাতে একই ভিডিও বা ছবি বারবার সিলেক্ট করা যায়
     fileAttachmentInput.value = "";
   };
   reader.readAsDataURL(file);
@@ -693,11 +687,9 @@ function sendChatMessage() {
       text: text
     };
 
-    // প্রথমে লোকাল স্ক্রিনে Sending স্ট্যাটাসসহ দেখাবো
     appendChatMessage(msgData, true, "Sending...");
     chatMessageInput.value = "";
 
-    // সার্ভারে পাঠাবো
     socket.emit("send-message", msgData, (ack) => {
       updateMessageStatus(msgId, "Sent");
     });
@@ -706,23 +698,20 @@ function sendChatMessage() {
 
 socket.on("receive-message", (msg) => {
   appendChatMessage(msg, false, "");
-  // রিসিভ করার সাথে সাথে সার্ভারকে জানিয়ে দেবো যে মেসেজ দেখা হয়ে গেছে (Seen)
   socket.emit("mark-message-seen", { messageId: msg.id, roomCode: currentRoom, userPic: currentUser.pic });
 });
 
-// যখন অন্য কেউ মেসেজ সিন করবে তখন এই ইভেন্ট ট্রিগার হবে
+// যখন অন্য কেউ মেসেজ সিন করবে তখন সিন করা ইউজারের প্রোফাইল পিক মেসেজের নিচে ডান থেকে বামে শো করবে
 socket.on("message-seen-update", (data) => {
   const msgEl = document.getElementById(data.messageId);
   if (msgEl) {
     const statusContainer = msgEl.querySelector(".msg-status-container");
     if (statusContainer) {
-      // Sending বা Sent লেখা মুছে দিয়ে সেখানে ছোট অবতার বা Seen স্ট্যাটাস দেখাবে
-      statusContainer.innerHTML = `<img src="${data.userPic}" title="Seen" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-left: 4px;" />`;
+      statusContainer.innerHTML = `<img src="${data.userPic}" title="Seen" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px;" />`;
     }
   }
 });
 
-// রুমে নতুন ইউজার জয়েন করলে সিস্টেম নোটিফিকেশন দেখানো
 socket.on("user-joined-notify", (data) => {
   if (data && data.user) {
     const notificationDiv = document.createElement("div");
@@ -737,7 +726,6 @@ socket.on("user-joined-notify", (data) => {
 });
 
 function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
-  // ডুপ্লিকেট মেসেজ প্রিভেন্ট করার জন্য চেক
   if (document.getElementById(msg.id)) return;
 
   const msgDiv = document.createElement("div");
@@ -764,10 +752,10 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
     contentHtml = `<span>${msg.text}</span>`;
   }
 
-  // নিজের মেসেজের নিচে Sending/Sent এবং অন্য ইউজারের ক্ষেত্রে নরমাল ভিউ
+  // এখানে মার্জিন এবং ফ্লেক্স ডিরেকশন সাজানো হয়েছে যাতে সিন প্রোফাইল পিকটি লেখার নিচের বাম পাশে আসে
   let statusHtml = "";
   if (isMe) {
-    statusHtml = `<div class="msg-status-container" style="font-size: 10px; text-align: right; color: #bbb; margin-top: 2px;">${initialStatus}</div>`;
+    statusHtml = `<div class="msg-status-container" style="font-size: 10px; text-align: right; color: #bbb; margin-top: 2px; display: flex; justify-content: flex-end; align-items: center;">${initialStatus}</div>`;
   }
 
   const avatarImg = `<img src="${msg.senderPic || 'https://via.placeholder.com/40'}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" />`;
@@ -796,7 +784,6 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  // মিডিয়া প্রিভিউ এবং ডাউনলোড মোডাল হ্যান্ডলার
   const mediaElement = msgDiv.querySelector(".previewable-media");
   if (mediaElement) {
     mediaElement.addEventListener("click", () => {
