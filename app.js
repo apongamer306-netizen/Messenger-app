@@ -11,7 +11,7 @@ let currentCallType = null;
 // Fixed Secret Admin Room Code
 const ADMIN_ROOM_PIN = "1430909";
 
-// রিমোট অডিও চালানোর জন্য গ্লোবাল অডিও এলিমেন্ট
+// গ্লোবাল অডিও এলিমেন্ট
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 remoteAudioElement.style.display = "none";
@@ -19,7 +19,6 @@ document.body.appendChild(remoteAudioElement);
 
 myPeer.on("open", (id) => {
   myPeerId = id;
-  checkActiveSession();
 });
 
 let currentUser = null;
@@ -55,7 +54,7 @@ const dashboardAvatar = document.getElementById("dashboardAvatar");
 const dashboardUserName = document.getElementById("dashboardUserName");
 const avatarUpload = document.getElementById("avatarUpload");
 
-// ড্যাশবোর্ডে নাম পরিবর্তনের জন্য এডিট বাটন যুক্ত করার এলিমেন্ট হ্যান্ডেলিং
+// ইউজারনেম পরিবর্তনের জন্য এডিট বাটন
 let editNameBtn = document.getElementById("editNameBtn");
 if (!editNameBtn && dashboardUserName) {
   editNameBtn = document.createElement("i");
@@ -82,13 +81,24 @@ const sendMessageBtn = document.getElementById("sendMessageBtn");
 const fileAttachmentInput = document.getElementById("fileAttachmentInput");
 const leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
-// চ্যাট বক্সে ফেসবুকের মতো লোডিং স্পিনারের জন্য এলিমেন্ট তৈরি
+// ================= GLOBAL APP LOADING SPINNER =================
+// রিফ্রেশ করার সময় পুরো স্ক্রিন বা চ্যাটবক্সে যাতে কালো দাগ না হয়ে ফেসবুকের মতো সুন্দর লোডিং স্পিনার থাকে
+const globalLoadingOverlay = document.createElement("div");
+globalLoadingOverlay.id = "globalLoadingOverlay";
+globalLoadingOverlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:#121212; z-index:99999; display:flex; justify-content:center; align-items:center; flex-direction:column; transition: opacity 0.3s ease;";
+globalLoadingOverlay.innerHTML = `
+  <div class="spinner-border text-primary" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
+  <span style="color: #fff; margin-top: 15px; font-size: 15px; font-weight: 500;">লোড হচ্ছে...</span>
+`;
+document.body.appendChild(globalLoadingOverlay);
+
+// চ্যাট বক্সের ভেতরের লোডিং ওভারলে
 const chatLoadingOverlay = document.createElement("div");
 chatLoadingOverlay.id = "chatLoadingOverlay";
-chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.85); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
+chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.9); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
 chatLoadingOverlay.innerHTML = `
   <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
-  <span style="color: #fff; margin-top: 10px; font-size: 14px;">লোড হচ্ছে...</span>
+  <span style="color: #fff; margin-top: 10px; font-size: 14px;">চ্যাট লোড হচ্ছে...</span>
 `;
 if (chatMessages && chatMessages.parentNode) {
   chatMessages.parentNode.style.position = "relative";
@@ -117,7 +127,7 @@ const modalInputGroup = document.getElementById("modalInputGroup");
 const modalInput = document.getElementById("modalInput");
 const modalActionContainer = document.getElementById("modalActionContainer");
 
-// Media Preview Modal Elements (Full Screen Viewer)
+// Media Preview Modal Elements
 const mediaPreviewModal = document.createElement("div");
 mediaPreviewModal.id = "mediaPreviewModal";
 mediaPreviewModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center; flex-direction:column;";
@@ -257,6 +267,7 @@ function showCustomAlert(title, subtitle) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // পেজ লোড হওয়ার সাথে সাথে সমস্ত স্টেট চেক করে সঠিক স্ক্রিন ফিক্স করে লোডিং স্পিনার সল্ভ করা হবে
   checkActiveSession();
 });
 
@@ -300,25 +311,36 @@ function checkActiveSession() {
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
   const activeRoom = sessionStorage.getItem("activeRoom");
 
-  if (isMasterUnlocked === "true") {
-    masterKeyScreen.style.display = "none";
-    if (savedUser) {
-      currentUser = savedUser;
-      if (activeRoom) {
-        joinRoom(activeRoom, true);
+  // ডিফল্টভাবে সব স্ক্রিন হাইড করে রাখা হবে যাতে ফ্ল্যাশ না করে
+  masterKeyScreen.style.display = "none";
+  authScreen.style.display = "none";
+  dashboardScreen.style.display = "none";
+  chatScreen.style.display = "none";
+
+  setTimeout(() => {
+    if (isMasterUnlocked === "true") {
+      if (savedUser) {
+        currentUser = savedUser;
+        if (activeRoom) {
+          joinRoom(activeRoom, true);
+        } else {
+          showDashboard();
+        }
       } else {
-        showDashboard();
+        authScreen.style.display = "block";
       }
     } else {
-      authScreen.style.display = "block";
+      masterKeyScreen.style.display = "block";
+      updateMasterScreenUI();
     }
-  } else {
-    masterKeyScreen.style.display = "block";
-    authScreen.style.display = "none";
-    dashboardScreen.style.display = "none";
-    chatScreen.style.display = "none";
-    updateMasterScreenUI();
-  }
+    
+    // সবকিছু প্রসেস হওয়ার পর গ্লোবাল লোডিং স্পিনার স্মুথলি ফেড আউট হয়ে ডাসবোর্ড বা চ্যাট দেখাবে
+    globalLoadingOverlay.style.opacity = "0";
+    setTimeout(() => {
+      globalLoadingOverlay.style.display = "none";
+    }, 300);
+
+  }, 150); // সামান্য ডিলে দিয়ে ব্যাকগ্রাউন্ড প্রসেস ফিক্স করা হলো
 }
 
 masterToggleLink.addEventListener("click", (e) => {
@@ -524,16 +546,17 @@ function showDashboard() {
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
   
-  // লেটেস্ট ডাটা রিলোড নিশ্চিত করতে লোকাল স্টোরেজ থেকে রিফ্রেশ করা হলো
   const latestUser = JSON.parse(localStorage.getItem("appUser"));
   if (latestUser) currentUser = latestUser;
 
-  dashboardUserName.textContent = currentUser.name;
-  if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
+  if (currentUser) {
+    dashboardUserName.textContent = currentUser.name;
+    if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
+  }
   updateDashboardPinUI();
 }
 
-// নাম পরিবর্তনের জন্য এডিট আইকনে ক্লিক ইভেন্ট
+// নাম পরিবর্তনের এডিট হ্যান্ডলার
 if (editNameBtn) {
   editNameBtn.addEventListener("click", async () => {
     const newName = await showCustomModal({
@@ -630,7 +653,6 @@ function joinRoom(code, isRefresh = false) {
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
 
-  // ইউজার ডাটা সবসময় লেটেস্ট রাখার জন্য রিফ্রেশ করা হলো
   const latestUser = JSON.parse(localStorage.getItem("appUser"));
   if (latestUser) currentUser = latestUser;
 
@@ -653,12 +675,11 @@ function joinRoom(code, isRefresh = false) {
     }
   });
 
-  // চ্যাটবক্স কালো হয়ে থাকা রোধ করে মাঝখানে লোডিং স্পিনার দেখানোর ব্যবস্থা
   chatMessages.innerHTML = "";
   chatLoadingOverlay.style.display = "flex";
 
   socket.emit("get-room-history", code, (historyMessages) => {
-    chatLoadingOverlay.style.display = "none"; // লোডিং শেষ হলে স্পিনার হাইড হবে
+    chatLoadingOverlay.style.display = "none";
     if (historyMessages && Array.isArray(historyMessages)) {
       chatMessages.innerHTML = "";
       historyMessages.forEach((msgData) => {
@@ -676,7 +697,7 @@ leaveRoomBtn.addEventListener("click", () => {
   chatScreen.classList.remove("special-room-chat");
   chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
-  showDashboard(); // অটো ড্যাশবোর্ডে ফিরে গিয়ে সব রিলোড নিশ্চিত করবে
+  showDashboard();
 });
 
 logoutBtn.addEventListener("click", () => {
