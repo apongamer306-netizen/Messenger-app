@@ -1,4 +1,21 @@
-const socket = io("https://ekt-chatter.onrender.com", {
+// ================= AUTO-CLEAR OLD/STALE STORAGE =================
+// Bumping APP_STORAGE_VERSION wipes every old localStorage & sessionStorage
+// value from previous versions of the app, so nobody gets stuck with a
+// corrupted/old session, PIN, or room flag.
+const APP_STORAGE_VERSION = "v2";
+try {
+  if (localStorage.getItem("appStorageVersion") !== APP_STORAGE_VERSION) {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("appStorageVersion", APP_STORAGE_VERSION);
+  }
+} catch (e) {
+  // storage not available (private mode etc.) — safe to ignore
+}
+
+// Connect to the SAME server that served this page (works on any Render URL,
+// custom domain, or localhost) instead of a hardcoded/foreign address.
+const socket = io({
   transports: ["websocket", "polling"]
 });
 
@@ -64,16 +81,17 @@ if (!editNameBtn && dashboardUserName) {
 
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
-// Premium friend icon injected into the chat room header
-const chatActionsForFriendIcon = document.querySelector(".chat-actions");
+// Premium friend icon injected into the top-right corner of the Dashboard
+const dashboardScreenForFriendIcon = document.getElementById("dashboardScreen");
 let friendIconBtn = document.getElementById("friendIconBtn");
-if (!friendIconBtn && chatActionsForFriendIcon) {
+if (!friendIconBtn && dashboardScreenForFriendIcon) {
+  dashboardScreenForFriendIcon.style.position = "relative";
   friendIconBtn = document.createElement("button");
   friendIconBtn.id = "friendIconBtn";
-  friendIconBtn.className = "action-btn friend-icon-btn";
+  friendIconBtn.className = "dashboard-friend-btn";
   friendIconBtn.title = "Friends";
   friendIconBtn.innerHTML = `<i class="fa-solid fa-user-group"></i><span id="friendReqBadge" class="friend-req-badge">0</span>`;
-  chatActionsForFriendIcon.insertBefore(friendIconBtn, chatActionsForFriendIcon.firstChild);
+  dashboardScreenForFriendIcon.insertBefore(friendIconBtn, dashboardScreenForFriendIcon.firstChild);
 }
 
 // Premium slide-up friends panel (requests + friends list)
@@ -493,33 +511,42 @@ function updateMasterScreenUI() {
 }
 
 function checkActiveSession() {
-  const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
-  const savedUser = JSON.parse(localStorage.getItem("appUser"));
-  const activeRoom = sessionStorage.getItem("activeRoom");
+  try {
+    const isMasterUnlocked = sessionStorage.getItem("masterUnlocked");
+    let savedUser = null;
+    try {
+      savedUser = JSON.parse(localStorage.getItem("appUser"));
+    } catch (e) {
+      localStorage.removeItem("appUser");
+      savedUser = null;
+    }
+    const activeRoom = sessionStorage.getItem("activeRoom");
 
-  masterKeyScreen.style.display = "none";
-  authScreen.style.display = "none";
-  dashboardScreen.style.display = "none";
-  chatScreen.style.display = "none";
+    masterKeyScreen.style.display = "none";
+    authScreen.style.display = "none";
+    dashboardScreen.style.display = "none";
+    chatScreen.style.display = "none";
 
-  if (isMasterUnlocked === "true") {
-    if (savedUser) {
-      currentUser = savedUser;
-      socket.emit("set-user-socket", { phone: currentUser.phone });
-      fetchFriendData();
-      if (activeRoom) {
-        joinRoom(activeRoom, true);
+    if (isMasterUnlocked === "true") {
+      if (savedUser) {
+        currentUser = savedUser;
+        socket.emit("set-user-socket", { phone: currentUser.phone });
+        fetchFriendData();
+        if (activeRoom) {
+          joinRoom(activeRoom, true);
+        } else {
+          showDashboard();
+        }
       } else {
-        showDashboard();
+        authScreen.style.display = "block";
       }
     } else {
-      authScreen.style.display = "block";
+      masterKeyScreen.style.display = "block";
+      updateMasterScreenUI();
     }
-  } else {
-    masterKeyScreen.style.display = "block";
-    updateMasterScreenUI();
+  } finally {
+    topLoadingBar.style.display = "none";
   }
-  topLoadingBar.style.display = "none";
 }
 
 masterToggleLink.addEventListener("click", (e) => {
