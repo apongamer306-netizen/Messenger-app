@@ -368,10 +368,35 @@ body.light-theme .chat-input-area input {
    PREMIUM FRIEND SYSTEM — icon, slide-up panel, full-screen DM
    ============================================================ */
 
-/* Friend icon in the chat room header */
+/* Friend icon in the chat room header (kept for compatibility) */
 .friend-icon-btn {
   position: relative;
 }
+
+/* Friend icon in the top-right corner of the Dashboard card */
+.dashboard-friend-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, rgba(13,110,253,0.16), rgba(111,66,193,0.16));
+  color: #4facfe;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s ease;
+  z-index: 5;
+}
+.dashboard-friend-btn:hover {
+  background: linear-gradient(135deg, rgba(13,110,253,0.28), rgba(111,66,193,0.28));
+  transform: scale(1.06);
+}
+body.light-theme .dashboard-friend-btn { color: #0d6efd; }
 
 .friend-req-badge {
   display: none;
@@ -390,7 +415,7 @@ body.light-theme .chat-input-area input {
   justify-content: center;
   box-shadow: 0 0 0 2px #1e1e1e;
 }
-body.light-theme .friend-req-badge { box-shadow: 0 0 0 2px #f1f3f5; }
+body.light-theme .friend-req-badge { box-shadow: 0 0 0 2px #ffffff; }
 .friend-req-badge.show { display: flex; }
 
 /* ---------- Friends panel (overlay) ---------- */
