@@ -81,17 +81,15 @@ if (!editNameBtn && dashboardUserName) {
 
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
-// Premium friend icon injected into the top-right corner of the Dashboard
-const dashboardScreenForFriendIcon = document.getElementById("dashboardScreen");
+// Premium friend button — same size/shape as "Create Room", placed above it
 let friendIconBtn = document.getElementById("friendIconBtn");
-if (!friendIconBtn && dashboardScreenForFriendIcon) {
-  dashboardScreenForFriendIcon.style.position = "relative";
+if (!friendIconBtn && createRoomBtn) {
   friendIconBtn = document.createElement("button");
   friendIconBtn.id = "friendIconBtn";
-  friendIconBtn.className = "dashboard-friend-btn";
-  friendIconBtn.title = "Friends";
-  friendIconBtn.innerHTML = `<i class="fa-solid fa-user-group"></i><span id="friendReqBadge" class="friend-req-badge">0</span>`;
-  dashboardScreenForFriendIcon.insertBefore(friendIconBtn, dashboardScreenForFriendIcon.firstChild);
+  friendIconBtn.className = "btn btn-primary";
+  friendIconBtn.style.cssText = "background: linear-gradient(135deg, #6f42c1, #563d7c); display: flex; align-items: center; justify-content: center; gap: 8px;";
+  friendIconBtn.innerHTML = `<i class="fa-solid fa-user-group"></i> Friends <span id="friendReqBadge" class="friend-req-badge">0</span>`;
+  createRoomBtn.parentNode.insertBefore(friendIconBtn, createRoomBtn);
 }
 
 // Premium slide-up friends panel (requests + friends list)
@@ -139,6 +137,7 @@ directChatScreen.innerHTML = `
       <div class="direct-menu-container">
         <button id="directMenuToggle" class="action-btn"><i class="fa-solid fa-ellipsis-vertical"></i></button>
         <div id="directDropdownMenu" class="direct-dropdown-menu">
+          <div id="menuDirectTheme"><i class="fa-solid fa-palette"></i> Theme</div>
           <div id="menuClearChat"><i class="fa-solid fa-trash"></i> Clear Chat</div>
           <div id="menuBlockUser"><i class="fa-solid fa-ban"></i> Block User</div>
         </div>
@@ -147,11 +146,19 @@ directChatScreen.innerHTML = `
   </div>
   <div id="directChatMessages" class="chat-messages"></div>
   <div class="chat-input-area">
+    <label for="directFileAttachmentInput" class="attach-btn"><i class="fa-solid fa-paperclip"></i></label>
+    <input type="file" id="directFileAttachmentInput" accept="image/*,video/*,audio/*" style="display: none;">
     <input type="text" id="directMessageInput" placeholder="Type a message...">
     <button id="sendDirectMsgBtn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
   </div>
 `;
 document.body.appendChild(directChatScreen);
+
+// Toast notification container for incoming friend messages
+const toastContainer = document.createElement("div");
+toastContainer.id = "toastContainer";
+toastContainer.className = "toast-container";
+document.body.appendChild(toastContainer);
 
 
 // রুম মেম্বার হেডার ব্যানার
@@ -188,39 +195,59 @@ themeModal.innerHTML = `
 `;
 document.body.appendChild(themeModal);
 
-// কল আইকনের পাশে থিম আইকন ইনজেক্ট করা
+// কল আইকনের পাশে থ্রি-ডট মেনু ইনজেক্ট করা (Theme এখন এই মেনুর ভেতরে)
 const chatHeaderActions = document.querySelector(".chat-header-actions") || document.getElementById("startAudioCallBtn")?.parentNode;
-let themeRoomBtn = document.getElementById("themeRoomBtn");
-if (!themeRoomBtn && chatHeaderActions) {
-  themeRoomBtn = document.createElement("button");
-  themeRoomBtn.id = "themeRoomBtn";
-  themeRoomBtn.className = "btn btn-sm btn-outline-secondary";
-  themeRoomBtn.title = "Change Theme / Background";
-  themeRoomBtn.innerHTML = `<i class="fa-solid fa-palette"></i>`;
-  themeRoomBtn.style.cssText = "margin-right: 5px; color: #fff; border-color: #555;";
-  chatHeaderActions.insertBefore(themeRoomBtn, chatHeaderActions.firstChild);
+let roomMenuToggle = document.getElementById("roomMenuToggle");
+if (!roomMenuToggle && chatHeaderActions) {
+  const roomMenuContainer = document.createElement("div");
+  roomMenuContainer.className = "direct-menu-container";
+  roomMenuContainer.innerHTML = `
+    <button id="roomMenuToggle" class="action-btn"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+    <div id="roomDropdownMenu" class="direct-dropdown-menu">
+      <div id="menuRoomTheme"><i class="fa-solid fa-palette"></i> Theme</div>
+    </div>
+  `;
+  chatHeaderActions.insertBefore(roomMenuContainer, chatHeaderActions.firstChild);
+  roomMenuToggle = document.getElementById("roomMenuToggle");
+}
+const roomDropdownMenu = document.getElementById("roomDropdownMenu");
+
+if (roomMenuToggle) {
+  roomMenuToggle.onclick = (e) => {
+    e.stopPropagation();
+    roomDropdownMenu.classList.toggle("open");
+  };
 }
 
-if (themeRoomBtn) {
-  themeRoomBtn.onclick = () => { themeModal.style.display = "flex"; };
-}
+// যেকোনো জায়গায় ক্লিক করলে খোলা মেনুগুলো বন্ধ হয়ে যাবে (রুম + ডিরেক্ট চ্যাট উভয়ই)
+document.addEventListener("click", () => {
+  document.querySelectorAll(".direct-dropdown-menu.open").forEach(menu => menu.classList.remove("open"));
+});
+
+// থিম মোডাল কোন কনটেক্সটের জন্য খোলা হয়েছে তা ট্র্যাক করা (room / direct)
+let themeContext = "room";
+
+document.getElementById("menuRoomTheme").onclick = () => {
+  themeContext = "room";
+  themeModal.style.display = "flex";
+  roomDropdownMenu.classList.remove("open");
+};
+
 document.getElementById("closeThemeModal").onclick = () => { themeModal.style.display = "none"; };
 
-// থিম পরিবর্তন হ্যান্ডলার
+
+// থিম পরিবর্তন হ্যান্ডলার (রুম / ডিরেক্ট চ্যাট — উভয় কনটেক্সটে কাজ করে)
 document.querySelectorAll(".theme-box").forEach(box => {
   box.onclick = () => {
     const bg = box.getAttribute("data-bg");
     const color = box.getAttribute("data-color") || "#fff";
-    applyRoomTheme({ background: bg, color: color });
-    socket.emit("set-room-theme", { roomCode: currentRoom, themeData: { background: bg, color: color } });
+    applyThemeForCurrentContext({ background: bg, color: color });
     themeModal.style.display = "none";
   };
 });
 
 document.getElementById("resetThemeBtn").onclick = () => {
-  const defaultTheme = { background: "", color: "" };
-  applyRoomTheme(defaultTheme);
-  socket.emit("set-room-theme", { roomCode: currentRoom, themeData: defaultTheme });
+  applyThemeForCurrentContext({ background: "", color: "" });
   themeModal.style.display = "none";
 };
 
@@ -230,14 +257,22 @@ document.getElementById("customThemeImageInput").onchange = (e) => {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const imgData = evt.target.result;
-      const themeData = { backgroundImage: `url(${imgData})`, color: "#fff" };
-      applyRoomTheme(themeData);
-      socket.emit("set-room-theme", { roomCode: currentRoom, themeData: themeData });
+      applyThemeForCurrentContext({ backgroundImage: `url(${imgData})`, color: "#fff" });
       themeModal.style.display = "none";
     };
     reader.readAsDataURL(file);
   }
 };
+
+function applyThemeForCurrentContext(themeData) {
+  if (themeContext === "direct" && activeDirectChatFriend) {
+    applyDirectTheme(themeData);
+    saveDirectTheme(activeDirectChatFriend.phone, themeData);
+  } else {
+    applyRoomTheme(themeData);
+    socket.emit("set-room-theme", { roomCode: currentRoom, themeData: themeData });
+  }
+}
 
 function applyRoomTheme(theme) {
   const chatArea = document.getElementById("chatMessages")?.parentNode || chatScreen;
@@ -257,6 +292,38 @@ function applyRoomTheme(theme) {
 socket.on("room-theme-update", (themeData) => {
   applyRoomTheme(themeData);
 });
+
+// ডিরেক্ট চ্যাটের থিম — প্রতিটি ফ্রেন্ডের জন্য আলাদাভাবে ব্রাউজারে সেভ থাকে
+function applyDirectTheme(theme) {
+  const chatArea = document.getElementById("directChatMessages");
+  if (!chatArea) return;
+  if (theme.background) {
+    chatArea.style.backgroundColor = theme.background;
+    chatArea.style.backgroundImage = "none";
+  } else if (theme.backgroundImage) {
+    chatArea.style.backgroundImage = theme.backgroundImage;
+    chatArea.style.backgroundSize = "cover";
+    chatArea.style.backgroundPosition = "center";
+  } else {
+    chatArea.style.backgroundColor = "";
+    chatArea.style.backgroundImage = "";
+  }
+}
+
+function saveDirectTheme(phone, theme) {
+  try { localStorage.setItem("direct_theme_" + phone, JSON.stringify(theme)); } catch (e) {}
+}
+
+function loadDirectTheme(phone) {
+  try {
+    const raw = localStorage.getItem("direct_theme_" + phone);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+
 
 const setPinBtn = document.getElementById("setPinBtn");
 const setPinBtnText = document.getElementById("setPinBtnText");
@@ -736,6 +803,46 @@ function fetchFriendData() {
   });
 }
 
+// ================= UNREAD MESSAGE NOTIFICATIONS =================
+let pendingRequestCount = 0;
+let unreadDirectCounts = {}; // phone -> unread count
+
+function updateFriendBadge() {
+  const badge = document.getElementById("friendReqBadge");
+  if (!badge) return;
+  const totalUnread = Object.values(unreadDirectCounts).reduce((a, b) => a + b, 0);
+  const total = pendingRequestCount + totalUnread;
+  if (total > 0) {
+    badge.textContent = total > 99 ? "99+" : total;
+    badge.classList.add("show");
+  } else {
+    badge.classList.remove("show");
+  }
+}
+
+function showMessageToast(msgData) {
+  const toast = document.createElement("div");
+  toast.className = "message-toast";
+  const preview = msgData.text ? msgData.text : (msgData.fileType ? "📎 Sent an attachment" : "New message");
+  toast.innerHTML = `
+    <img src="${msgData.senderPic || 'https://via.placeholder.com/40'}" alt="">
+    <div class="message-toast-body">
+      <span class="message-toast-name">${msgData.senderName || 'Friend'}</span>
+      <span class="message-toast-text">${preview}</span>
+    </div>
+  `;
+  toast.onclick = () => {
+    openDirectChat({ phone: msgData.senderPhone, name: msgData.senderName, pic: msgData.senderPic });
+    toast.remove();
+  };
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 4500);
+}
+
 function renderFriendData(data) {
   const reqSection = document.getElementById("friendRequestsSection");
   const reqList = document.getElementById("friendRequestsList");
@@ -744,13 +851,8 @@ function renderFriendData(data) {
 
   countText.textContent = `You have ${data.friends.length} ${data.friends.length === 1 ? "friend" : "friends"}`;
 
-  const badge = document.getElementById("friendReqBadge");
-  if (data.requests.length > 0) {
-    badge.classList.add("show");
-    badge.textContent = data.requests.length;
-  } else {
-    badge.classList.remove("show");
-  }
+  pendingRequestCount = data.requests.length;
+  updateFriendBadge();
 
   if (data.requests.length > 0) {
     reqSection.classList.add("has-requests");
@@ -780,15 +882,18 @@ function renderFriendData(data) {
     friendList.innerHTML = `<div class="friends-empty-state"><i class="fa-solid fa-user-group"></i><p>এখনো কোনো ফ্রেন্ড নেই। রুমে গিয়ে কারো প্রোফাইলে ট্যাপ করে ফ্রেন্ড রিকোয়েস্ট পাঠান!</p></div>`;
   } else {
     data.friends.forEach(friend => {
+      const unreadCount = unreadDirectCounts[friend.phone] || 0;
       const item = document.createElement("div");
       item.className = "friend-card";
       item.innerHTML = `
         <img src="${friend.pic || 'https://via.placeholder.com/48'}" alt="${friend.name}">
         <div class="friend-card-info">
           <span class="friend-card-name">${friend.name}</span>
-          <span class="friend-card-sub">Tap to message</span>
+          <span class="friend-card-sub">${unreadCount > 0 ? unreadCount + " new message" + (unreadCount > 1 ? "s" : "") : "Tap to message"}</span>
         </div>
-        <i class="fa-solid fa-message friend-card-chat-icon"></i>
+        ${unreadCount > 0
+          ? `<span class="friend-card-unread-dot">${unreadCount > 99 ? "99+" : unreadCount}</span>`
+          : `<i class="fa-solid fa-message friend-card-chat-icon"></i>`}
       `;
       item.onclick = () => openDirectChat(friend);
       friendList.appendChild(item);
@@ -805,6 +910,13 @@ function openDirectChat(friend) {
   document.getElementById("directChatName").textContent = friend.name;
   friendsPanelOverlay.classList.remove("active");
   directChatScreen.classList.add("active");
+
+  if (unreadDirectCounts[friend.phone]) {
+    delete unreadDirectCounts[friend.phone];
+    updateFriendBadge();
+  }
+
+  applyDirectTheme(loadDirectTheme(friend.phone) || {});
   loadDirectChatHistory();
 }
 
@@ -822,9 +934,12 @@ directMenuToggle.onclick = (e) => {
   directDropdownMenu.classList.toggle("open");
 };
 
-document.addEventListener("click", () => {
-  if (directDropdownMenu) directDropdownMenu.classList.remove("open");
-});
+// ডিরেক্ট চ্যাটের থিম
+document.getElementById("menuDirectTheme").onclick = () => {
+  themeContext = "direct";
+  themeModal.style.display = "flex";
+  directDropdownMenu.classList.remove("open");
+};
 
 // ডিরেক্ট চ্যাট ক্লিয়ার করা
 document.getElementById("menuClearChat").onclick = async () => {
@@ -862,6 +977,7 @@ function loadDirectChatHistory() {
 
 const sendDirectMsgBtn = document.getElementById("sendDirectMsgBtn");
 const directMessageInput = document.getElementById("directMessageInput");
+const directFileAttachmentInput = document.getElementById("directFileAttachmentInput");
 
 if (sendDirectMsgBtn) {
   sendDirectMsgBtn.onclick = sendDirectMessage;
@@ -895,10 +1011,52 @@ function sendDirectMessage() {
   });
 }
 
+// ডিরেক্ট চ্যাটে ফাইল/ছবি/ভিডিও/অডিও পাঠানো — রুম চ্যাটের মতোই
+if (directFileAttachmentInput) {
+  directFileAttachmentInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeDirectChatFriend) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const msgData = {
+        senderPhone: currentUser.phone,
+        senderName: currentUser.name,
+        senderPic: currentUser.pic,
+        receiverPhone: activeDirectChatFriend.phone,
+        fileType: file.type,
+        fileContent: evt.target.result,
+        fileName: file.name,
+        timestamp: Date.now()
+      };
+
+      appendDirectMessage(msgData);
+
+      socket.emit("send-direct-message", msgData, (res) => {
+        if (res && res.success === false) {
+          if (res.error === "blocked_by_you") {
+            showCustomAlert("Error", "আপনি এই ইউজারকে ব্লক করে রেখেছেন!");
+          } else {
+            showCustomAlert("Error", "এই ইউজার আপনাকে ব্লক করে রেখেছেন, মেসেজ পাঠানো যায়নি!");
+          }
+        }
+      });
+      directFileAttachmentInput.value = "";
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 socket.on("receive-direct-message", (msgData) => {
-  if (activeDirectChatFriend && msgData.senderPhone === activeDirectChatFriend.phone) {
+  const isViewingThisChat = directChatScreen.classList.contains("active") &&
+    activeDirectChatFriend && msgData.senderPhone === activeDirectChatFriend.phone;
+
+  if (isViewingThisChat) {
     appendDirectMessage(msgData);
   } else {
+    unreadDirectCounts[msgData.senderPhone] = (unreadDirectCounts[msgData.senderPhone] || 0) + 1;
+    updateFriendBadge();
+    showMessageToast(msgData);
     fetchFriendData();
   }
 });
@@ -913,13 +1071,45 @@ function appendDirectMessage(msg) {
   const avatarSrc = isMe ? (currentUser.pic || 'https://via.placeholder.com/40') : (msg.senderPic || 'https://via.placeholder.com/40');
   const avatarImg = `<img src="${avatarSrc}" alt="">`;
 
+  let contentHtml;
+  if (msg.fileType) {
+    if (msg.fileType.startsWith("image/")) {
+      contentHtml = `<img src="${msg.fileContent}" class="msg-media previewable-media" data-type="image" data-src="${msg.fileContent}" data-name="${msg.fileName || 'image.png'}" />`;
+    } else if (msg.fileType.startsWith("video/")) {
+      contentHtml = `<video src="${msg.fileContent}" class="msg-media previewable-media" data-type="video" data-src="${msg.fileContent}" data-name="${msg.fileName || 'video.mp4'}"></video>`;
+    } else if (msg.fileType.startsWith("audio/")) {
+      contentHtml = `<audio src="${msg.fileContent}" controls class="msg-audio"></audio>`;
+    } else {
+      contentHtml = `<a href="${msg.fileContent}" download="${msg.fileName}" class="msg-file-link">📁 ${msg.fileName}</a>`;
+    }
+  } else {
+    contentHtml = msg.text;
+  }
+
   msgDiv.innerHTML = isMe
-    ? `<div class="msg-bubble">${msg.text}</div>${avatarImg}`
-    : `${avatarImg}<div class="msg-bubble">${msg.text}</div>`;
+    ? `<div class="msg-bubble">${contentHtml}</div>${avatarImg}`
+    : `${avatarImg}<div class="msg-bubble">${contentHtml}</div>`;
 
   chatContainer.appendChild(msgDiv);
   chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  const mediaElement = msgDiv.querySelector(".previewable-media");
+  if (mediaElement) {
+    mediaElement.onclick = () => {
+      const src = mediaElement.getAttribute("data-src");
+      const name = mediaElement.getAttribute("data-name");
+      const type = mediaElement.getAttribute("data-type");
+      mediaPreviewContent.innerHTML = type === "video"
+        ? `<video src="${src}" controls autoplay style="max-width:100%; max-height:80vh; border-radius:8px;"></video>`
+        : `<img src="${src}" style="max-width:100%; max-height:80vh; object-fit:contain; border-radius:8px;" />`;
+      mediaDownloadBtn.style.display = "inline-block";
+      mediaDownloadBtn.href = src;
+      mediaDownloadBtn.download = name;
+      mediaPreviewModal.style.display = "flex";
+    };
+  }
 }
+
 
 // ================= ROOM MEMBERS & PROFILE =================
 socket.on("room-members-update", (members) => {
