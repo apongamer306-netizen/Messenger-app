@@ -629,6 +629,108 @@ io.on("connection", (socket) => {
   });
 });
 
+// ---------- কল-এর জন্য TURN সার্ভারের ক্রেডেনশিয়াল (একাধিক ফ্রি সার্ভিস একসাথে) ----------
+// আলাদা নেটওয়ার্কের দুই ডিভাইসের মধ্যে কল চালাতে TURN সার্ভার লাগে। ক্রেডেনশিয়াল পাবলিক
+// GitHub-এ না রেখে Render-এর Environment-এ রাখা হয়। যতগুলো সার্ভিসের তথ্য দেওয়া থাকবে, সব
+// একসাথে ব্রাউজারে যায় — একটা ফুরিয়ে গেলে বা বন্ধ থাকলে অন্যটা দিয়ে কল চলবে।
+//
+//  ১) Metered (কার্ড ছাড়া ০.৫ GB, কার্ড দিলে ২০ GB):
+//       METERED_APP = অ্যাপের নাম (যেমন ektchatter),  METERED_API_KEY = API Key
+//  ২) Cloudflare (মাসে ১,০০০ GB ফ্রি, কার্ড/PayPal লাগে):
+//       CF_TURN_KEY_ID,  CF_TURN_API_TOKEN
+//  ৩) যেকোনো অন্য সার্ভিস (ExpressTURN, Turnix, Xirsys ইত্যাদি) — ড্যাশবোর্ডের ক্রেডেনশিয়াল দিয়ে:
+//       EXTRA_ICE_SERVERS = [{"urls":"turn:সার্ভার:3478","username":"...","credential":"..."}]
+let iceCache = { at: 0, data: null };
+
+async function fetchIceFromCloudflare(keyId, token) {
+  const r = await fetch(
+    `https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttl: 86400 }),
+    }
+  );
+  if (!r.ok) throw new Error("Cloudflare TURN API status " + r.status);
+  const body = await r.json();
+  return Array.isArray(body.iceServers) ? body.iceServers : body.iceServers ? [body.iceServers] : [];
+}
+
+async function fetchIceFromMetered(appName, apiKey) {
+  const r = await fetch(
+    `https://${appName}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(apiKey)}`
+  );
+  if (!r.ok) throw new Error("Metered TURN API status " + r.status);
+  const body = await r.json();
+  return Array.isArray(body) ? body : [];
+}
+
+function readExtraIceServers() {
+  const raw = process.env.EXTRA_ICE_SERVERS;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  } catch (e) {
+    console.error("EXTRA_ICE_SERVERS সঠিক JSON নয়:", e.message);
+    return [];
+  }
+}
+
+app.get("/api/ice-servers", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    if (iceCache.data && Date.now() - iceCache.at < 60 * 60 * 1000) {
+      return res.json(iceCache.data);
+    }
+
+    const jobs = [];
+    if (typeof fetch === "function") {
+      if (process.env.METERED_APP && process.env.METERED_API_KEY) {
+        jobs.push(["metered", fetchIceFromMetered(process.env.METERED_APP, process.env.METERED_API_KEY)]);
+      }
+      if (process.env.CF_TURN_KEY_ID && process.env.CF_TURN_API_TOKEN) {
+        jobs.push(["cloudflare", fetchIceFromCloudflare(process.env.CF_TURN_KEY_ID, process.env.CF_TURN_API_TOKEN)]);
+      }
+    }
+    const extra = readExtraIceServers();
+    if (extra.length) jobs.push(["extra", Promise.resolve(extra)]);
+
+    if (!jobs.length) return res.json({ iceServers: [], hasTurn: false, providers: [] });
+
+    const results = await Promise.allSettled(jobs.map((j) => j[1]));
+    let list = [];
+    const providers = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled" && Array.isArray(r.value) && r.value.length) {
+        list = list.concat(r.value);
+        providers.push(jobs[i][0]);
+      } else if (r.status === "rejected") {
+        console.error(`ICE provider "${jobs[i][0]}" failed:`, r.reason && r.reason.message);
+      }
+    });
+
+    // পোর্ট 53 ফায়ারফক্সে সমস্যা করে, তাই বাদ দেওয়া হলো
+    list = list
+      .map((s) => {
+        const urls = (Array.isArray(s.urls) ? s.urls : [s.urls]).filter(
+          (u) => u && !/:53(\?|$)/.test(u)
+        );
+        return { ...s, urls };
+      })
+      .filter((s) => s.urls.length);
+
+    const data = { iceServers: list, hasTurn: list.some((s) => s.username), providers };
+    // শুধু সফল হলেই ক্যাশ করা হয়, নইলে পরের রিকোয়েস্টে আবার চেষ্টা হবে
+    if (list.length) iceCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (e) {
+    console.error("ICE server fetch failed:", e.message);
+    res.json({ iceServers: [], hasTurn: false, providers: [] });
+  }
+});
+
 // Fallback: send index.html for any other route (so refreshing on Render works)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
