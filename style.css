@@ -784,3 +784,48 @@ body.light-theme .message-toast {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ===== CALL BUTTONS (room header + direct chat header) ===== */
+.action-btn.call-audio,
+.action-btn.call-video {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.action-btn.call-audio {
+  background: linear-gradient(135deg, #198754, #157347);
+  color: #fff;
+}
+
+.action-btn.call-video {
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  color: #fff;
+}
+
+.action-btn.leave-room {
+  background: linear-gradient(135deg, #dc3545, #b02a37);
+  color: #fff;
+}
+
+.action-btn.call-audio:hover,
+.action-btn.call-video:hover,
+.action-btn.leave-room:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.action-btn.call-audio:active,
+.action-btn.call-video:active { transform: scale(0.94); }
+
+body.light-theme .action-btn.call-audio,
+body.light-theme .action-btn.call-video,
+body.light-theme .action-btn.leave-room { color: #fff; }
+
+/* ছোট স্ক্রিনে হেডারের বাটনগুলো যেন গাদাগাদি না লাগে */
+@media (max-width: 420px) {
+  .chat-actions { gap: 6px; }
+  .action-btn { width: 33px; height: 33px; font-size: 13px; }
+}
