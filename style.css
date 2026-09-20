@@ -48,7 +48,15 @@ body.light-theme .navbar {
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 60px);
+  min-height: calc(100dvh - 60px);
   padding: 10px;
+  position: relative;
+}
+
+/* প্রত্যেকটা স্ক্রিন সুইচেই একটা হালকা fade + rise অ্যানিমেশন হবে — প্রিমিয়াম ফিল */
+@keyframes screenFadeSlide {
+  from { opacity: 0; transform: translateY(18px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .card-screen {
@@ -59,11 +67,53 @@ body.light-theme .navbar {
   max-width: 380px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   text-align: center;
+  animation: screenFadeSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 body.light-theme .card-screen {
   background-color: #ffffff;
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* ---------- ড্যাশবোর্ড: ল্যাপটপে পুরো স্ক্রিন জুড়ে সুন্দর ব্যাকগ্রাউন্ড, বাটন-কার্ড বড় ---------- */
+#dashboardScreen { position: relative; z-index: 1; }
+
+/* কার্ডের পেছনে পুরো ভিউপোর্ট জুড়ে হালকা রঙিন আভা — "খালি কালো জায়গা" আর লাগবে না */
+.main-container::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background:
+    radial-gradient(40% 34% at 18% 20%, rgba(13,110,253,.14) 0%, rgba(13,110,253,0) 70%),
+    radial-gradient(36% 30% at 84% 18%, rgba(111,66,193,.13) 0%, rgba(111,66,193,0) 70%),
+    radial-gradient(42% 36% at 50% 92%, rgba(232,62,140,.10) 0%, rgba(232,62,140,0) 70%);
+}
+body.dashboard-active .main-container::before { opacity: 1; }
+
+@media (min-width: 768px) {
+  #dashboardScreen {
+    max-width: 460px;
+    padding: 34px 30px;
+  }
+  #dashboardScreen .avatar-container { width: 108px; height: 108px; }
+  #dashboardScreen #dashboardUserName { font-size: 20px; }
+  #dashboardScreen .btn { padding: 14px; font-size: 15px; }
+  #dashboardScreen .btn i { font-size: 15px; }
+}
+
+@media (min-width: 1200px) {
+  #dashboardScreen {
+    max-width: 520px;
+    padding: 40px 36px;
+  }
+  #dashboardScreen .avatar-container { width: 124px; height: 124px; }
+  #dashboardScreen .avatar-edit-badge { width: 36px; height: 36px; font-size: 14px; }
+  #dashboardScreen #dashboardUserName { font-size: 22px; }
+  #dashboardScreen .btn { padding: 16px; font-size: 16px; border-radius: 10px; }
 }
 
 .input-wrapper {
@@ -177,19 +227,27 @@ body.light-theme .input-wrapper input {
 }
 
 .chat-container {
+  /* এখন রুম চ্যাটও ডিরেক্ট চ্যাটের মতোই পুরো ব্রাউজার উইন্ডো জুড়ে বসবে —
+     ছোট্ট একটা বক্স হয়ে মাঝখানে ভাসবে না, চারপাশে খালি কালো জায়গাও থাকবে না */
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
   width: 100%;
-  max-width: 500px;
-  height: 92vh; /* চ্যাট বক্সের উচ্চতা বাড়িয়ে ফাঁকা জায়গা ফিলাপ করা হলো */
+  max-width: 100%;
+  height: 100vh;
+  height: 100dvh;
   background: #1e1e1e;
-  border-radius: 16px;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  animation: screenFadeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 body.light-theme .chat-container {
   background: #ffffff;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
 /* --- স্পেশাল রুমের ব্যাকগ্রাউন্ড ফিটিং --- */
@@ -1055,17 +1113,14 @@ body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15
 
 /* =======================================================================
    =====================  রেসপন্সিভ লেআউট  ===============================
-   ফোন  → পুরো স্ক্রিন জুড়ে, মাঝখানে চ্যাট
-   ল্যাপটপ → বড় স্ক্রিনে সুন্দরভাবে ছড়িয়ে, মেসেজ কলাম মাঝখানে সেন্টার
+   ফোন  → পুরো স্ক্রিন জুড়ে ফিট, মাঝখানে ছোট আইকন
+   ল্যাপটপ/পিসি → পুরো ব্রাউজার উইন্ডো জুড়ে ছড়িয়ে, আইকন/লেখা একটু বড়
+   ডিরেক্ট চ্যাট আর রুম চ্যাট — দুটোই এখন একই নিয়মে ফুল-স্ক্রিন
    ======================================================================= */
 
 /* iOS/অ্যান্ড্রয়েডে অ্যাড্রেস বার লুকালেও উচ্চতা ঠিক থাকবে */
-.chat-container {
-  height: 92vh;
-  height: 92dvh;
-}
-
-.direct-chat-screen .chat-messages {
+.direct-chat-screen .chat-messages,
+.chat-container .chat-messages {
   padding: 14px 12px 8px;
   gap: 2px;
   scroll-behavior: smooth;
@@ -1073,68 +1128,67 @@ body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15
   -webkit-overflow-scrolling: touch;
 }
 
-/* ---- ফোন (ছোট স্ক্রিন) ---- */
+/* ---- ফোন (ছোট স্ক্রিন): সব কিছু এক্কেবারে এজ-টু-এজ ফিট ---- */
 @media (max-width: 767px) {
-  .main-container { padding: 6px; }
+  .main-container { padding: 0; }
 
-  .chat-container {
-    max-width: 100%;
-    height: calc(100dvh - 62px);
-    border-radius: 0;
-  }
-
-  .direct-chat-screen .chat-header { padding: 10px 12px; }
-  .direct-chat-screen .user-info img { width: 36px; height: 36px; }
-  .direct-chat-screen #directChatName { font-size: 15px; }
+  .direct-chat-screen .chat-header,
+  .chat-container .chat-header { padding: 10px 12px; }
+  .direct-chat-screen .user-info img,
+  .chat-container .user-info img { width: 36px; height: 36px; }
+  .direct-chat-screen #directChatName,
+  .chat-container #chatUserName { font-size: 15px; }
 
   .msg-bubble { max-width: 78%; font-size: 14.5px; }
   .msg-bubble.media-bubble { max-width: 74%; }
   .media-wrap .msg-media { max-height: 300px; }
 
-  .chat-input-area { padding: 9px 10px; gap: 8px; }
+  .direct-chat-screen .chat-input-area,
+  .chat-container .chat-input-area { padding: 9px 10px; gap: 8px; }
   .chat-input-area input { font-size: 15px; padding: 10px 14px; } /* 15px+ = iOS-এ জুম হয় না */
 }
 
-/* ---- ল্যাপটপ / ডেস্কটপ ---- */
+/* ---- ল্যাপটপ / ডেস্কটপ: পুরো ব্রাউজার উইন্ডো জুড়ে, আইকন একটু বড় ---- */
 @media (min-width: 768px) {
-  .main-container { padding: 16px; }
-
-  .chat-container {
-    max-width: 780px;
-    height: calc(100vh - 92px);
-    border-radius: 18px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
-  }
-
-  /* ল্যাপটপে চ্যাট পুরো উইন্ডো জুড়ে ছড়িয়ে থাকবে (মাঝখানে সরু কলাম নয়) */
+  /* ল্যাপটপে চ্যাট পুরো উইন্ডো জুড়ে ছড়িয়ে থাকবে (মাঝখানে সরু কলাম বা ছোট বক্স নয়) */
   .direct-chat-screen .chat-header,
-  .direct-chat-screen .chat-input-area {
-    padding-left: 22px;
-    padding-right: 22px;
+  .direct-chat-screen .chat-input-area,
+  .chat-container .chat-header,
+  .chat-container .chat-input-area {
+    padding-left: 26px;
+    padding-right: 26px;
   }
-  .direct-chat-screen .chat-header { padding-top: 12px; padding-bottom: 12px; }
+  .direct-chat-screen .chat-header,
+  .chat-container .chat-header { padding-top: 14px; padding-bottom: 14px; }
 
-  .direct-chat-screen .chat-messages {
-    padding: 18px 22px 10px;
+  .direct-chat-screen .chat-messages,
+  .chat-container .chat-messages {
+    padding: 20px 26px 12px;
   }
 
-  .msg-bubble { max-width: 62%; }
-  .msg-bubble.media-bubble { max-width: 330px; }
-  .media-wrap .msg-media { max-height: 380px; }
+  .msg-bubble { max-width: 60%; font-size: 15px; }
+  .msg-bubble.media-bubble { max-width: 340px; }
+  .media-wrap .msg-media { max-height: 400px; }
 
-  .direct-chat-screen .user-info img { width: 42px; height: 42px; }
-  .direct-chat-screen #directChatName { font-size: 16.5px; }
+  .direct-chat-screen .user-info img,
+  .chat-container .user-info img { width: 44px; height: 44px; }
+  .direct-chat-screen #directChatName,
+  .chat-container #chatUserName { font-size: 17px; }
 
-  .chat-input-area input { padding: 12px 18px; font-size: 14.5px; }
-  .attach-btn, .send-btn { width: 42px; height: 42px; }
+  .chat-input-area input { padding: 13px 20px; font-size: 15px; }
+  .attach-btn, .send-btn { width: 44px; height: 44px; font-size: 15px; }
+  .action-btn { width: 40px; height: 40px; font-size: 15px; }
 }
 
-/* ---- বড় মনিটর: শুধু বাবলের প্রস্থ একটু সীমিত, স্ক্রিন পুরোটাই ব্যবহার হবে ---- */
+/* ---- বড় মনিটর: বাবলের প্রস্থ সীমিত (পড়তে সুবিধা), বাকিটা স্ক্রিন জুড়েই থাকে ---- */
 @media (min-width: 1400px) {
   .direct-chat-screen .chat-header,
-  .direct-chat-screen .chat-input-area { padding-left: 34px; padding-right: 34px; }
-  .direct-chat-screen .chat-messages { padding: 22px 34px 12px; }
-  .msg-bubble { max-width: 54%; }
+  .direct-chat-screen .chat-input-area,
+  .chat-container .chat-header,
+  .chat-container .chat-input-area { padding-left: 40px; padding-right: 40px; }
+  .direct-chat-screen .chat-messages,
+  .chat-container .chat-messages { padding: 24px 40px 14px; }
+  .msg-bubble { max-width: 52%; }
 }
 
 /* স্ক্রলবার সুন্দর করা */
@@ -1153,12 +1207,15 @@ body.light-theme .chat-messages::-webkit-scrollbar-thumb { background: rgba(0, 0
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: 200003;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
-.profile-modal-overlay.active { display: flex; }
+.profile-modal-overlay.active { opacity: 1; pointer-events: auto; }
 
 .profile-modal {
   width: 100%;
@@ -1170,7 +1227,10 @@ body.light-theme .chat-messages::-webkit-scrollbar-thumb { background: rgba(0, 0
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  transform: scale(0.92) translateY(14px);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.profile-modal-overlay.active .profile-modal { transform: scale(1) translateY(0); }
 body.light-theme .profile-modal { background: #fff; color: #1c1e21; }
 
 .profile-modal-cover {
@@ -1849,4 +1909,56 @@ textarea.profile-edit-field { resize: vertical; min-height: 64px; }
   #callProfileGrid .call-avatar-ring { width: 190px; height: 190px; margin-bottom: 30px; }
   #callProfileGrid .call-avatar { width: 170px; height: 170px; }
   #callProfileGrid .call-username { font-size: 31px; }
+}
+
+
+/* =======================================================================
+   =======================  UNIVERSAL PAGE ANIMATIONS  ===================
+   সব মডাল/পপআপেও হালকা fade+scale অ্যানিমেশন — প্রিমিয়াম ফিল
+   ======================================================================= */
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.93) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.theme-modal-card {
+  animation: fadeScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+#mediaPreviewContent img,
+#mediaPreviewContent video,
+.audio-player-card {
+  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* কল স্ক্রিনের ভেতরের কন্টেন্টেও হালকা fade-in */
+#callProfileGrid.call-profile-grid,
+#callVideoGrid.video-grid {
+  animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* বাটনে হালকা প্রেস ফিডব্যাক — পুরো অ্যাপ জুড়ে প্রিমিয়াম অনুভূতি */
+.btn, .action-btn, .attach-btn, .send-btn,
+.friend-card, .friend-request-card,
+.profile-gallery-item {
+  transition: transform 0.14s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+.btn:active, .action-btn:active, .attach-btn:active, .send-btn:active {
+  transform: scale(0.96);
+}
+.friend-card:active, .friend-request-card:active {
+  transform: scale(0.98);
+}
+
+/* মেসেজ বাবল ঢোকার সময় হালকা pop */
+@keyframes bubblePop {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-row { animation: bubblePop 0.22s ease both; }
+
+/* ফ্রেন্ড কার্ড ও রিকোয়েস্ট কার্ড তালিকায় ঢোকার সময় হালকা fade */
+.friend-card, .friend-request-card {
+  animation: fadeScaleIn 0.25s ease both;
 }
