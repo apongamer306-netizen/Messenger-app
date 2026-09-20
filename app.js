@@ -19,8 +19,47 @@ const socket = io({
   transports: ["websocket", "polling"]
 });
 
-let myPeer = new Peer();
+// ================= WEBRTC: STUN + TURN সার্ভার =================
+// কল করলে কথা না শোনার সবচেয়ে বড় কারণ: দুই ফোন/কম্পিউটার আলাদা নেটওয়ার্কে (বিশেষ করে
+// মোবাইল ডেটায়) থাকলে সরাসরি অডিও পাঠানো যায় না। তখন TURN সার্ভার লাগে, যেটা মাঝখানে
+// থেকে অডিও পৌঁছে দেয়। আগে শুধু ডিফল্ট STUN ছিল, TURN ছিল না।
+//
+// ✅ সবচেয়ে নির্ভরযোগ্য উপায়: https://www.metered.ca এ ফ্রি অ্যাকাউন্ট খুলে (মাসে ২০ GB ফ্রি)
+// TURN Server থেকে আপনার username/credential নিয়ে নিচের কমেন্ট করা লাইনটা চালু করুন।
+const ICE_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:global.stun.twilio.com:3478" },
+
+  // ---- আপনার নিজের Metered TURN (এখানে বসান, // তুলে দিন) ----
+  // { urls: "turn:global.relay.metered.ca:80", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
+  // { urls: "turn:global.relay.metered.ca:80?transport=tcp", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
+  // { urls: "turn:global.relay.metered.ca:443", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
+  // { urls: "turns:global.relay.metered.ca:443?transport=tcp", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
+
+  // ---- পাবলিক ফ্রি TURN (ব্যাকআপ; যেকোনো সময় বন্ধ বা ধীর হতে পারে) ----
+  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+];
+
+// কথা পরিষ্কার শোনার জন্য: ইকো ও নয়েজ কমানো
+const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+let myPeer = new Peer({ config: { iceServers: ICE_SERVERS } });
 let myPeerId = null;
+
+// কল-সিগন্যালিং সার্ভারের সাথে সংযোগ কেটে গেলে নিজে থেকে আবার যুক্ত হওয়া
+myPeer.on("disconnected", () => {
+  try { myPeer.reconnect(); } catch (e) {}
+});
+myPeer.on("error", (err) => {
+  console.warn("PeerJS error:", err && err.type, err);
+  if (err && err.type === "peer-unavailable") {
+    endCallCleanup();
+    showCustomAlert("Call Failed", "ওপাশের ব্যক্তির কল সংযোগ পাওয়া যাচ্ছে না। দুজনেই পেজ রিফ্রেশ করে আবার চেষ্টা করুন।");
+  }
+});
 let currentCall = null;
 let localStream = null;
 let currentCallType = null;
@@ -29,8 +68,22 @@ const ADMIN_ROOM_PIN = "1430909";
 
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
+remoteAudioElement.setAttribute("playsinline", "");
 remoteAudioElement.style.display = "none";
 document.body.appendChild(remoteAudioElement);
+
+// ব্রাউজার অটো-প্লে আটকে দিলে পরের ক্লিক/টাচেই অডিও চালু হয়ে যাবে
+function playRemoteAudio() {
+  const p = remoteAudioElement.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      const retry = () => { remoteAudioElement.play().catch(() => {}); };
+      ["click", "touchstart", "keydown"].forEach((ev) =>
+        document.addEventListener(ev, retry, { once: true })
+      );
+    });
+  }
+}
 
 myPeer.on("open", (id) => {
   myPeerId = id;
@@ -2765,7 +2818,7 @@ async function initiateCall(type) {
   callContext = { mode: "room", phone: null };
   currentCallType = type;
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: type === "video" });
     if (type === "video") localVideo.srcObject = localStream;
 
     openCallScreen({
@@ -2805,7 +2858,7 @@ socket.on("incoming-call", (data) => {
 
   acceptCallBtn.onclick = async () => {
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentCallType === "video" });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: currentCallType === "video" });
       if (currentCallType === "video") localVideo.srcObject = localStream;
       setCallLayout(currentCallType === "video" ? "video" : "audio");
       const call = myPeer.call(data.callerPeerId, localStream);
@@ -2822,7 +2875,7 @@ myPeer.on("call", async (call) => {
   currentCallType = call.metadata ? call.metadata.type : currentCallType;
   try {
     if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentCallType === "video" });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: currentCallType === "video" });
     }
     if (currentCallType === "video") localVideo.srcObject = localStream;
     setCallLayout(currentCallType === "video" ? "video" : "audio");
@@ -2836,18 +2889,42 @@ myPeer.on("call", async (call) => {
 function handleCallConnection(call) {
   currentCall = call;
   call.on("stream", (remoteStream) => {
-    if (currentCallType === "video") {
-      remoteVideo.srcObject = remoteStream;
-    } else {
-      remoteAudioElement.srcObject = remoteStream;
-      remoteAudioElement.play().catch(() => {});
-    }
-    // কলের মাঝপথে ভিডিওতে সুইচ করলেও যেন রিমোট ভিডিও পাওয়া যায়
+    // শব্দ সবসময় আলাদা audio এলিমেন্ট দিয়ে চলবে (অডিও ও ভিডিও দুই কলেই),
+    // ভিডিও এলিমেন্ট mute থাকবে — নইলে একই শব্দ দুইবার বাজে বা কোনোটাই বাজে না।
+    remoteAudioElement.srcObject = remoteStream;
+    remoteAudioElement.volume = isSpeakerOn ? 1 : 0.25;
+    playRemoteAudio();
+
+    remoteVideo.muted = true;
     remoteVideo.srcObject = remoteStream;
     markCallConnected();
   });
   call.on("close", endCallCleanup);
   call.on("error", endCallCleanup);
+  watchCallConnection(call);
+}
+
+// কলের নেটওয়ার্ক অবস্থা দেখানো — কানেকশন ফেইল হলে "Connected" লেখা দেখিয়ে ভুল বোঝাবে না
+function watchCallConnection(call) {
+  let tries = 0;
+  const attach = () => {
+    const pc = call.peerConnection;
+    if (!pc) {
+      if (tries++ < 40) setTimeout(attach, 250);
+      return;
+    }
+    pc.addEventListener("iceconnectionstatechange", () => {
+      const s = pc.iceConnectionState;
+      if (s === "failed") {
+        setCallStatus("Connection failed — নেটওয়ার্কে কল যাচ্ছে না");
+      } else if (s === "disconnected") {
+        setCallStatus("Reconnecting...");
+      } else if (s === "connected" || s === "completed") {
+        if (isCallConnected) callStatusText.style.display = "none";
+      }
+    });
+  };
+  attach();
 }
 
 socket.on("call-accepted-by-receiver", () => { markCallConnected(); });
@@ -2904,7 +2981,7 @@ async function initiateDirectCall(type) {
 
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
+      audio: AUDIO_CONSTRAINTS,
       video: type === "video"
     });
 
@@ -2969,7 +3046,7 @@ socket.on("direct-incoming-call", (data) => {
   acceptCallBtn.onclick = async () => {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: AUDIO_CONSTRAINTS,
         video: currentCallType === "video"
       });
 
