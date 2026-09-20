@@ -415,31 +415,59 @@
       </div>
     </div>
 
-    <!-- Dynamic Call Overlay Modal -->
+    <!-- WhatsApp-style full screen call screen -->
     <div id="callModal" class="call-modal" style="display: none;">
       <div class="call-box">
-        <h3 id="callStatusText">Incoming Call...</h3>
-        
+
+        <!-- ভিডিও লেয়ার: রিমোট ফুল স্ক্রিন, নিজেরটা কোণায় ছোট -->
         <div id="callVideoGrid" class="video-grid" style="display: none;">
-          <video id="localVideo" autoplay muted playsinline></video>
-          <video id="remoteVideo" autoplay playsinline></video>
+          <video id="remoteVideo" class="call-remote-video" autoplay playsinline></video>
+          <video id="localVideo" class="call-local-video" autoplay muted playsinline></video>
         </div>
 
+        <!-- অডিও কল / রিংিং অবস্থার প্রোফাইল ভিউ -->
         <div id="callProfileGrid" class="call-profile-grid">
           <div class="call-profile-item">
-            <img id="localCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="My Profile">
-            <span id="localCallName" class="call-username">Me</span>
-          </div>
-          <div class="call-profile-item">
-            <img id="remoteCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="Other Profile">
+            <div class="call-avatar-ring">
+              <img id="remoteCallAvatar" src="https://via.placeholder.com/100" class="call-avatar" alt="Other Profile">
+            </div>
             <span id="remoteCallName" class="call-username">Other</span>
+            <span id="callStatusText" class="call-status-text">Calling...</span>
+            <span id="callTimer" class="call-timer" style="display:none;">00:00</span>
           </div>
+          <!-- অডিও কলে নিজের নাম/ছবি লুকানো থাকে, কোডের জন্য রাখা হলো -->
+          <img id="localCallAvatar" src="https://via.placeholder.com/100" alt="" style="display:none;">
+          <span id="localCallName" style="display:none;">Me</span>
         </div>
 
-        <div class="call-controls">
-          <button id="acceptCallBtn" class="btn-call accept"><i class="fa-solid fa-phone"></i> Receive</button>
-          <button id="rejectCallBtn" class="btn-call reject"><i class="fa-solid fa-phone-slash"></i> End</button>
+        <!-- ভিডিও কলে উপরে ছোট করে নাম ও সময় -->
+        <div id="callTopBar" class="call-top-bar" style="display:none;">
+          <span id="callTopName">Friend</span>
+          <span id="callTopTimer">00:00</span>
         </div>
+
+        <!-- নিচের কন্ট্রোল বার -->
+        <div class="call-controls" id="callControls">
+          <button id="muteCallBtn" class="call-ctrl-btn" title="Mute"><i class="fa-solid fa-microphone"></i></button>
+          <button id="videoToggleBtn" class="call-ctrl-btn" title="Switch to video"><i class="fa-solid fa-video-slash"></i></button>
+          <button id="speakerCallBtn" class="call-ctrl-btn" title="Speaker"><i class="fa-solid fa-volume-high"></i></button>
+          <button id="acceptCallBtn" class="call-ctrl-btn accept" title="Accept"><i class="fa-solid fa-phone"></i></button>
+          <button id="rejectCallBtn" class="call-ctrl-btn end" title="End call"><i class="fa-solid fa-phone-slash"></i></button>
+        </div>
+
+        <!-- কল শেষ হওয়ার পরের স্ক্রিন -->
+        <div class="call-ended-actions" id="callEndedActions" style="display:none;">
+          <button id="callEndedMessageBtn" class="call-ended-btn">
+            <span class="ce-icon"><i class="fa-solid fa-message"></i></span>Message
+          </button>
+          <button id="callAgainBtn" class="call-ended-btn">
+            <span class="ce-icon green"><i class="fa-solid fa-phone"></i></span>Call again
+          </button>
+          <button id="callCloseBtn" class="call-ended-btn">
+            <span class="ce-icon"><i class="fa-solid fa-xmark"></i></span>Close
+          </button>
+        </div>
+
       </div>
     </div>
 
