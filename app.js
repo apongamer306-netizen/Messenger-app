@@ -661,6 +661,15 @@ function checkActiveSession() {
     }
     const activeRoom = sessionStorage.getItem("activeRoom");
 
+    // ডিরেক্ট মেসেজ চ্যাট খোলা অবস্থায় রিলোড করলে ওই একই চ্যাটেই ফিরে
+    // আসবে — আগে এটা সেভ হতো না বলে রিলোড দিলেই ড্যাশবোর্ডে চলে যেত
+    let activeDirectChat = null;
+    try {
+      activeDirectChat = JSON.parse(sessionStorage.getItem("activeDirectChat") || "null");
+    } catch (e) {
+      activeDirectChat = null;
+    }
+
     masterKeyScreen.style.display = "none";
     authScreen.style.display = "none";
     dashboardScreen.style.display = "none";
@@ -675,6 +684,9 @@ function checkActiveSession() {
           joinRoom(activeRoom, true);
         } else {
           showDashboard();
+          if (activeDirectChat && activeDirectChat.phone) {
+            openDirectChat(activeDirectChat);
+          }
         }
       } else {
         authScreen.style.display = "block";
@@ -719,7 +731,17 @@ function grantAccess() {
     currentUser = savedUser;
     socket.emit("set-user-socket", { phone: currentUser.phone });
     fetchFriendData();
-    showDashboard();
+
+    const activeRoom = sessionStorage.getItem("activeRoom");
+    let activeDirectChat = null;
+    try { activeDirectChat = JSON.parse(sessionStorage.getItem("activeDirectChat") || "null"); } catch (e) {}
+
+    if (activeRoom) {
+      joinRoom(activeRoom, true);
+    } else {
+      showDashboard();
+      if (activeDirectChat && activeDirectChat.phone) openDirectChat(activeDirectChat);
+    }
   } else {
     authScreen.style.display = "block";
   }
@@ -1045,6 +1067,9 @@ function openDirectChat(friend) {
   friendsPanelOverlay.classList.remove("active");
   directChatScreen.classList.add("active");
 
+  // রিলোড দিলে যেন এই একই চ্যাটেই ফিরে আসে, ড্যাশবোর্ডে ছুড়ে না দেয়
+  try { sessionStorage.setItem("activeDirectChat", JSON.stringify(friend)); } catch (e) {}
+
   if (unreadDirectCounts[friend.phone]) {
     delete unreadDirectCounts[friend.phone];
     updateFriendBadge();
@@ -1068,6 +1093,7 @@ function openDirectChat(friend) {
 document.getElementById("backFromDirectChatBtn").addEventListener("click", () => {
   directChatScreen.classList.remove("active");
   activeDirectChatFriend = null;
+  try { sessionStorage.removeItem("activeDirectChat"); } catch (e) {}
 });
 
 // ================= PROFILE PAGE (নিজের + বন্ধুর) =================
@@ -2012,6 +2038,7 @@ leaveRoomBtn.addEventListener("click", () => {
 logoutBtn.addEventListener("click", () => {
   localStorage.removeItem("appUser");
   sessionStorage.removeItem("activeRoom");
+  sessionStorage.removeItem("activeDirectChat");
   sessionStorage.removeItem("masterUnlocked");
   currentUser = null;
   location.reload();
