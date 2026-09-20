@@ -1106,22 +1106,20 @@ body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
   }
 
-  /* ডিরেক্ট চ্যাট পুরো স্ক্রিন জুড়ে, কিন্তু ভেতরের কনটেন্ট সেন্টারে */
+  /* ল্যাপটপে চ্যাট পুরো উইন্ডো জুড়ে ছড়িয়ে থাকবে (মাঝখানে সরু কলাম নয়) */
   .direct-chat-screen .chat-header,
   .direct-chat-screen .chat-input-area {
-    padding-left: max(24px, calc((100vw - 980px) / 2));
-    padding-right: max(24px, calc((100vw - 980px) / 2));
+    padding-left: 22px;
+    padding-right: 22px;
   }
   .direct-chat-screen .chat-header { padding-top: 12px; padding-bottom: 12px; }
 
   .direct-chat-screen .chat-messages {
-    padding-left: max(24px, calc((100vw - 980px) / 2));
-    padding-right: max(24px, calc((100vw - 980px) / 2));
-    padding-top: 18px;
+    padding: 18px 22px 10px;
   }
 
-  .msg-bubble { max-width: 58%; }
-  .msg-bubble.media-bubble { max-width: 44%; }
+  .msg-bubble { max-width: 62%; }
+  .msg-bubble.media-bubble { max-width: 330px; }
   .media-wrap .msg-media { max-height: 380px; }
 
   .direct-chat-screen .user-info img { width: 42px; height: 42px; }
@@ -1131,14 +1129,12 @@ body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15
   .attach-btn, .send-btn { width: 42px; height: 42px; }
 }
 
-/* ---- বড় মনিটর ---- */
+/* ---- বড় মনিটর: শুধু বাবলের প্রস্থ একটু সীমিত, স্ক্রিন পুরোটাই ব্যবহার হবে ---- */
 @media (min-width: 1400px) {
   .direct-chat-screen .chat-header,
-  .direct-chat-screen .chat-input-area,
-  .direct-chat-screen .chat-messages {
-    padding-left: calc((100vw - 1100px) / 2);
-    padding-right: calc((100vw - 1100px) / 2);
-  }
+  .direct-chat-screen .chat-input-area { padding-left: 34px; padding-right: 34px; }
+  .direct-chat-screen .chat-messages { padding: 22px 34px 12px; }
+  .msg-bubble { max-width: 54%; }
 }
 
 /* স্ক্রলবার সুন্দর করা */
@@ -1234,3 +1230,507 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
 .room-msg-col .msg-bubble { max-width: 100%; }
 .room-msg-col.me { align-items: flex-end; }
 .room-msg-col .media-wrap { max-width: 300px; }
+
+
+/* =======================================================================
+   ===========  WHATSAPP-STYLE FULL SCREEN CALL SCREEN  ==================
+   ======================================================================= */
+
+#callModal.call-modal {
+  background: #0b141a;
+  padding: 0;
+}
+
+#callModal .call-box {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  background: radial-gradient(120% 90% at 50% 12%, #1d2a32 0%, #0b141a 62%);
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ---- ভিডিও লেয়ার ---- */
+#callVideoGrid.video-grid {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: #000;
+}
+#callVideoGrid .call-remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+#callVideoGrid .call-local-video {
+  position: absolute;
+  right: 16px;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  width: 118px;
+  height: 168px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  background: #111;
+  z-index: 3;
+}
+@media (min-width: 768px) {
+  #callVideoGrid .call-local-video { width: 190px; height: 130px; right: 24px; top: 24px; }
+}
+
+/* ---- প্রোফাইল / রিংিং ভিউ ---- */
+#callProfileGrid.call-profile-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  z-index: 2;
+  text-align: center;
+  padding: 0 20px;
+}
+
+.call-avatar-ring {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+.call-avatar-ring::before,
+.call-avatar-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(37, 211, 102, 0.45);
+  animation: callPulse 2.4s ease-out infinite;
+}
+.call-avatar-ring::after { animation-delay: 1.2s; }
+@keyframes callPulse {
+  0%   { transform: scale(0.82); opacity: 0.9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+/* কানেক্ট হয়ে গেলে রিং থেমে যাবে */
+#callModal.connected .call-avatar-ring::before,
+#callModal.connected .call-avatar-ring::after { animation: none; opacity: 0; }
+
+.call-avatar {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  background: #223;
+}
+
+.call-username {
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+.call-status-text {
+  display: block;
+  margin-top: 8px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.62);
+  min-height: 20px;
+}
+.call-timer {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #25d366;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- ভিডিও কলে উপরের বার ---- */
+.call-top-bar {
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top, 0px));
+  left: 18px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+#callTopName { font-size: 17px; font-weight: 600; }
+#callTopTimer { font-size: 13px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+
+/* ---- নিচের কন্ট্রোল বার ---- */
+#callModal .call-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 5;
+  padding: 0 16px;
+  flex-wrap: wrap;
+}
+
+.call-ctrl-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 19px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.call-ctrl-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.call-ctrl-btn:active { transform: scale(0.92); }
+.call-ctrl-btn.active { background: #fff; color: #0b141a; }
+
+.call-ctrl-btn.accept { background: #25d366; width: 62px; height: 62px; font-size: 22px; }
+.call-ctrl-btn.accept:hover { background: #22c35e; }
+.call-ctrl-btn.end { background: #f0353d; width: 62px; height: 62px; font-size: 22px; }
+.call-ctrl-btn.end:hover { background: #d92b33; }
+
+/* ---- কল শেষ হওয়ার স্ক্রিন ---- */
+.call-ended-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  z-index: 6;
+}
+.call-ended-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.call-ended-btn .ce-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  transition: transform 0.15s ease;
+}
+.call-ended-btn .ce-icon.green { background: #25d366; }
+.call-ended-btn:active .ce-icon { transform: scale(0.92); }
+
+/* ছোট ফোনে বাটনগুলো একটু ছোট */
+@media (max-width: 380px) {
+  .call-ctrl-btn { width: 50px; height: 50px; font-size: 17px; }
+  .call-ctrl-btn.accept, .call-ctrl-btn.end { width: 56px; height: 56px; }
+  #callModal .call-controls { gap: 12px; }
+  .call-ended-actions { gap: 26px; }
+}
+
+
+/* =======================================================================
+   ==============  MEDIA PREVIEW (ছবি / ভিডিও / অডিও প্লেয়ার)  ===========
+   ======================================================================= */
+
+#mediaPreviewModal {
+  background: rgba(0, 0, 0, 0.94) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.media-preview-topbar {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 5;
+}
+
+.media-preview-title {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13.5px;
+  font-weight: 600;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-preview-tools { display: flex; gap: 10px; }
+
+/* ডাউনলোড ও ক্লোজ — নিচের চওড়া নীল বারের বদলে এখন কোণায় গোল আইকন */
+.media-tool-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.15s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.media-tool-btn:hover { background: rgba(255, 255, 255, 0.26); }
+.media-tool-btn:active { transform: scale(0.92); }
+
+#mediaPreviewContent {
+  max-width: 94vw !important;
+  max-height: 84vh !important;
+}
+#mediaPreviewContent img,
+#mediaPreviewContent video {
+  max-width: 94vw;
+  max-height: 84vh;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  background: #000;
+}
+
+/* অডিও প্লেয়ার কার্ড */
+.audio-player-card {
+  width: min(420px, 90vw);
+  background: #1b1f24;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 26px 22px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.audio-player-card .ap-disc {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d6efd, #6f42c1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  animation: apSpin 7s linear infinite;
+}
+@keyframes apSpin { to { transform: rotate(360deg); } }
+.audio-player-card .ap-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  word-break: break-word;
+}
+.audio-player-card audio { width: 100%; }
+
+
+/* =======================================================================
+   =====================  PROFILE PAGE / GALLERY  ========================
+   ======================================================================= */
+
+.profile-modal { max-width: 460px; }
+
+.profile-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  border-radius: 12px;
+}
+body.light-theme .profile-tabs { background: rgba(0, 0, 0, 0.05); }
+.profile-tab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.profile-tab.active {
+  background: #0d6efd;
+  color: #fff;
+  opacity: 1;
+}
+
+.profile-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.profile-gallery-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+}
+.profile-gallery-item img,
+.profile-gallery-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.profile-gallery-item .pg-badge {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-gallery-item.audio-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #0d6efd;
+  background: rgba(13, 110, 253, 0.12);
+}
+.profile-gallery-item .pg-delete {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(220, 53, 69, 0.9);
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+  display: none;
+}
+.profile-gallery.editable .pg-delete { display: block; }
+
+.profile-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 26px 10px;
+  opacity: 0.55;
+  font-size: 12.5px;
+}
+
+.profile-upload-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.profile-upload-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+body.light-theme .profile-upload-btn { border-color: rgba(0, 0, 0, 0.15); background: rgba(0, 0, 0, 0.03); }
+.profile-upload-btn:hover { border-color: #0d6efd; color: #0d6efd; }
+
+.profile-edit-field {
+  width: 100%;
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 13.5px;
+  margin-bottom: 8px;
+}
+body.light-theme .profile-edit-field { border-color: rgba(0, 0, 0, 0.12); background: #f6f7f9; }
+textarea.profile-edit-field { resize: vertical; min-height: 64px; }
+
+.profile-modal-actions .btn { flex: 1; }
+
+/* অডিও মেসেজ চিপ */
+.audio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 170px;
+}
+.audio-chip-play {
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.audio-chip-name {
+  font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 190px;
+}
+
+/* ফ্রেন্ড লিস্টে প্রোফাইল আইকন */
+.friend-card-profile-btn {
+  background: rgba(13, 110, 253, 0.14);
+  border: none;
+  color: #4d9bff;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+.friend-card-profile-btn:hover { background: rgba(13, 110, 253, 0.3); }
+.friend-card-profile-btn:active { transform: scale(0.9); }
