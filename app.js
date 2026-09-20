@@ -134,6 +134,8 @@ directChatScreen.innerHTML = `
       </div>
     </div>
     <div class="chat-actions">
+      <button id="directAudioCallBtn" class="action-btn call-audio" title="Audio Call"><i class="fa-solid fa-phone"></i></button>
+      <button id="directVideoCallBtn" class="action-btn call-video" title="Video Call"><i class="fa-solid fa-video"></i></button>
       <div class="direct-menu-container">
         <button id="directMenuToggle" class="action-btn"><i class="fa-solid fa-ellipsis-vertical"></i></button>
         <div id="directDropdownMenu" class="direct-dropdown-menu">
@@ -796,12 +798,62 @@ friendsPanelOverlay.addEventListener("click", (e) => {
   if (e.target === friendsPanelOverlay) friendsPanelOverlay.classList.remove("active");
 });
 
+// ============ FRIEND PERSISTENCE ============
+// সমস্যা ছিল: সার্ভার রিস্টার্ট/স্লিপ হলে ফ্রেন্ড লিস্ট মুছে যেত।
+// সমাধান: (১) ফ্রেন্ড লিস্ট ব্রাউজারে ক্যাশ করা হয়, (২) প্রতিবার কানেক্ট হলে
+// সেই ক্যাশ সার্ভারে পাঠিয়ে সার্ভারের ডেটা আবার তৈরি (restore) করা হয়।
+
+function friendCacheKey() {
+  return "friend_cache_" + (currentUser ? currentUser.phone : "guest");
+}
+
+function saveFriendCache(data) {
+  try {
+    localStorage.setItem(friendCacheKey(), JSON.stringify({
+      friends: data.friends || [],
+      requests: data.requests || []
+    }));
+  } catch (e) {}
+}
+
+function loadFriendCache() {
+  try {
+    const raw = localStorage.getItem(friendCacheKey());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return { friends: parsed.friends || [], requests: parsed.requests || [] };
+  } catch (e) {
+    return null;
+  }
+}
+
 function fetchFriendData() {
   if (!currentUser) return;
-  socket.emit("get-friend-data", { phone: currentUser.phone }, (data) => {
-    renderFriendData(data);
-  });
+
+  // ১) আগে ক্যাশ থেকে সাথে সাথে দেখানো হয় (সার্ভার ডাউন থাকলেও লিস্ট থাকবে)
+  const cached = loadFriendCache();
+  if (cached) renderFriendData(cached);
+
+  // ২) এরপর সার্ভারে নিজের প্রোফাইল + ফ্রেন্ড লিস্ট পাঠিয়ে সিঙ্ক করা হয়
+  socket.emit(
+    "sync-user-data",
+    { user: currentUser, friends: (cached && cached.friends) || [] },
+    (data) => {
+      if (data && Array.isArray(data.friends)) renderFriendData(data);
+    }
+  );
 }
+
+// সার্ভার রিস্টার্ট বা নেট কেটে গিয়ে আবার কানেক্ট হলে সব কিছু আবার সিঙ্ক হবে
+socket.on("connect", () => {
+  if (!currentUser) return;
+  socket.emit("set-user-socket", { phone: currentUser.phone });
+  socket.emit("register-user", currentUser, () => {});
+  fetchFriendData();
+  if (currentRoom) {
+    socket.emit("join-room", { roomCode: currentRoom, user: currentUser, peerId: myPeerId });
+  }
+});
 
 // ================= UNREAD MESSAGE NOTIFICATIONS =================
 let pendingRequestCount = 0;
@@ -848,6 +900,12 @@ function renderFriendData(data) {
   const reqList = document.getElementById("friendRequestsList");
   const friendList = document.getElementById("myFriendsList");
   const countText = document.getElementById("friendsCountText");
+
+  data.friends = data.friends || [];
+  data.requests = data.requests || [];
+
+  // প্রতিবার রেন্ডারের সময় লিস্টটা ব্রাউজারে সেভ করে রাখা হয়
+  saveFriendCache(data);
 
   countText.textContent = `You have ${data.friends.length} ${data.friends.length === 1 ? "friend" : "friends"}`;
 
@@ -1410,10 +1468,14 @@ function updateMessageStatus(msgId, statusText) {
 }
 
 // ================= AUDIO/VIDEO CALLING =================
+// callContext দিয়ে বোঝা যায় কলটা রুমের ভেতরে নাকি কোনো ফ্রেন্ডের সাথে ডিরেক্ট
+let callContext = { mode: "room", phone: null };
+
 if (startAudioCallBtn) startAudioCallBtn.onclick = () => initiateCall("audio");
 if (startVideoCallBtn) startVideoCallBtn.onclick = () => initiateCall("video");
 
 async function initiateCall(type) {
+  callContext = { mode: "room", phone: null };
   currentCallType = type;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
@@ -1444,6 +1506,7 @@ async function initiateCall(type) {
 }
 
 socket.on("incoming-call", (data) => {
+  callContext = { mode: "room", phone: null };
   currentCallType = data.callType;
   remoteCallName.textContent = data.callerName;
   remoteCallAvatar.src = data.callerPic;
@@ -1515,7 +1578,16 @@ function handleCallConnection(call) {
 }
 
 socket.on("call-accepted-by-receiver", () => { callStatusText.textContent = "Connected"; });
-rejectCallBtn.onclick = () => { socket.emit("end-call", { roomCode: currentRoom }); endCallCleanup(); };
+
+rejectCallBtn.onclick = () => {
+  if (callContext.mode === "direct" && callContext.phone) {
+    socket.emit("direct-call-end", { toPhone: callContext.phone });
+  } else {
+    socket.emit("end-call", { roomCode: currentRoom });
+  }
+  endCallCleanup();
+};
+
 socket.on("call-ended", endCallCleanup);
 socket.on("call-directly-ended", endCallCleanup);
 
@@ -1535,4 +1607,126 @@ function endCallCleanup() {
   remoteVideo.srcObject = null;
   remoteAudioElement.srcObject = null;
   callStatusText.textContent = "Call Ended";
+  callContext = { mode: "room", phone: null };
 }
+
+// ================= DIRECT (FRIEND) AUDIO & VIDEO CALL =================
+// ফ্রেন্ডের ডিরেক্ট মেসেজ স্ক্রিনে এখন অডিও ও ভিডিও কল বাটন কাজ করে।
+// রুম কোড ছাড়াই ফোন নম্বর ধরে সিগন্যালিং হয়, মিডিয়া যায় PeerJS দিয়ে।
+
+const directAudioCallBtn = document.getElementById("directAudioCallBtn");
+const directVideoCallBtn = document.getElementById("directVideoCallBtn");
+
+if (directAudioCallBtn) directAudioCallBtn.onclick = () => initiateDirectCall("audio");
+if (directVideoCallBtn) directVideoCallBtn.onclick = () => initiateDirectCall("video");
+
+async function initiateDirectCall(type) {
+  if (!activeDirectChatFriend) return;
+  if (!myPeerId) {
+    await showCustomAlert("Please Wait", "কল সার্ভারের সাথে সংযোগ হচ্ছে, কয়েক সেকেন্ড পর আবার চেষ্টা করুন।");
+    return;
+  }
+
+  callContext = { mode: "direct", phone: activeDirectChatFriend.phone };
+  currentCallType = type;
+
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: type === "video"
+    });
+
+    if (type === "video") {
+      localVideo.srcObject = localStream;
+      callVideoGrid.style.display = "flex";
+      callProfileGrid.style.display = "none";
+    } else {
+      callVideoGrid.style.display = "none";
+      callProfileGrid.style.display = "flex";
+    }
+
+    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
+    localCallName.textContent = currentUser.name;
+    remoteCallAvatar.src = activeDirectChatFriend.pic || "https://via.placeholder.com/100";
+    remoteCallName.textContent = activeDirectChatFriend.name;
+
+    callStatusText.textContent = `Calling ${activeDirectChatFriend.name}...`;
+    acceptCallBtn.style.display = "none";
+    callModal.style.display = "flex";
+
+    socket.emit("direct-call-user", {
+      toPhone: activeDirectChatFriend.phone,
+      fromPhone: currentUser.phone,
+      callerPeerId: myPeerId,
+      callerName: currentUser.name,
+      callerPic: currentUser.pic,
+      callType: type
+    });
+  } catch (err) {
+    endCallCleanup();
+    await showCustomAlert("Permission Error", "মাইক্রোফোন বা ক্যামেরা পারমিশন দেওয়া হয়নি!");
+  }
+}
+
+// ফ্রেন্ড অফলাইন থাকলে
+socket.on("direct-call-unavailable", async () => {
+  endCallCleanup();
+  await showCustomAlert("Not Available", "এই ফ্রেন্ড এখন অনলাইনে নেই, কল যাচ্ছে না।");
+});
+
+// কেউ আমাকে ডিরেক্ট কল করলে
+socket.on("direct-incoming-call", (data) => {
+  callContext = { mode: "direct", phone: data.fromPhone };
+  currentCallType = data.callType;
+
+  remoteCallName.textContent = data.callerName || "Friend";
+  remoteCallAvatar.src = data.callerPic || "https://via.placeholder.com/100";
+  localCallAvatar.src = (currentUser && currentUser.pic) || "https://via.placeholder.com/100";
+  localCallName.textContent = currentUser ? currentUser.name : "Me";
+
+  callStatusText.textContent = `Incoming ${data.callType} call from ${data.callerName || "Friend"}`;
+  acceptCallBtn.style.display = "inline-block";
+  callVideoGrid.style.display = "none";
+  callProfileGrid.style.display = "flex";
+  callModal.style.display = "flex";
+
+  acceptCallBtn.onclick = async () => {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: currentCallType === "video"
+      });
+
+      if (currentCallType === "video") {
+        localVideo.srcObject = localStream;
+        callVideoGrid.style.display = "flex";
+        callProfileGrid.style.display = "none";
+      } else {
+        callVideoGrid.style.display = "none";
+        callProfileGrid.style.display = "flex";
+      }
+
+      const call = myPeer.call(data.callerPeerId, localStream, {
+        metadata: { type: currentCallType }
+      });
+      handleCallConnection(call);
+
+      socket.emit("direct-call-accept", { toPhone: data.fromPhone });
+      acceptCallBtn.style.display = "none";
+      callStatusText.textContent = "Connected";
+    } catch (err) {
+      endCallCleanup();
+      showCustomAlert("Error", "কল রিসিভ করার সময় ক্যামেরা/মাইক এক্সেস পাওয়া যায়নি!");
+    }
+  };
+});
+
+socket.on("direct-call-accepted", () => { callStatusText.textContent = "Connected"; });
+socket.on("direct-call-ended", endCallCleanup);
+
+// স্প্ল্যাশ স্ক্রিন — অ্যাপ প্রস্তুত হলে সরিয়ে দেওয়া (index.html-এর টাইমারের ব্যাকআপ)
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
+  }, 2200);
+});
