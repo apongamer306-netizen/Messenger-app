@@ -1734,3 +1734,119 @@ textarea.profile-edit-field { resize: vertical; min-height: 64px; }
 }
 .friend-card-profile-btn:hover { background: rgba(13, 110, 253, 0.3); }
 .friend-card-profile-btn:active { transform: scale(0.9); }
+
+
+/* =======================================================================
+   =========  CALL SCREEN POLISH — প্রোফাইল একদম মাঝখানে  ================
+   সমস্যা ছিল: .call-profile-item একটা সাধারণ ব্লক, তাই ভেতরের গোল ছবিটা
+   বাঁ দিকে চেপে থাকত আর নামটা সেন্টারে — দুটো এক লাইনে পড়ত না।
+   ======================================================================= */
+
+#callProfileGrid .call-profile-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+  gap: 0;
+}
+
+/* ছবি এখন নামের ঠিক উপরে, একদম সেন্টারে */
+#callProfileGrid .call-avatar-ring {
+  width: 168px;
+  height: 168px;
+  margin: 0 auto 26px;
+  flex-shrink: 0;
+}
+
+#callProfileGrid .call-avatar {
+  width: 150px;
+  height: 150px;
+  border: 0;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.10),
+    0 0 46px rgba(37, 211, 102, 0.22),
+    0 22px 55px rgba(0, 0, 0, 0.55);
+}
+
+/* কানেক্ট হওয়ার পর গ্লো সবুজ থেকে নরম নীলচে হয়ে যায় */
+#callModal.connected #callProfileGrid .call-avatar {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.12),
+    0 0 42px rgba(90, 160, 255, 0.20),
+    0 22px 55px rgba(0, 0, 0, 0.55);
+}
+
+/* রিংগুলো আরও নরম ও ধীর */
+#callProfileGrid .call-avatar-ring::before,
+#callProfileGrid .call-avatar-ring::after {
+  border-width: 1.5px;
+  border-color: rgba(37, 211, 102, 0.35);
+  animation-duration: 2.8s;
+}
+
+#callProfileGrid .call-username {
+  display: block;
+  width: 100%;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.25;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55);
+}
+
+#callProfileGrid .call-status-text {
+  margin-top: 10px;
+  font-size: 14.5px;
+  letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+#callProfileGrid .call-timer {
+  margin-top: 10px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* কল স্ক্রিনের ব্যাকগ্রাউন্ডে নরম আলো — একদম সমতল কালো লাগবে না */
+#callModal .call-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 50% 38%, rgba(37, 211, 102, 0.10) 0%, rgba(37, 211, 102, 0) 70%),
+    radial-gradient(90% 60% at 50% 110%, rgba(13, 110, 253, 0.10) 0%, rgba(13, 110, 253, 0) 70%);
+  z-index: 0;
+}
+
+/* কন্ট্রোল বারটা একটু আলাদা করে বসানো */
+#callModal .call-controls {
+  gap: 18px;
+  bottom: calc(38px + env(safe-area-inset-bottom, 0px));
+}
+.call-ctrl-btn {
+  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.call-ctrl-btn.accept,
+.call-ctrl-btn.end { border: none; }
+.call-ctrl-btn.end { box-shadow: 0 10px 26px rgba(240, 53, 61, 0.32); }
+.call-ctrl-btn.accept { box-shadow: 0 10px 26px rgba(37, 211, 102, 0.32); }
+
+/* ছোট ফোনে ছবি একটু ছোট, তবু সেন্টারেই */
+@media (max-width: 420px) {
+  #callProfileGrid .call-avatar-ring { width: 142px; height: 142px; margin-bottom: 22px; }
+  #callProfileGrid .call-avatar { width: 126px; height: 126px; }
+  #callProfileGrid .call-username { font-size: 24px; }
+}
+
+/* ল্যাপটপে একটু বড় ও বেশি জায়গা নিয়ে */
+@media (min-width: 900px) {
+  #callProfileGrid .call-avatar-ring { width: 190px; height: 190px; margin-bottom: 30px; }
+  #callProfileGrid .call-avatar { width: 170px; height: 170px; }
+  #callProfileGrid .call-username { font-size: 31px; }
+}
