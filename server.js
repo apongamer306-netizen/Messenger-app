@@ -14,6 +14,15 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
   maxHttpBufferSize: 1e8, // allow base64 images/files through sockets
+
+  // ছবি/ফাইল base64 আকারে যায় বলে কম্প্রেশন চালু করলে ট্রান্সফার অনেক দ্রুত হয়
+  perMessageDeflate: { threshold: 1024 },
+  httpCompression: { threshold: 1024 },
+
+  // ওয়েবসকেট আগে চেষ্টা করা হবে — পোলিং-এ পড়ে গেলে মেসেজে দেরি হয়
+  transports: ["websocket", "polling"],
+  pingInterval: 20000,
+  pingTimeout: 25000,
 });
 
 app.use(cors());
@@ -269,7 +278,30 @@ io.on("connection", (socket) => {
     const targetSocket = phoneToSocket[receiverPhone];
     if (targetSocket) io.to(targetSocket).emit("receive-direct-message", msgData);
 
-    if (typeof callback === "function") callback({ success: true });
+    // Messenger-এর মতো স্ট্যাটাস: রিসিভার অনলাইনে থাকলে "Delivered"
+    if (typeof callback === "function") {
+      callback({ success: true, delivered: !!targetSocket });
+    }
+  });
+
+  // রিসিভার চ্যাট খুললে সব মেসেজ "Seen" হিসেবে মার্ক হয় এবং সেন্ডার জানতে পারে
+  socket.on("mark-direct-seen", ({ viewerPhone, friendPhone }) => {
+    if (!viewerPhone || !friendPhone) return;
+    const key = directKey(viewerPhone, friendPhone);
+    const list = directMessages[key] || [];
+    let changed = false;
+    list.forEach((m) => {
+      if (m.senderPhone === friendPhone && !m.seen) {
+        m.seen = true;
+        changed = true;
+      }
+    });
+    if (changed) saveData();
+
+    const senderSocket = phoneToSocket[friendPhone];
+    if (senderSocket) {
+      io.to(senderSocket).emit("direct-messages-seen", { byPhone: viewerPhone });
+    }
   });
 
   socket.on("clear-direct-history", ({ senderPhone, receiverPhone }, callback) => {
