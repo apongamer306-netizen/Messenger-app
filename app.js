@@ -92,6 +92,20 @@ if (!friendIconBtn && createRoomBtn) {
   createRoomBtn.parentNode.insertBefore(friendIconBtn, createRoomBtn);
 }
 
+// নিজের প্রোফাইল বাটন — এখান থেকে তথ্য, ছবি, ভিডিও, অডিও যোগ করা যায়
+let myProfileBtn = document.getElementById("myProfileBtn");
+if (!myProfileBtn && createRoomBtn) {
+  myProfileBtn = document.createElement("button");
+  myProfileBtn.id = "myProfileBtn";
+  myProfileBtn.className = "btn btn-primary";
+  myProfileBtn.style.cssText = "background: linear-gradient(135deg, #0aa2c0, #0b7e93); display: flex; align-items: center; justify-content: center; gap: 8px;";
+  myProfileBtn.innerHTML = `<i class="fa-solid fa-id-badge"></i> My Profile`;
+  createRoomBtn.parentNode.insertBefore(myProfileBtn, friendIconBtn || createRoomBtn);
+  myProfileBtn.onclick = () => {
+    if (currentUser) openProfile(currentUser.phone, currentUser);
+  };
+}
+
 // Premium slide-up friends panel (requests + friends list)
 const friendsPanelOverlay = document.createElement("div");
 friendsPanelOverlay.id = "friendsPanelOverlay";
@@ -255,23 +269,27 @@ document.getElementById("resetThemeBtn").onclick = () => {
   themeModal.style.display = "none";
 };
 
-document.getElementById("customThemeImageInput").onchange = (e) => {
+document.getElementById("customThemeImageInput").onchange = async (e) => {
   const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const imgData = evt.target.result;
-      applyThemeForCurrentContext({ backgroundImage: `url(${imgData})`, color: "#fff" });
-      themeModal.style.display = "none";
-    };
-    reader.readAsDataURL(file);
-  }
+  e.target.value = "";
+  if (!file) return;
+  // ওয়ালপেপারও কম্প্রেস করে পাঠানো হয়, নাহলে দুই পাশে সিঙ্ক হতে দেরি হয়
+  const compressed = await compressImageFile(file);
+  const imgData = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+  applyThemeForCurrentContext({ backgroundImage: "url(" + imgData + ")", color: "#fff" });
+  themeModal.style.display = "none";
 };
 
 function applyThemeForCurrentContext(themeData) {
   if (themeContext === "direct" && activeDirectChatFriend) {
     applyDirectTheme(themeData);
     saveDirectTheme(activeDirectChatFriend.phone, themeData);
+    // থিম এখন সার্ভারে সেভ হয় এবং বন্ধুর স্ক্রিনেও সাথে সাথে বদলে যায়
+    socket.emit("set-direct-theme", {
+      fromPhone: currentUser.phone,
+      toPhone: activeDirectChatFriend.phone,
+      themeData: themeData
+    });
   } else {
     applyRoomTheme(themeData);
     socket.emit("set-room-theme", { roomCode: currentRoom, themeData: themeData });
@@ -298,6 +316,14 @@ function applyRoomTheme(theme) {
 
 socket.on("room-theme-update", (themeData) => {
   applyRoomTheme(themeData);
+});
+
+// বন্ধু থিম বদলালে আমার চ্যাটেও একই থিম বসবে
+socket.on("direct-theme-update", ({ fromPhone, themeData }) => {
+  saveDirectTheme(fromPhone, themeData);
+  if (activeDirectChatFriend && activeDirectChatFriend.phone === fromPhone) {
+    applyDirectTheme(themeData || {});
+  }
 });
 
 // ডিরেক্ট চ্যাটের থিম — প্রতিটি ফ্রেন্ডের জন্য আলাদাভাবে ব্রাউজারে সেভ থাকে
@@ -422,21 +448,60 @@ const modalActionContainer = document.getElementById("modalActionContainer");
 const mediaPreviewModal = document.createElement("div");
 mediaPreviewModal.id = "mediaPreviewModal";
 mediaPreviewModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center; flex-direction:column;";
+// ডাউনলোড বাটন আগে নিচে চওড়া নীল বার হয়ে থাকত — এখন উপরের কোণায় ছোট গোল আইকন
 mediaPreviewModal.innerHTML = `
-  <div style="position:absolute; top:20px; right:20px; cursor:pointer; color:#fff; font-size:30px;" id="closeMediaPreview">&times;</div>
-  <div id="mediaPreviewContent" style="max-width:90%; max-height:85%; display:flex; justify-content:center; align-items:center;"></div>
-  <a id="mediaDownloadBtn" class="btn btn-primary" style="margin-top:15px; display:none; text-decoration:none; color:#fff;" download>Download</a>
+  <div class="media-preview-topbar">
+    <span id="mediaPreviewTitle" class="media-preview-title"></span>
+    <div class="media-preview-tools">
+      <a id="mediaDownloadBtn" class="media-tool-btn" title="Download" download><i class="fa-solid fa-download"></i></a>
+      <button id="closeMediaPreview" class="media-tool-btn" title="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+  <div id="mediaPreviewContent" style="display:flex; justify-content:center; align-items:center;"></div>
 `;
 document.body.appendChild(mediaPreviewModal);
 
 const closeMediaPreview = document.getElementById("closeMediaPreview");
 const mediaPreviewContent = document.getElementById("mediaPreviewContent");
 const mediaDownloadBtn = document.getElementById("mediaDownloadBtn");
+const mediaPreviewTitle = document.getElementById("mediaPreviewTitle");
 
-closeMediaPreview.addEventListener("click", () => {
+function closeMediaPreviewModal() {
   mediaPreviewModal.style.display = "none";
-  mediaPreviewContent.innerHTML = "";
+  mediaPreviewContent.innerHTML = ""; // ভিডিও/অডিও বাজতে থাকলে বন্ধ হয়ে যাবে
+}
+
+closeMediaPreview.addEventListener("click", closeMediaPreviewModal);
+mediaPreviewModal.addEventListener("click", (e) => {
+  if (e.target === mediaPreviewModal) closeMediaPreviewModal();
 });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && mediaPreviewModal.style.display === "flex") closeMediaPreviewModal();
+});
+
+// ছবি, ভিডিও ও অডিও — তিনটাই সুন্দর ফুল-স্ক্রিন প্লেয়ারে খুলবে
+function openMediaPreview(type, src, name) {
+  mediaPreviewTitle.textContent = name || "";
+
+  if (type === "video") {
+    mediaPreviewContent.innerHTML =
+      `<video src="${src}" controls autoplay playsinline controlsList="nodownload"></video>`;
+  } else if (type === "audio") {
+    mediaPreviewContent.innerHTML = `
+      <div class="audio-player-card">
+        <div class="ap-disc"><i class="fa-solid fa-music"></i></div>
+        <div class="ap-name">${escapeHtml(name || "Audio")}</div>
+        <audio src="${src}" controls autoplay></audio>
+      </div>`;
+  } else {
+    mediaPreviewContent.innerHTML = `<img src="${src}" alt="${escapeHtml(name || "")}" />`;
+  }
+
+  mediaDownloadBtn.style.display = "inline-flex";
+  mediaDownloadBtn.href = src;
+  mediaDownloadBtn.download = name || "file";
+  mediaPreviewModal.style.display = "flex";
+}
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const bodyElement = document.body;
@@ -956,8 +1021,14 @@ function renderFriendData(data) {
         </div>
         ${unreadCount > 0
           ? `<span class="friend-card-unread-dot">${unreadCount > 99 ? "99+" : unreadCount}</span>`
-          : `<i class="fa-solid fa-message friend-card-chat-icon"></i>`}
+          : ""}
+        <button class="friend-card-profile-btn" title="View profile"><i class="fa-solid fa-circle-user"></i></button>
       `;
+      // প্রোফাইল আইকনে চাপ দিলে প্রোফাইল, বাকি জায়গায় চাপ দিলে চ্যাট
+      item.querySelector(".friend-card-profile-btn").onclick = (e) => {
+        e.stopPropagation();
+        openFriendProfile(friend);
+      };
       item.onclick = () => openDirectChat(friend);
       friendList.appendChild(item);
     });
@@ -980,6 +1051,17 @@ function openDirectChat(friend) {
   }
 
   applyDirectTheme(loadDirectTheme(friend.phone) || {});
+
+  // সার্ভারে সেভ করা থিমটাই আসল — দুই ডিভাইসেই এক দেখাবে
+  socket.emit("get-direct-theme", { myPhone: currentUser.phone, friendPhone: friend.phone }, (theme) => {
+    if (theme) {
+      saveDirectTheme(friend.phone, theme);
+      if (activeDirectChatFriend && activeDirectChatFriend.phone === friend.phone) {
+        applyDirectTheme(theme);
+      }
+    }
+  });
+
   loadDirectChatHistory();
 }
 
@@ -988,8 +1070,10 @@ document.getElementById("backFromDirectChatBtn").addEventListener("click", () =>
   activeDirectChatFriend = null;
 });
 
-// ================= ফ্রেন্ড প্রোফাইল মোডাল =================
-// চ্যাট হেডারের ছবি/নামে ট্যাপ করলে বন্ধুর ডিটেইলস দেখা যাবে।
+// ================= PROFILE PAGE (নিজের + বন্ধুর) =================
+// নিজের প্রোফাইলে তথ্য লেখা যায় এবং ছবি / ভিডিও / অডিও আপলোড করা যায়।
+// বন্ধুরা প্রোফাইলে ঢুকে সেই সব দেখতে ও চালাতে পারে।
+
 const profileModalOverlay = document.createElement("div");
 profileModalOverlay.id = "profileModalOverlay";
 profileModalOverlay.className = "profile-modal-overlay";
@@ -1001,7 +1085,22 @@ profileModalOverlay.innerHTML = `
     <div class="profile-modal-body">
       <div id="pmName" class="profile-modal-name">Friend</div>
       <div id="pmSub" class="profile-modal-sub">Friend on EKT Chating App</div>
-      <div id="pmDetails"></div>
+
+      <div class="profile-tabs">
+        <button class="profile-tab active" data-tab="about">About</button>
+        <button class="profile-tab" data-tab="photos">Photos</button>
+        <button class="profile-tab" data-tab="videos">Videos</button>
+        <button class="profile-tab" data-tab="audio">Audio</button>
+      </div>
+
+      <div id="pmTabAbout"></div>
+      <div id="pmTabMedia" style="display:none;">
+        <div id="pmUploadRow" class="profile-upload-row" style="display:none;">
+          <button class="profile-upload-btn" id="pmUploadBtn"><i class="fa-solid fa-plus"></i> <span id="pmUploadLabel">Add</span></button>
+        </div>
+        <div id="pmGallery" class="profile-gallery"></div>
+      </div>
+
       <div class="profile-modal-actions">
         <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
         <button id="pmCloseBtn" class="btn btn-secondary" style="background:#495057; color:#fff;">Close</button>
@@ -1011,6 +1110,14 @@ profileModalOverlay.innerHTML = `
 `;
 document.body.appendChild(profileModalOverlay);
 
+// আপলোডের জন্য লুকানো ফাইল ইনপুট
+const profileFileInput = document.createElement("input");
+profileFileInput.type = "file";
+profileFileInput.style.display = "none";
+document.body.appendChild(profileFileInput);
+
+let profileViewState = { phone: null, isMe: false, data: {}, tab: "about" };
+
 function detailRow(icon, label, value) {
   if (!value) return "";
   return `<div class="profile-detail-row">
@@ -1019,23 +1126,224 @@ function detailRow(icon, label, value) {
           </div>`;
 }
 
-function openFriendProfile(friend) {
-  if (!friend) return;
-  document.getElementById("pmAvatar").src = friend.pic || "https://via.placeholder.com/100";
-  document.getElementById("pmName").textContent = friend.name || "Friend";
-  document.getElementById("pmSub").textContent = friend.bio || "Friend on EKT Chating App";
+// ---------- ট্যাব রেন্ডার ----------
+function renderProfileAbout() {
+  const d = profileViewState.data || {};
+  const box = document.getElementById("pmTabAbout");
 
-  document.getElementById("pmDetails").innerHTML =
-    detailRow("fa-solid fa-phone", "Phone", friend.phone) +
-    detailRow("fa-solid fa-location-dot", "Lives in", friend.location) +
-    detailRow("fa-brands fa-facebook", "Facebook", friend.facebookName) +
-    detailRow("fa-solid fa-circle-info", "About", friend.about);
-
-  profileModalOverlay.classList.add("active");
+  if (profileViewState.isMe) {
+    // নিজের প্রোফাইল — সরাসরি এডিট করা যাবে
+    box.innerHTML = `
+      <input class="profile-edit-field" id="pfBio" placeholder="Bio / স্ট্যাটাস" value="${escapeHtml(d.bio || "")}">
+      <input class="profile-edit-field" id="pfLocation" placeholder="কোথায় থাকেন" value="${escapeHtml(d.location || "")}">
+      <input class="profile-edit-field" id="pfWork" placeholder="কাজ / পেশা" value="${escapeHtml(d.work || "")}">
+      <input class="profile-edit-field" id="pfEducation" placeholder="পড়াশোনা" value="${escapeHtml(d.education || "")}">
+      <textarea class="profile-edit-field" id="pfAbout" placeholder="নিজের সম্পর্কে কিছু লিখুন...">${escapeHtml(d.about || "")}</textarea>
+      <button id="pfSaveBtn" class="btn btn-primary" style="margin-top:4px;"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+    `;
+    document.getElementById("pfSaveBtn").onclick = saveMyProfile;
+  } else {
+    const html =
+      detailRow("fa-solid fa-phone", "Phone", d.phone) +
+      detailRow("fa-solid fa-location-dot", "Lives in", d.location) +
+      detailRow("fa-solid fa-briefcase", "Work", d.work) +
+      detailRow("fa-solid fa-graduation-cap", "Education", d.education) +
+      detailRow("fa-solid fa-circle-info", "About", d.about);
+    box.innerHTML = html || `<div class="profile-empty">এই বন্ধু এখনো প্রোফাইলে কিছু যোগ করেননি।</div>`;
+  }
 }
 
+function renderProfileGallery(kind) {
+  const gallery = document.getElementById("pmGallery");
+  const items = (profileViewState.data.items || []).filter((it) => it.kind === kind);
+
+  gallery.className = "profile-gallery" + (profileViewState.isMe ? " editable" : "");
+
+  if (!items.length) {
+    const label = kind === "photo" ? "ছবি" : kind === "video" ? "ভিডিও" : "অডিও";
+    gallery.innerHTML = `<div class="profile-empty">এখনো কোনো ${label} নেই।</div>`;
+    return;
+  }
+
+  gallery.innerHTML = items.map((it) => {
+    const inner =
+      kind === "photo" ? `<img src="${it.src}" alt="">`
+      : kind === "video" ? `<video src="${it.src}#t=0.1" muted preload="metadata"></video><span class="pg-badge"><i class="fa-solid fa-play"></i></span>`
+      : `<i class="fa-solid fa-music"></i>`;
+    return `<div class="profile-gallery-item ${kind === "audio" ? "audio-item" : ""}" data-id="${it.id}">
+              ${inner}
+              <button class="pg-delete" data-del="${it.id}"><i class="fa-solid fa-trash"></i></button>
+            </div>`;
+  }).join("");
+
+  gallery.querySelectorAll(".profile-gallery-item").forEach((el) => {
+    el.onclick = (e) => {
+      if (e.target.closest(".pg-delete")) return;
+      const item = items.find((i) => i.id === el.dataset.id);
+      if (item) openMediaPreview(kind === "photo" ? "image" : kind, item.src, item.name);
+    };
+  });
+
+  gallery.querySelectorAll(".pg-delete").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.del;
+      socket.emit("delete-profile-item", { phone: currentUser.phone, itemId: id }, () => {
+        profileViewState.data.items = (profileViewState.data.items || []).filter((i) => i.id !== id);
+        renderProfileGallery(kind);
+      });
+    };
+  });
+}
+
+function switchProfileTab(tab) {
+  profileViewState.tab = tab;
+  document.querySelectorAll(".profile-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+
+  const aboutBox = document.getElementById("pmTabAbout");
+  const mediaBox = document.getElementById("pmTabMedia");
+  const uploadRow = document.getElementById("pmUploadRow");
+
+  if (tab === "about") {
+    aboutBox.style.display = "block";
+    mediaBox.style.display = "none";
+    renderProfileAbout();
+    return;
+  }
+
+  aboutBox.style.display = "none";
+  mediaBox.style.display = "block";
+
+  const kind = tab === "photos" ? "photo" : tab === "videos" ? "video" : "audio";
+  uploadRow.style.display = profileViewState.isMe ? "flex" : "none";
+  document.getElementById("pmUploadLabel").textContent =
+    kind === "photo" ? "Add Photo" : kind === "video" ? "Add Video" : "Add Audio";
+  profileFileInput.accept = kind === "photo" ? "image/*" : kind === "video" ? "video/*" : "audio/*";
+  profileFileInput.dataset.kind = kind;
+
+  renderProfileGallery(kind);
+}
+
+document.querySelectorAll(".profile-tab").forEach((btn) => {
+  btn.onclick = () => switchProfileTab(btn.dataset.tab);
+});
+
+// ---------- আপলোড ----------
+document.getElementById("pmUploadBtn").onclick = () => profileFileInput.click();
+
+profileFileInput.onchange = async () => {
+  const file = profileFileInput.files[0];
+  const kind = profileFileInput.dataset.kind;
+  profileFileInput.value = "";
+  if (!file || !currentUser) return;
+
+  let src = null;
+  try {
+    if (kind === "photo") {
+      const compressed = await compressImageFile(file);
+      src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+    } else {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        await showCustomAlert("File Too Large", "ফাইলটি অনেক বড় (১৮MB এর বেশি)। ছোট ফাইল দিন।");
+        return;
+      }
+      src = await readFileAsDataUrl(file);
+    }
+  } catch (e) {
+    await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
+    return;
+  }
+
+  const item = {
+    id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    kind: kind,
+    src: src,
+    name: file.name,
+    timestamp: Date.now()
+  };
+
+  socket.emit("add-profile-item", { phone: currentUser.phone, item }, (res) => {
+    if (res && res.success) {
+      profileViewState.data.items = res.items;
+      renderProfileGallery(kind);
+    } else {
+      showCustomAlert("Error", "আপলোড করা যায়নি, আবার চেষ্টা করুন।");
+    }
+  });
+};
+
+// ---------- সেভ ----------
+function saveMyProfile() {
+  const profile = {
+    bio: document.getElementById("pfBio").value.trim(),
+    location: document.getElementById("pfLocation").value.trim(),
+    work: document.getElementById("pfWork").value.trim(),
+    education: document.getElementById("pfEducation").value.trim(),
+    about: document.getElementById("pfAbout").value.trim()
+  };
+  socket.emit("save-profile", { phone: currentUser.phone, profile }, (res) => {
+    if (res && res.success) {
+      profileViewState.data = { ...profileViewState.data, ...res.profile };
+      document.getElementById("pmSub").textContent = profile.bio || "EKT Chating App";
+      showCustomAlert("Saved", "আপনার প্রোফাইল সেভ হয়েছে।");
+    }
+  });
+}
+
+// ---------- প্রোফাইল খোলা ----------
+function openProfile(phone, fallback) {
+  if (!phone || !currentUser) return;
+  const isMe = phone === currentUser.phone;
+
+  document.getElementById("pmAvatar").src = (fallback && fallback.pic) || "https://via.placeholder.com/100";
+  document.getElementById("pmName").textContent = (fallback && fallback.name) || "Profile";
+  document.getElementById("pmSub").textContent = "লোড হচ্ছে...";
+  document.getElementById("pmMessageBtn").style.display = isMe ? "none" : "inline-flex";
+
+  profileViewState = { phone, isMe, data: fallback || {}, tab: "about" };
+  profileModalOverlay.classList.add("active");
+  switchProfileTab("about");
+
+  socket.emit("get-profile", { phone }, (data) => {
+    if (!data) return;
+    profileViewState.data = data;
+    document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
+    document.getElementById("pmName").textContent = data.name || "Profile";
+    document.getElementById("pmSub").textContent = data.bio || (isMe ? "আপনার প্রোফাইল" : "EKT Chating App");
+    switchProfileTab(profileViewState.tab);
+  });
+}
+
+function openFriendProfile(friend) {
+  if (!friend) return;
+  openProfile(friend.phone, friend);
+}
+
+// বন্ধু নতুন কিছু পোস্ট করলে, তার প্রোফাইল খোলা থাকলে রিফ্রেশ
+socket.on("friend-profile-updated", ({ phone }) => {
+  if (profileViewState.phone === phone && profileModalOverlay.classList.contains("active")) {
+    socket.emit("get-profile", { phone }, (data) => {
+      if (data) {
+        profileViewState.data = data;
+        switchProfileTab(profileViewState.tab);
+      }
+    });
+  }
+});
+
 document.getElementById("pmCloseBtn").onclick = () => profileModalOverlay.classList.remove("active");
-document.getElementById("pmMessageBtn").onclick = () => profileModalOverlay.classList.remove("active");
+document.getElementById("pmMessageBtn").onclick = () => {
+  profileModalOverlay.classList.remove("active");
+  if (profileViewState.phone && !profileViewState.isMe) {
+    openDirectChat({
+      phone: profileViewState.phone,
+      name: profileViewState.data.name,
+      pic: profileViewState.data.pic
+    });
+  }
+};
 profileModalOverlay.addEventListener("click", (e) => {
   if (e.target === profileModalOverlay) profileModalOverlay.classList.remove("active");
 });
@@ -1045,6 +1353,13 @@ if (openFriendProfileBtn) {
   openFriendProfileBtn.onclick = () => openFriendProfile(activeDirectChatFriend);
 }
 
+// ড্যাশবোর্ডের নিজের ছবিতে ক্লিক করলে নিজের প্রোফাইল খুলবে
+if (dashboardAvatar) {
+  dashboardAvatar.style.cursor = "pointer";
+  dashboardAvatar.addEventListener("click", () => {
+    if (currentUser) openProfile(currentUser.phone, currentUser);
+  });
+}
 // থ্রি-ডট মেনু টগল ও অ্যাকশন
 const directMenuToggle = document.getElementById("directMenuToggle");
 const directDropdownMenu = document.getElementById("directDropdownMenu");
@@ -1343,7 +1658,14 @@ function buildMessageContent(msg) {
       };
     }
     if (msg.fileType.startsWith("audio/")) {
-      return { isMedia: false, html: `<audio src="${msg.fileContent}" controls class="msg-audio"></audio>` };
+      // চাপ দিলে ফুল-স্ক্রিন সুন্দর প্লেয়ারে খুলবে
+      return {
+        isMedia: false,
+        html: `<div class="audio-chip previewable-media" data-type="audio" data-src="${msg.fileContent}" data-name="${escapeHtml(name)}">
+                 <span class="audio-chip-play"><i class="fa-solid fa-play"></i></span>
+                 <span class="audio-chip-name">${escapeHtml(name)}</span>
+               </div>`
+      };
     }
     return {
       isMedia: false,
@@ -1390,16 +1712,11 @@ function attachMediaPreview(row) {
   }
 
   mediaElement.onclick = () => {
-    const src = mediaElement.getAttribute("data-src");
-    const name = mediaElement.getAttribute("data-name");
-    const type = mediaElement.getAttribute("data-type");
-    mediaPreviewContent.innerHTML = type === "video"
-      ? `<video src="${src}" controls autoplay playsinline style="max-width:100%; max-height:80vh; border-radius:12px;"></video>`
-      : `<img src="${src}" style="max-width:100%; max-height:80vh; object-fit:contain; border-radius:12px;" />`;
-    mediaDownloadBtn.style.display = "inline-block";
-    mediaDownloadBtn.href = src;
-    mediaDownloadBtn.download = name;
-    mediaPreviewModal.style.display = "flex";
+    openMediaPreview(
+      mediaElement.getAttribute("data-type"),
+      mediaElement.getAttribute("data-src"),
+      mediaElement.getAttribute("data-name")
+    );
   };
 }
 
@@ -1848,6 +2165,248 @@ function updateMessageStatus(msgId, statusText) {
 // callContext দিয়ে বোঝা যায় কলটা রুমের ভেতরে নাকি কোনো ফ্রেন্ডের সাথে ডিরেক্ট
 let callContext = { mode: "room", phone: null };
 
+// ================= WHATSAPP-STYLE CALL UI CONTROLLER =================
+// কল স্ক্রিনে এখন: Connecting → Ringing → Connected + সময় গণনা,
+// মিউট, স্পিকার, অডিও থেকে ভিডিওতে সুইচ, আর কল শেষে "Call ended" স্ক্রিন।
+
+const callTimerEl = document.getElementById("callTimer");
+const callTopBar = document.getElementById("callTopBar");
+const callTopName = document.getElementById("callTopName");
+const callTopTimer = document.getElementById("callTopTimer");
+const callControls = document.getElementById("callControls");
+const callEndedActions = document.getElementById("callEndedActions");
+const muteCallBtn = document.getElementById("muteCallBtn");
+const videoToggleBtn = document.getElementById("videoToggleBtn");
+const speakerCallBtn = document.getElementById("speakerCallBtn");
+
+let callTimerInterval = null;
+let callStartedAt = null;
+let isCallConnected = false;
+let isMicMuted = false;
+let isSpeakerOn = true;
+let lastCallInfo = null;   // { mode, phone, name, pic, type } — "Call again" এর জন্য
+
+function formatCallDuration(ms) {
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h > 0 ? pad(h) + ":" + pad(m) + ":" + pad(sec) : pad(m) + ":" + pad(sec);
+}
+
+function startCallTimer() {
+  stopCallTimer();
+  callStartedAt = Date.now();
+  callTimerEl.style.display = "block";
+  const tick = () => {
+    const txt = formatCallDuration(Date.now() - callStartedAt);
+    callTimerEl.textContent = txt;
+    callTopTimer.textContent = txt;
+  };
+  tick();
+  callTimerInterval = setInterval(tick, 1000);
+}
+
+function stopCallTimer() {
+  if (callTimerInterval) clearInterval(callTimerInterval);
+  callTimerInterval = null;
+}
+
+function setCallStatus(text) {
+  callStatusText.textContent = text;
+  callStatusText.style.display = "block";
+}
+
+// কল কানেক্ট হলে — রিং থামবে, সময় গোনা শুরু হবে
+function markCallConnected() {
+  if (isCallConnected) return;
+  isCallConnected = true;
+  callModal.classList.add("connected");
+  setCallStatus("Connected");
+  acceptCallBtn.style.display = "none";
+  startCallTimer();
+  setTimeout(() => { if (isCallConnected) callStatusText.style.display = "none"; }, 1500);
+}
+
+// ভিডিও নাকি অডিও লেআউট দেখানো হবে
+function setCallLayout(type) {
+  if (type === "video") {
+    callVideoGrid.style.display = "block";
+    callProfileGrid.style.display = "none";
+    callTopBar.style.display = "flex";
+    videoToggleBtn.innerHTML = '<i class="fa-solid fa-video"></i>';
+    videoToggleBtn.classList.add("active");
+    videoToggleBtn.title = "Turn off camera";
+  } else {
+    callVideoGrid.style.display = "none";
+    callProfileGrid.style.display = "flex";
+    callTopBar.style.display = "none";
+    videoToggleBtn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
+    videoToggleBtn.classList.remove("active");
+    videoToggleBtn.title = "Switch to video";
+  }
+}
+
+// কল স্ক্রিন খোলা (সব অবস্থা রিসেট করে)
+function openCallScreen(opts) {
+  const o = opts || {};
+  lastCallInfo = { mode: o.mode, phone: o.phone, name: o.name, pic: o.pic, type: o.type };
+  isCallConnected = false;
+  callModal.classList.remove("connected");
+  stopCallTimer();
+  callStartedAt = null;
+
+  remoteCallName.textContent = o.name || "Friend";
+  remoteCallAvatar.src = o.pic || "https://via.placeholder.com/100";
+  callTopName.textContent = o.name || "Friend";
+  callTimerEl.style.display = "none";
+  callTimerEl.textContent = "00:00";
+  callTopTimer.textContent = "00:00";
+
+  setCallStatus(o.status || (o.incoming ? "Incoming call..." : "Connecting..."));
+  setCallLayout(o.type === "video" ? "video" : "audio");
+
+  callControls.style.display = "flex";
+  callEndedActions.style.display = "none";
+  acceptCallBtn.style.display = o.incoming ? "inline-flex" : "none";
+
+  isMicMuted = false;
+  muteCallBtn.classList.remove("active");
+  muteCallBtn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+
+  callModal.style.display = "flex";
+
+  // আউটগোয়িং কল: প্রথমে Connecting, তারপর Ringing দেখানো হয়
+  if (!o.incoming) {
+    setTimeout(() => { if (!isCallConnected) setCallStatus("Ringing..."); }, 1400);
+  }
+}
+
+// কল শেষ হওয়ার স্ক্রিন (হোয়াটসঅ্যাপের মতো Message / Call again / Close)
+function showCallEndedScreen() {
+  const duration = callStartedAt ? formatCallDuration(Date.now() - callStartedAt) : null;
+  stopCallTimer();
+  callModal.classList.remove("connected");
+  setCallLayout("audio");
+  callStatusText.style.display = "block";
+  callStatusText.textContent = duration ? "Call ended · " + duration : "Call ended";
+  callTimerEl.style.display = "none";
+  callControls.style.display = "none";
+  callEndedActions.style.display = "flex";
+  callModal.style.display = "flex";
+  isCallConnected = false;
+  callStartedAt = null;
+}
+
+function hideCallScreen() {
+  callModal.style.display = "none";
+  callEndedActions.style.display = "none";
+  callControls.style.display = "flex";
+}
+
+// ---- মিউট ----
+if (muteCallBtn) {
+  muteCallBtn.onclick = () => {
+    if (!localStream) return;
+    isMicMuted = !isMicMuted;
+    localStream.getAudioTracks().forEach((t) => { t.enabled = !isMicMuted; });
+    muteCallBtn.classList.toggle("active", isMicMuted);
+    muteCallBtn.innerHTML = isMicMuted
+      ? '<i class="fa-solid fa-microphone-slash"></i>'
+      : '<i class="fa-solid fa-microphone"></i>';
+  };
+}
+
+// ---- স্পিকার ----
+if (speakerCallBtn) {
+  speakerCallBtn.onclick = () => {
+    isSpeakerOn = !isSpeakerOn;
+    remoteAudioElement.volume = isSpeakerOn ? 1 : 0.25;
+    remoteVideo.volume = isSpeakerOn ? 1 : 0.25;
+    speakerCallBtn.classList.toggle("active", !isSpeakerOn);
+    speakerCallBtn.innerHTML = isSpeakerOn
+      ? '<i class="fa-solid fa-volume-high"></i>'
+      : '<i class="fa-solid fa-volume-low"></i>';
+  };
+}
+
+// ---- অডিও কল থেকে ভিডিও কলে সুইচ (কলের মাঝপথেই) ----
+if (videoToggleBtn) {
+  videoToggleBtn.onclick = async () => {
+    if (!localStream) return;
+
+    const existingVideoTrack = localStream.getVideoTracks()[0];
+
+    if (existingVideoTrack && existingVideoTrack.enabled) {
+      existingVideoTrack.enabled = false;          // ক্যামেরা বন্ধ
+      setCallLayout("audio");
+      return;
+    }
+    if (existingVideoTrack) {
+      existingVideoTrack.enabled = true;           // আগে নেওয়া ক্যামেরা আবার চালু
+      currentCallType = "video";
+      setCallLayout("video");
+      return;
+    }
+
+    // একদম নতুন করে ক্যামেরা চালু করে চলমান কলে যোগ করা
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTrack = camStream.getVideoTracks()[0];
+      localStream.addTrack(videoTrack);
+      localVideo.srcObject = localStream;
+
+      const pc = currentCall && currentCall.peerConnection;
+      if (pc) {
+        const sender = pc.getSenders().find((sn) => sn.track && sn.track.kind === "video");
+        if (sender) await sender.replaceTrack(videoTrack);
+        else pc.addTrack(videoTrack, localStream);
+      }
+
+      currentCallType = "video";
+      setCallLayout("video");
+
+      if (callContext.mode === "direct" && callContext.phone) {
+        socket.emit("direct-call-upgrade", { toPhone: callContext.phone });
+      }
+    } catch (err) {
+      showCustomAlert("Camera Error", "ক্যামেরা চালু করা যায়নি। পারমিশন দেওয়া আছে কিনা দেখুন।");
+    }
+  };
+}
+
+// অন্য পাশ ভিডিওতে সুইচ করলে আমার স্ক্রিনেও ভিডিও লেআউট আসবে
+socket.on("direct-call-upgraded", () => {
+  currentCallType = "video";
+  setCallLayout("video");
+});
+
+// ---- কল শেষের স্ক্রিনের বাটনগুলো ----
+document.getElementById("callCloseBtn").onclick = hideCallScreen;
+
+document.getElementById("callEndedMessageBtn").onclick = () => {
+  hideCallScreen();
+  if (lastCallInfo && lastCallInfo.mode === "direct" && lastCallInfo.phone) {
+    openDirectChat({ phone: lastCallInfo.phone, name: lastCallInfo.name, pic: lastCallInfo.pic });
+  }
+};
+
+document.getElementById("callAgainBtn").onclick = () => {
+  callEndedActions.style.display = "none";
+  callControls.style.display = "flex";
+  if (!lastCallInfo) return;
+  if (lastCallInfo.mode === "direct") {
+    if (!activeDirectChatFriend) {
+      activeDirectChatFriend = { phone: lastCallInfo.phone, name: lastCallInfo.name, pic: lastCallInfo.pic };
+    }
+    initiateDirectCall(lastCallInfo.type || "audio");
+  } else {
+    initiateCall(lastCallInfo.type || "audio");
+  }
+};
+
+
 if (startAudioCallBtn) startAudioCallBtn.onclick = () => initiateCall("audio");
 if (startVideoCallBtn) startVideoCallBtn.onclick = () => initiateCall("video");
 
@@ -1856,19 +2415,16 @@ async function initiateCall(type) {
   currentCallType = type;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
-    if (type === "video") {
-      localVideo.srcObject = localStream;
-      callVideoGrid.style.display = "flex";
-      callProfileGrid.style.display = "none";
-    } else {
-      callVideoGrid.style.display = "none";
-      callProfileGrid.style.display = "flex";
-    }
-    localCallAvatar.src = currentUser.pic;
-    localCallName.textContent = currentUser.name;
-    callStatusText.textContent = "Calling...";
-    acceptCallBtn.style.display = "none";
-    callModal.style.display = "flex";
+    if (type === "video") localVideo.srcObject = localStream;
+
+    openCallScreen({
+      mode: "room",
+      phone: null,
+      name: currentRoom ? "Room " + currentRoom : "Room",
+      pic: (currentUser && currentUser.pic) || "https://via.placeholder.com/100",
+      type: type,
+      incoming: false
+    });
 
     socket.emit("call-user", {
       roomCode: currentRoom,
@@ -1885,35 +2441,28 @@ async function initiateCall(type) {
 socket.on("incoming-call", (data) => {
   callContext = { mode: "room", phone: null };
   currentCallType = data.callType;
-  remoteCallName.textContent = data.callerName;
-  remoteCallAvatar.src = data.callerPic;
-  localCallAvatar.src = currentUser.pic;
-  localCallName.textContent = currentUser.name;
-  
-  callStatusText.textContent = `Incoming ${data.callType} call from ${data.callerName}`;
-  acceptCallBtn.style.display = "inline-block";
-  callVideoGrid.style.display = "none";
-  callProfileGrid.style.display = "flex";
-  callModal.style.display = "flex";
+
+  openCallScreen({
+    mode: "room",
+    phone: null,
+    name: data.callerName,
+    pic: data.callerPic,
+    type: data.callType,
+    incoming: true,
+    status: "Incoming " + data.callType + " call"
+  });
 
   acceptCallBtn.onclick = async () => {
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentCallType === "video" });
-      if (currentCallType === "video") {
-        localVideo.srcObject = localStream;
-        callVideoGrid.style.display = "flex";
-        callProfileGrid.style.display = "none";
-      } else {
-        callVideoGrid.style.display = "none";
-        callProfileGrid.style.display = "flex";
-      }
+      if (currentCallType === "video") localVideo.srcObject = localStream;
+      setCallLayout(currentCallType === "video" ? "video" : "audio");
       const call = myPeer.call(data.callerPeerId, localStream);
       handleCallConnection(call);
       socket.emit("accept-call-notify", { roomCode: currentRoom });
-      acceptCallBtn.style.display = "none";
-      callStatusText.textContent = "Connected";
+      markCallConnected();
     } catch (err) {
-      showCustomAlert("Error", "কল রিসিভ করার সময় এক্সেস পাওয়া যায়নি!");
+      showCustomAlert("Error", "কল রিসিভ করার সময় এক্সেস পাওয়া যায়নি!");
     }
   };
 });
@@ -1924,18 +2473,12 @@ myPeer.on("call", async (call) => {
     if (!localStream) {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentCallType === "video" });
     }
-    if (currentCallType === "video") {
-      localVideo.srcObject = localStream;
-      callVideoGrid.style.display = "flex";
-      callProfileGrid.style.display = "none";
-    } else {
-      callVideoGrid.style.display = "none";
-      callProfileGrid.style.display = "flex";
-    }
+    if (currentCallType === "video") localVideo.srcObject = localStream;
+    setCallLayout(currentCallType === "video" ? "video" : "audio");
     call.answer(localStream);
     handleCallConnection(call);
     callModal.style.display = "flex";
-    callStatusText.textContent = "Connected";
+    markCallConnected();
   } catch (err) {}
 });
 
@@ -1948,13 +2491,15 @@ function handleCallConnection(call) {
       remoteAudioElement.srcObject = remoteStream;
       remoteAudioElement.play().catch(() => {});
     }
-    callStatusText.textContent = "Connected";
+    // কলের মাঝপথে ভিডিওতে সুইচ করলেও যেন রিমোট ভিডিও পাওয়া যায়
+    remoteVideo.srcObject = remoteStream;
+    markCallConnected();
   });
   call.on("close", endCallCleanup);
   call.on("error", endCallCleanup);
 }
 
-socket.on("call-accepted-by-receiver", () => { callStatusText.textContent = "Connected"; });
+socket.on("call-accepted-by-receiver", () => { markCallConnected(); });
 
 rejectCallBtn.onclick = () => {
   if (callContext.mode === "direct" && callContext.phone) {
@@ -1977,13 +2522,12 @@ function endCallCleanup() {
     currentCall.close();
     currentCall = null;
   }
-  callModal.style.display = "none";
-  callVideoGrid.style.display = "none";
-  callProfileGrid.style.display = "flex";
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   remoteAudioElement.srcObject = null;
-  callStatusText.textContent = "Call Ended";
+
+  // সাথে সাথে বন্ধ না করে হোয়াটসঅ্যাপের মতো "Call ended" স্ক্রিন দেখানো হয়
+  showCallEndedScreen();
   callContext = { mode: "room", phone: null };
 }
 
@@ -2013,23 +2557,16 @@ async function initiateDirectCall(type) {
       video: type === "video"
     });
 
-    if (type === "video") {
-      localVideo.srcObject = localStream;
-      callVideoGrid.style.display = "flex";
-      callProfileGrid.style.display = "none";
-    } else {
-      callVideoGrid.style.display = "none";
-      callProfileGrid.style.display = "flex";
-    }
+    if (type === "video") localVideo.srcObject = localStream;
 
-    localCallAvatar.src = currentUser.pic || "https://via.placeholder.com/100";
-    localCallName.textContent = currentUser.name;
-    remoteCallAvatar.src = activeDirectChatFriend.pic || "https://via.placeholder.com/100";
-    remoteCallName.textContent = activeDirectChatFriend.name;
-
-    callStatusText.textContent = `Calling ${activeDirectChatFriend.name}...`;
-    acceptCallBtn.style.display = "none";
-    callModal.style.display = "flex";
+    openCallScreen({
+      mode: "direct",
+      phone: activeDirectChatFriend.phone,
+      name: activeDirectChatFriend.name,
+      pic: activeDirectChatFriend.pic,
+      type: type,
+      incoming: false
+    });
 
     socket.emit("direct-call-user", {
       toPhone: activeDirectChatFriend.phone,
@@ -2068,16 +2605,15 @@ socket.on("direct-incoming-call", (data) => {
     activeDirectChatFriend.phone === data.fromPhone;
   if (!alreadyInThisChat) openDirectChat(callerFriend);
 
-  remoteCallName.textContent = data.callerName || "Friend";
-  remoteCallAvatar.src = data.callerPic || "https://via.placeholder.com/100";
-  localCallAvatar.src = (currentUser && currentUser.pic) || "https://via.placeholder.com/100";
-  localCallName.textContent = currentUser ? currentUser.name : "Me";
-
-  callStatusText.textContent = `Incoming ${data.callType} call from ${data.callerName || "Friend"}`;
-  acceptCallBtn.style.display = "inline-block";
-  callVideoGrid.style.display = "none";
-  callProfileGrid.style.display = "flex";
-  callModal.style.display = "flex";
+  openCallScreen({
+    mode: "direct",
+    phone: data.fromPhone,
+    name: data.callerName || "Friend",
+    pic: data.callerPic,
+    type: data.callType,
+    incoming: true,
+    status: "Incoming " + data.callType + " call"
+  });
 
   acceptCallBtn.onclick = async () => {
     try {
@@ -2086,14 +2622,8 @@ socket.on("direct-incoming-call", (data) => {
         video: currentCallType === "video"
       });
 
-      if (currentCallType === "video") {
-        localVideo.srcObject = localStream;
-        callVideoGrid.style.display = "flex";
-        callProfileGrid.style.display = "none";
-      } else {
-        callVideoGrid.style.display = "none";
-        callProfileGrid.style.display = "flex";
-      }
+      if (currentCallType === "video") localVideo.srcObject = localStream;
+      setCallLayout(currentCallType === "video" ? "video" : "audio");
 
       const call = myPeer.call(data.callerPeerId, localStream, {
         metadata: { type: currentCallType }
@@ -2101,8 +2631,7 @@ socket.on("direct-incoming-call", (data) => {
       handleCallConnection(call);
 
       socket.emit("direct-call-accept", { toPhone: data.fromPhone });
-      acceptCallBtn.style.display = "none";
-      callStatusText.textContent = "Connected";
+      markCallConnected();
     } catch (err) {
       endCallCleanup();
       showCustomAlert("Error", "কল রিসিভ করার সময় ক্যামেরা/মাইক এক্সেস পাওয়া যায়নি!");
@@ -2110,7 +2639,7 @@ socket.on("direct-incoming-call", (data) => {
   };
 });
 
-socket.on("direct-call-accepted", () => { callStatusText.textContent = "Connected"; });
+socket.on("direct-call-accepted", () => { markCallConnected(); });
 socket.on("direct-call-ended", endCallCleanup);
 
 // স্প্ল্যাশ স্ক্রিন — অ্যাপ প্রস্তুত হলে সরিয়ে দেওয়া (index.html-এর টাইমারের ব্যাকআপ)
