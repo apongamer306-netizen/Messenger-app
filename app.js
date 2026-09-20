@@ -127,11 +127,13 @@ directChatScreen.innerHTML = `
   <div class="chat-header direct-chat-header">
     <div class="user-info">
       <button id="backFromDirectChatBtn" class="icon-btn direct-back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-      <img id="directChatAvatar" src="https://via.placeholder.com/40" alt="Avatar">
-      <div>
-        <h4 id="directChatName">Friend Name</h4>
-        <span class="direct-chat-status">Direct Message</span>
-      </div>
+      <button id="openFriendProfileBtn" class="header-profile-btn" title="View profile">
+        <img id="directChatAvatar" src="https://via.placeholder.com/40" alt="Avatar">
+        <div>
+          <h4 id="directChatName">Friend Name</h4>
+          <span class="direct-chat-status">Direct Message</span>
+        </div>
+      </button>
     </div>
     <div class="chat-actions">
       <button id="directAudioCallBtn" class="action-btn call-audio" title="Audio Call"><i class="fa-solid fa-phone"></i></button>
@@ -986,6 +988,63 @@ document.getElementById("backFromDirectChatBtn").addEventListener("click", () =>
   activeDirectChatFriend = null;
 });
 
+// ================= ফ্রেন্ড প্রোফাইল মোডাল =================
+// চ্যাট হেডারের ছবি/নামে ট্যাপ করলে বন্ধুর ডিটেইলস দেখা যাবে।
+const profileModalOverlay = document.createElement("div");
+profileModalOverlay.id = "profileModalOverlay";
+profileModalOverlay.className = "profile-modal-overlay";
+profileModalOverlay.innerHTML = `
+  <div class="profile-modal">
+    <div class="profile-modal-cover">
+      <img id="pmAvatar" class="profile-modal-avatar" src="https://via.placeholder.com/100" alt="">
+    </div>
+    <div class="profile-modal-body">
+      <div id="pmName" class="profile-modal-name">Friend</div>
+      <div id="pmSub" class="profile-modal-sub">Friend on EKT Chating App</div>
+      <div id="pmDetails"></div>
+      <div class="profile-modal-actions">
+        <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
+        <button id="pmCloseBtn" class="btn btn-secondary" style="background:#495057; color:#fff;">Close</button>
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(profileModalOverlay);
+
+function detailRow(icon, label, value) {
+  if (!value) return "";
+  return `<div class="profile-detail-row">
+            <i class="${icon}"></i>
+            <div><span class="pd-label">${label}</span><span class="pd-value">${escapeHtml(value)}</span></div>
+          </div>`;
+}
+
+function openFriendProfile(friend) {
+  if (!friend) return;
+  document.getElementById("pmAvatar").src = friend.pic || "https://via.placeholder.com/100";
+  document.getElementById("pmName").textContent = friend.name || "Friend";
+  document.getElementById("pmSub").textContent = friend.bio || "Friend on EKT Chating App";
+
+  document.getElementById("pmDetails").innerHTML =
+    detailRow("fa-solid fa-phone", "Phone", friend.phone) +
+    detailRow("fa-solid fa-location-dot", "Lives in", friend.location) +
+    detailRow("fa-brands fa-facebook", "Facebook", friend.facebookName) +
+    detailRow("fa-solid fa-circle-info", "About", friend.about);
+
+  profileModalOverlay.classList.add("active");
+}
+
+document.getElementById("pmCloseBtn").onclick = () => profileModalOverlay.classList.remove("active");
+document.getElementById("pmMessageBtn").onclick = () => profileModalOverlay.classList.remove("active");
+profileModalOverlay.addEventListener("click", (e) => {
+  if (e.target === profileModalOverlay) profileModalOverlay.classList.remove("active");
+});
+
+const openFriendProfileBtn = document.getElementById("openFriendProfileBtn");
+if (openFriendProfileBtn) {
+  openFriendProfileBtn.onclick = () => openFriendProfile(activeDirectChatFriend);
+}
+
 // থ্রি-ডট মেনু টগল ও অ্যাকশন
 const directMenuToggle = document.getElementById("directMenuToggle");
 const directDropdownMenu = document.getElementById("directDropdownMenu");
@@ -1029,10 +1088,26 @@ document.getElementById("menuBlockUser").onclick = () => {
 
 function loadDirectChatHistory() {
   if (!activeDirectChatFriend) return;
+  const chatContainer = document.getElementById("directChatMessages");
   socket.emit("get-direct-history", { senderPhone: currentUser.phone, receiverPhone: activeDirectChatFriend.phone }, (messages) => {
-    const chatContainer = document.getElementById("directChatMessages");
     chatContainer.innerHTML = "";
-    messages.forEach(msg => appendDirectMessage(msg));
+
+    // পুরো হিস্ট্রি একবারে বসানো হয় (প্রতি মেসেজে স্ট্যাটাস রি-রেন্ডার নয়) —
+    // তাই অনেক মেসেজ থাকলেও চ্যাট সাথে সাথে খোলে
+    (messages || []).forEach(msg =>
+      appendDirectMessage(msg, { skipStatus: true, silentScroll: true })
+    );
+
+    // সর্বশেষ নিজের মেসেজটা বন্ধু দেখেছে কিনা তার উপর স্ট্যাটাস
+    const mine = (messages || []).filter(m => m.senderPhone === currentUser.phone);
+    const last = mine[mine.length - 1];
+    directStatusState = last && last.seen
+      ? { text: "Seen", seen: true }
+      : { text: "Sent", seen: false };
+    renderDirectStatus();
+
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    markDirectChatSeen();
   });
 }
 
@@ -1045,11 +1120,41 @@ if (sendDirectMsgBtn) {
   directMessageInput.onkeypress = (e) => { if (e.key === "Enter") sendDirectMessage(); };
 }
 
+// ================= দ্রুত মেসেজ পাঠানো (Optimistic Send) =================
+// আগে মেসেজ পাঠালে সার্ভারের উত্তরের জন্য অপেক্ষা করতে হতো বলে দেরি মনে হতো।
+// এখন মেসেজ সাথে সাথেই স্ক্রিনে বসে যায়, আর স্ট্যাটাস (Sending → Sent →
+// Delivered → Seen) আলাদাভাবে আপডেট হয় — একদম মেসেঞ্জারের মতো।
+
+function makeClientId() {
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function dispatchDirectMessage(msgData) {
+  setDirectStatus("Sending...", false);
+
+  socket.emit("send-direct-message", msgData, (res) => {
+    const row = document.querySelector(`.msg-row[data-client-id="${msgData.clientId}"]`);
+    if (row) row.classList.remove("pending");
+
+    if (res && res.success === false) {
+      setDirectStatus("Not sent", false);
+      if (res.error === "blocked_by_you") {
+        showCustomAlert("Error", "আপনি এই ইউজারকে ব্লক করে রেখেছেন!");
+      } else {
+        showCustomAlert("Error", "এই ইউজার আপনাকে ব্লক করে রেখেছেন, মেসেজ পাঠানো যায়নি!");
+      }
+      return;
+    }
+    setDirectStatus(res && res.delivered ? "Delivered" : "Sent", false);
+  });
+}
+
 function sendDirectMessage() {
   const text = directMessageInput.value.trim();
   if (!text || !activeDirectChatFriend) return;
 
   const msgData = {
+    clientId: makeClientId(),
     senderPhone: currentUser.phone,
     senderName: currentUser.name,
     senderPic: currentUser.pic,
@@ -1058,53 +1163,123 @@ function sendDirectMessage() {
     timestamp: Date.now()
   };
 
-  appendDirectMessage(msgData);
+  // ইনপুট আগে খালি করা হয় যাতে টাইপিং কখনো আটকে না থাকে
   directMessageInput.value = "";
+  const row = appendDirectMessage(msgData);
+  if (row) row.classList.add("pending");
+  directMessageInput.focus();
 
-  socket.emit("send-direct-message", msgData, (res) => {
-    if (res && res.success === false) {
-      if (res.error === "blocked_by_you") {
-        showCustomAlert("Error", "আপনি এই ইউজারকে ব্লক করে রেখেছেন!");
-      } else {
-        showCustomAlert("Error", "এই ইউজার আপনাকে ব্লক করে রেখেছেন, মেসেজ পাঠানো যায়নি!");
+  dispatchDirectMessage(msgData);
+}
+
+// ================= ছবি ছোট করে পাঠানো (স্পিডের মূল সমাধান) =================
+// আগে ফোনের ৪-৮ MB ছবি হুবহু base64 করে পাঠানো হতো, তাই এক মেসেজ যেতেই
+// ১০-৩০ সেকেন্ড লাগত এবং অন্য পাশে কালো বক্স দেখাত। এখন পাঠানোর আগেই ছবিটা
+// সর্বোচ্চ ১৬০০px করে JPEG-এ কম্প্রেস করা হয় — সাইজ ২০-৫০ গুণ কমে যায়।
+
+const MAX_IMAGE_DIMENSION = 1600;
+const IMAGE_QUALITY = 0.72;
+
+function compressImageFile(file) {
+  return new Promise((resolve) => {
+    // GIF কম্প্রেস করলে অ্যানিমেশন নষ্ট হয়, তাই ওটা যেমন আছে তেমনই যাবে
+    if (file.type === "image/gif") return resolve(null);
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+        URL.revokeObjectURL(url);
+        resolve({ dataUrl, width, height, type: "image/jpeg" });
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        resolve(null);
       }
-    }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
   });
 }
 
-// ডিরেক্ট চ্যাটে ফাইল/ছবি/ভিডিও/অডিও পাঠানো — রুম চ্যাটের মতোই
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (evt) => resolve(evt.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024; // ~18MB এর বেশি হলে পাঠানো হবে না
+
+// ডিরেক্ট চ্যাটে ফাইল/ছবি/ভিডিও/অডিও পাঠানো
 if (directFileAttachmentInput) {
-  directFileAttachmentInput.addEventListener("change", (e) => {
+  directFileAttachmentInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
+    directFileAttachmentInput.value = "";
     if (!file || !activeDirectChatFriend) return;
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const msgData = {
-        senderPhone: currentUser.phone,
-        senderName: currentUser.name,
-        senderPic: currentUser.pic,
-        receiverPhone: activeDirectChatFriend.phone,
-        fileType: file.type,
-        fileContent: evt.target.result,
-        fileName: file.name,
-        timestamp: Date.now()
-      };
+    let fileContent = null;
+    let fileType = file.type;
+    let mediaWidth = null;
+    let mediaHeight = null;
 
-      appendDirectMessage(msgData);
-
-      socket.emit("send-direct-message", msgData, (res) => {
-        if (res && res.success === false) {
-          if (res.error === "blocked_by_you") {
-            showCustomAlert("Error", "আপনি এই ইউজারকে ব্লক করে রেখেছেন!");
-          } else {
-            showCustomAlert("Error", "এই ইউজার আপনাকে ব্লক করে রেখেছেন, মেসেজ পাঠানো যায়নি!");
-          }
+    try {
+      if (file.type.startsWith("image/")) {
+        const compressed = await compressImageFile(file);
+        if (compressed) {
+          fileContent = compressed.dataUrl;
+          fileType = compressed.type;
+          mediaWidth = compressed.width;
+          mediaHeight = compressed.height;
+        } else {
+          fileContent = await readFileAsDataUrl(file);
         }
-      });
-      directFileAttachmentInput.value = "";
+      } else {
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          await showCustomAlert("File Too Large", "ফাইলটি অনেক বড় (১৮MB এর বেশি)। ছোট একটা ফাইল পাঠান।");
+          return;
+        }
+        fileContent = await readFileAsDataUrl(file);
+      }
+    } catch (err) {
+      await showCustomAlert("Error", "ফাইলটি পড়া যায়নি, আবার চেষ্টা করুন।");
+      return;
+    }
+
+    if (!fileContent) return;
+
+    const msgData = {
+      clientId: makeClientId(),
+      senderPhone: currentUser.phone,
+      senderName: currentUser.name,
+      senderPic: currentUser.pic,
+      receiverPhone: activeDirectChatFriend.phone,
+      fileType: fileType,
+      fileContent: fileContent,
+      fileName: file.name,
+      mediaWidth: mediaWidth,
+      mediaHeight: mediaHeight,
+      timestamp: Date.now()
     };
-    reader.readAsDataURL(file);
+
+    const row = appendDirectMessage(msgData);
+    if (row) row.classList.add("pending");
+
+    dispatchDirectMessage(msgData);
   });
 }
 
@@ -1114,6 +1289,7 @@ socket.on("receive-direct-message", (msgData) => {
 
   if (isViewingThisChat) {
     appendDirectMessage(msgData);
+    markDirectChatSeen();   // চ্যাট খোলা থাকলে সাথে সাথেই Seen পাঠানো
   } else {
     unreadDirectCounts[msgData.senderPhone] = (unreadDirectCounts[msgData.senderPhone] || 0) + 1;
     updateFriendBadge();
@@ -1122,55 +1298,251 @@ socket.on("receive-direct-message", (msgData) => {
   }
 });
 
-function appendDirectMessage(msg) {
-  const chatContainer = document.getElementById("directChatMessages");
-  if (!chatContainer) return;
-  const isMe = msg.senderPhone === currentUser.phone;
+// ================= MESSENGER-STYLE MESSAGE RENDERING =================
+// মেসেজ গ্রুপিং, টাইম স্ট্যাম্প, ছবি/ভিডিওর সুন্দর প্রিভিউ এবং
+// Sent / Delivered / Seen স্ট্যাটাস — সবই মেসেঞ্জারের মতো।
 
-  const msgDiv = document.createElement("div");
-  msgDiv.className = `msg-row ${isMe ? "me" : ""}`;
-  const avatarSrc = isMe ? (currentUser.pic || 'https://via.placeholder.com/40') : (msg.senderPic || 'https://via.placeholder.com/40');
-  const avatarImg = `<img src="${avatarSrc}" alt="">`;
+const GROUP_GAP_MS = 4 * 60 * 1000;      // এর চেয়ে কম সময়ের মেসেজগুলো একসাথে গ্রুপ হবে
+const DIVIDER_GAP_MS = 20 * 60 * 1000;   // এর চেয়ে বেশি গ্যাপ হলে সময় দেখানো হবে
 
-  let contentHtml;
-  if (msg.fileType) {
-    if (msg.fileType.startsWith("image/")) {
-      contentHtml = `<img src="${msg.fileContent}" class="msg-media previewable-media" data-type="image" data-src="${msg.fileContent}" data-name="${msg.fileName || 'image.png'}" />`;
-    } else if (msg.fileType.startsWith("video/")) {
-      contentHtml = `<video src="${msg.fileContent}" class="msg-media previewable-media" data-type="video" data-src="${msg.fileContent}" data-name="${msg.fileName || 'video.mp4'}"></video>`;
-    } else if (msg.fileType.startsWith("audio/")) {
-      contentHtml = `<audio src="${msg.fileContent}" controls class="msg-audio"></audio>`;
-    } else {
-      contentHtml = `<a href="${msg.fileContent}" download="${msg.fileName}" class="msg-file-link">📁 ${msg.fileName}</a>`;
-    }
-  } else {
-    contentHtml = msg.text;
-  }
-
-  msgDiv.innerHTML = isMe
-    ? `<div class="msg-bubble">${contentHtml}</div>${avatarImg}`
-    : `${avatarImg}<div class="msg-bubble">${contentHtml}</div>`;
-
-  chatContainer.appendChild(msgDiv);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-
-  const mediaElement = msgDiv.querySelector(".previewable-media");
-  if (mediaElement) {
-    mediaElement.onclick = () => {
-      const src = mediaElement.getAttribute("data-src");
-      const name = mediaElement.getAttribute("data-name");
-      const type = mediaElement.getAttribute("data-type");
-      mediaPreviewContent.innerHTML = type === "video"
-        ? `<video src="${src}" controls autoplay style="max-width:100%; max-height:80vh; border-radius:8px;"></video>`
-        : `<img src="${src}" style="max-width:100%; max-height:80vh; object-fit:contain; border-radius:8px;" />`;
-      mediaDownloadBtn.style.display = "inline-block";
-      mediaDownloadBtn.href = src;
-      mediaDownloadBtn.download = name;
-      mediaPreviewModal.style.display = "flex";
-    };
-  }
+function formatMsgTime(ts) {
+  const d = new Date(ts || Date.now());
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return time;
+  const yest = new Date(now.getTime() - 86400000);
+  if (d.toDateString() === yest.toDateString()) return "Yesterday " + time;
+  return d.toLocaleDateString([], { day: "numeric", month: "short" }) + " " + time;
 }
 
+function buildMessageContent(msg) {
+  // ফেরত দেয়: { html, isMedia }
+  if (msg.fileType) {
+    const name = msg.fileName || "file";
+    if (msg.fileType.startsWith("image/")) {
+      // আসল অনুপাত জানা থাকলে আগেই জায়গা রাখা হয় — তাই ছবি লোড হওয়ার সময়
+      // চ্যাট লাফায় না এবং কালো ফাঁকা বক্স দেখায় না
+      const ratioStyle = (msg.mediaWidth && msg.mediaHeight)
+        ? ` style="aspect-ratio:${msg.mediaWidth}/${msg.mediaHeight}"`
+        : "";
+      return {
+        isMedia: true,
+        html: `<div class="media-wrap loading previewable-media" data-type="image" data-src="${msg.fileContent}" data-name="${escapeHtml(name)}"${ratioStyle}>
+                 <img src="${msg.fileContent}" class="msg-media" alt="${escapeHtml(name)}" />
+               </div>`
+      };
+    }
+    if (msg.fileType.startsWith("video/")) {
+      return {
+        isMedia: true,
+        html: `<div class="media-wrap video-wrap previewable-media" data-type="video" data-src="${msg.fileContent}" data-name="${escapeHtml(name)}">
+                 <video class="msg-media" preload="metadata" muted playsinline disablepictureinpicture src="${msg.fileContent}#t=0.1"></video>
+                 <span class="video-play-badge"><i class="fa-solid fa-play"></i></span>
+               </div>`
+      };
+    }
+    if (msg.fileType.startsWith("audio/")) {
+      return { isMedia: false, html: `<audio src="${msg.fileContent}" controls class="msg-audio"></audio>` };
+    }
+    return {
+      isMedia: false,
+      html: `<a href="${msg.fileContent}" download="${name}" class="msg-file-link">
+               <i class="fa-solid fa-file-arrow-down"></i><span>${name}</span>
+             </a>`
+    };
+  }
+  return { isMedia: false, html: `<span class="msg-text">${escapeHtml(msg.text || "")}</span>` };
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function attachMediaPreview(row) {
+  const mediaElement = row.querySelector(".previewable-media");
+  if (!mediaElement) return;
+
+  // ছবি/ভিডিও লোড শেষ হলে শিমার সরিয়ে দিয়ে আসল সাইজে বসানো
+  const img = mediaElement.querySelector("img.msg-media");
+  if (img) {
+    const done = () => {
+      mediaElement.classList.remove("loading");
+      if (img.naturalWidth && img.naturalHeight) {
+        mediaElement.style.aspectRatio = `${img.naturalWidth}/${img.naturalHeight}`;
+      }
+      keepChatPinned();
+    };
+    if (img.complete && img.naturalWidth) done();
+    else {
+      img.addEventListener("load", done, { once: true });
+      img.addEventListener("error", () => mediaElement.classList.remove("loading"), { once: true });
+    }
+  }
+  const vid = mediaElement.querySelector("video.msg-media");
+  if (vid) {
+    vid.addEventListener("loadeddata", () => {
+      mediaElement.classList.remove("loading");
+      keepChatPinned();
+    }, { once: true });
+  }
+
+  mediaElement.onclick = () => {
+    const src = mediaElement.getAttribute("data-src");
+    const name = mediaElement.getAttribute("data-name");
+    const type = mediaElement.getAttribute("data-type");
+    mediaPreviewContent.innerHTML = type === "video"
+      ? `<video src="${src}" controls autoplay playsinline style="max-width:100%; max-height:80vh; border-radius:12px;"></video>`
+      : `<img src="${src}" style="max-width:100%; max-height:80vh; object-fit:contain; border-radius:12px;" />`;
+    mediaDownloadBtn.style.display = "inline-block";
+    mediaDownloadBtn.href = src;
+    mediaDownloadBtn.download = name;
+    mediaPreviewModal.style.display = "flex";
+  };
+}
+
+// চ্যাট নিচে থাকলে নিচেই রাখা (ছবি লোড হয়ে উচ্চতা বাড়লেও)
+function keepChatPinned() {
+  const c = document.getElementById("directChatMessages");
+  if (!c) return;
+  const nearBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 220;
+  if (nearBottom) c.scrollTop = c.scrollHeight;
+}
+
+function appendDirectMessage(msg, options) {
+  const chatContainer = document.getElementById("directChatMessages");
+  if (!chatContainer || !currentUser) return;
+
+  // সার্ভার থেকে একই মেসেজ আবার এলে দুইবার যেন না দেখায়
+  if (msg.clientId && chatContainer.querySelector(`.msg-row[data-client-id="${msg.clientId}"]`)) {
+    return null;
+  }
+
+  const opts = options || {};
+  const isMe = msg.senderPhone === currentUser.phone;
+  const ts = msg.timestamp || Date.now();
+
+  // আগের মেসেজের সাথে অনেক সময়ের ফারাক থাকলে সময়ের লাইন দেখানো
+  const rows = chatContainer.querySelectorAll(".msg-row");
+  const prevRow = rows.length ? rows[rows.length - 1] : null;
+  const prevTs = prevRow ? Number(prevRow.dataset.ts || 0) : 0;
+  if (!prevRow || ts - prevTs > DIVIDER_GAP_MS) {
+    const divider = document.createElement("div");
+    divider.className = "msg-time-divider";
+    divider.textContent = formatMsgTime(ts);
+    chatContainer.appendChild(divider);
+  }
+
+  const { html, isMedia } = buildMessageContent(msg);
+
+  const row = document.createElement("div");
+  row.className = `msg-row ${isMe ? "me" : ""}`;
+  row.dataset.sender = msg.senderPhone || "";
+  row.dataset.ts = String(ts);
+  if (msg.clientId) row.dataset.clientId = msg.clientId;
+
+  const avatarSrc = isMe
+    ? (currentUser.pic || "https://via.placeholder.com/40")
+    : (msg.senderPic || (activeDirectChatFriend && activeDirectChatFriend.pic) || "https://via.placeholder.com/40");
+
+  const avatarHtml = `<div class="msg-avatar"><img src="${avatarSrc}" alt="" /></div>`;
+  const bubbleHtml = `<div class="msg-bubble ${isMedia ? "media-bubble" : ""}" title="${formatMsgTime(ts)}">${html}</div>`;
+
+  row.innerHTML = isMe ? bubbleHtml : avatarHtml + bubbleHtml;
+
+  // স্ট্যাটাস রো সবসময় শেষে থাকবে, তাই সেটা সরিয়ে নতুন মেসেজ বসানো হয়
+  const oldStatus = chatContainer.querySelector(".msg-status-row");
+  if (oldStatus) oldStatus.remove();
+
+  chatContainer.appendChild(row);
+  attachMediaPreview(row);
+  regroupDirectMessages();
+
+  if (!opts.skipStatus) renderDirectStatus();
+
+  if (!opts.silentScroll) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+  return row;
+}
+
+// একই মানুষের পরপর মেসেজগুলোকে একসাথে গ্রুপ করা (মেসেঞ্জারের মতো)
+function regroupDirectMessages() {
+  const chatContainer = document.getElementById("directChatMessages");
+  if (!chatContainer) return;
+  const rows = Array.from(chatContainer.querySelectorAll(".msg-row"));
+
+  rows.forEach((row, i) => {
+    const prev = rows[i - 1];
+    const next = rows[i + 1];
+    const ts = Number(row.dataset.ts || 0);
+
+    const samePrev = prev && prev.dataset.sender === row.dataset.sender &&
+      ts - Number(prev.dataset.ts || 0) < GROUP_GAP_MS;
+    const sameNext = next && next.dataset.sender === row.dataset.sender &&
+      Number(next.dataset.ts || 0) - ts < GROUP_GAP_MS;
+
+    row.classList.toggle("group-start", !samePrev);
+    row.classList.toggle("group-end", !sameNext);
+    row.classList.toggle("group-mid", !!samePrev && !!sameNext);
+  });
+}
+
+// ---- Sent / Delivered / Seen স্ট্যাটাস ----
+let directStatusState = { text: "Sent", seen: false };
+
+function renderDirectStatus() {
+  const chatContainer = document.getElementById("directChatMessages");
+  if (!chatContainer) return;
+
+  const old = chatContainer.querySelector(".msg-status-row");
+  if (old) old.remove();
+
+  const myRows = chatContainer.querySelectorAll(".msg-row.me");
+  if (!myRows.length) return;
+  const lastMine = myRows[myRows.length - 1];
+
+  const statusRow = document.createElement("div");
+  statusRow.className = "msg-status-row";
+
+  if (directStatusState.seen) {
+    const pic = (activeDirectChatFriend && activeDirectChatFriend.pic) || "https://via.placeholder.com/40";
+    statusRow.innerHTML = `<img class="seen-avatar" src="${pic}" title="Seen" alt="Seen" />`;
+  } else {
+    const icon = directStatusState.text === "Sending..."
+      ? `<i class="fa-regular fa-clock"></i>`
+      : directStatusState.text === "Delivered"
+        ? `<i class="fa-solid fa-circle-check"></i>`
+        : `<i class="fa-regular fa-circle-check"></i>`;
+    statusRow.innerHTML = `<span class="status-chip">${icon}${directStatusState.text}</span>`;
+  }
+
+  lastMine.insertAdjacentElement("afterend", statusRow);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function setDirectStatus(text, seen) {
+  directStatusState = { text: text, seen: !!seen };
+  renderDirectStatus();
+}
+
+// বন্ধু আমার মেসেজ দেখে ফেললে
+socket.on("direct-messages-seen", ({ byPhone }) => {
+  if (activeDirectChatFriend && activeDirectChatFriend.phone === byPhone) {
+    setDirectStatus("Seen", true);
+  }
+});
+
+// আমি চ্যাট খুললে বন্ধুকে জানানো যে দেখেছি
+function markDirectChatSeen() {
+  if (!currentUser || !activeDirectChatFriend) return;
+  socket.emit("mark-direct-seen", {
+    viewerPhone: currentUser.phone,
+    friendPhone: activeDirectChatFriend.phone
+  });
+}
 
 // ================= ROOM MEMBERS & PROFILE =================
 socket.on("room-members-update", (members) => {
@@ -1331,30 +1703,47 @@ logoutBtn.addEventListener("click", () => {
 sendMessageBtn.addEventListener("click", sendChatMessage);
 chatMessageInput.addEventListener("keypress", (e) => { if (e.key === "Enter") sendChatMessage(); });
 
-fileAttachmentInput.addEventListener("change", (e) => {
+fileAttachmentInput.addEventListener("change", async (e) => {
   const file = e.target.files[0];
+  fileAttachmentInput.value = "";
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-    const fileData = {
-      id: msgId,
-      roomCode: currentRoom,
-      sender: currentUser.name,
-      senderPic: currentUser.pic || "https://via.placeholder.com/40",
-      fileType: file.type,
-      fileContent: evt.target.result,
-      fileName: file.name
-    };
-    appendChatMessage(fileData, true, "Sending...");
-    socket.emit("send-message", fileData, () => {
-      updateMessageStatus(msgId, "Sent");
-      saveCurrentRoomHistoryToLocal();
-    });
-    fileAttachmentInput.value = "";
+  let fileContent = null;
+  let fileType = file.type;
+
+  try {
+    if (file.type.startsWith("image/")) {
+      const compressed = await compressImageFile(file);   // রুমেও ছবি ছোট করে পাঠানো
+      if (compressed) { fileContent = compressed.dataUrl; fileType = compressed.type; }
+      else fileContent = await readFileAsDataUrl(file);
+    } else {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        await showCustomAlert("File Too Large", "ফাইলটি অনেক বড় (১৮MB এর বেশি)।");
+        return;
+      }
+      fileContent = await readFileAsDataUrl(file);
+    }
+  } catch (err) {
+    await showCustomAlert("Error", "ফাইলটি পড়া যায়নি, আবার চেষ্টা করুন।");
+    return;
+  }
+  if (!fileContent) return;
+
+  const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+  const fileData = {
+    id: msgId,
+    roomCode: currentRoom,
+    sender: currentUser.name,
+    senderPic: currentUser.pic || "https://via.placeholder.com/40",
+    fileType: fileType,
+    fileContent: fileContent,
+    fileName: file.name
   };
-  reader.readAsDataURL(file);
+  appendChatMessage(fileData, true, "Sending...");
+  socket.emit("send-message", fileData, () => {
+    updateMessageStatus(msgId, "Sent");
+    saveCurrentRoomHistoryToLocal();
+  });
 });
 
 function sendChatMessage() {
@@ -1410,26 +1799,21 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
   const isMe = msg.sender === currentUser.name;
   msgDiv.style.cssText = `display: flex; align-items: flex-end; gap: 8px; justify-content: ${isMe ? 'flex-end' : 'flex-start'}; margin-bottom: 10px;`;
 
-  let contentHtml = "";
-  if (msg.fileType) {
-    if (msg.fileType.startsWith("image/")) {
-      contentHtml = `<img src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px; cursor: pointer;" class="previewable-media" data-type="image" data-src="${msg.fileContent}" data-name="${msg.fileName || 'image.png'}" />`;
-    } else if (msg.fileType.startsWith("video/")) {
-      contentHtml = `<video src="${msg.fileContent}" style="max-width: 200px; border-radius: 8px; display: block; margin-top: 4px; cursor: pointer;" class="previewable-media" data-type="video" data-src="${msg.fileContent}" data-name="${msg.fileName || 'video.mp4'}"></video>`;
-    } else {
-      contentHtml = `<a href="${msg.fileContent}" download="${msg.fileName}" style="color: #fff; text-decoration: underline;">📁 ${msg.fileName}</a>`;
-    }
-  } else {
-    contentHtml = `<span>${msg.text}</span>`;
-  }
+  // ডিরেক্ট চ্যাটের মতো একই সুন্দর বাবল/মিডিয়া স্টাইল রুমেও ব্যবহার করা হলো
+  const built = buildMessageContent(msg);
+  const contentHtml = built.html;
+  const isMedia = built.isMedia;
 
-  let statusHtml = isMe ? `<div class="msg-status-container" style="font-size: 10px; text-align: right; color: #bbb; margin-top: 2px;">${initialStatus}</div>` : "";
-  const avatarImg = `<img src="${msg.senderPic || 'https://via.placeholder.com/40'}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" />`;
+  const statusHtml = isMe
+    ? `<div class="msg-status-container status-chip" style="justify-content:flex-end; margin-top:3px;">${initialStatus}</div>`
+    : "";
+  const avatarImg = `<div class="msg-avatar"><img src="${msg.senderPic || 'https://via.placeholder.com/40'}" alt="" /></div>`;
+  const bubble = `<div class="msg-bubble ${isMedia ? "media-bubble" : ""}">${contentHtml}</div>`;
 
   if (isMe) {
     msgDiv.innerHTML = `
-      <div style="display: flex; flex-direction: column; max-width: 70%;">
-        <div style="background: #0d6efd; color: #fff; padding: 10px 14px; border-radius: 12px; word-break: break-word;">${contentHtml}</div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; max-width:78%;" class="room-msg-col me">
+        ${bubble}
         ${statusHtml}
       </div>
       ${avatarImg}
@@ -1437,27 +1821,17 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
   } else {
     msgDiv.innerHTML = `
       ${avatarImg}
-      <div style="display: flex; flex-direction: column; max-width: 70%;">
-        <div style="background: #333; color: #fff; padding: 10px 14px; border-radius: 12px; word-break: break-word;">${contentHtml}</div>
+      <div style="display:flex; flex-direction:column; align-items:flex-start; max-width:78%;" class="room-msg-col">
+        ${bubble}
       </div>
     `;
   }
+  msgDiv.classList.add("msg-row", "group-start", "group-end");
+  if (isMe) msgDiv.classList.add("me");
 
   chatMessages.appendChild(msgDiv);
+  attachMediaPreview(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  const mediaElement = msgDiv.querySelector(".previewable-media");
-  if (mediaElement) {
-    mediaElement.onclick = () => {
-      const src = mediaElement.getAttribute("data-src");
-      const name = mediaElement.getAttribute("data-name");
-      mediaPreviewContent.innerHTML = `<img src="${src}" style="max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;" />`;
-      mediaDownloadBtn.style.display = "inline-block";
-      mediaDownloadBtn.href = src;
-      mediaDownloadBtn.download = name;
-      mediaPreviewModal.style.display = "flex";
-    };
-  }
 }
 
 function updateMessageStatus(msgId, statusText) {
