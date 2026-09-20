@@ -151,23 +151,26 @@ body.light-theme .input-wrapper input {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
 .btn:hover {
-  opacity: 0.9;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.26);
 }
 
 .btn-primary {
-  background-color: #0d6efd;
+  background: linear-gradient(135deg, #2f8dff, #0d6efd 55%, #6f42c1);
   color: white;
 }
 
 .btn-danger {
-  background-color: #dc3545;
+  background: linear-gradient(135deg, #ff5a68, #dc3545);
   color: white;
 }
 
@@ -207,7 +210,8 @@ body.light-theme .input-wrapper input {
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #0d6efd;
+  border: 3px solid rgba(13, 110, 253, 0.55);
+  box-shadow: 0 0 0 4px rgba(111, 66, 193, 0.14), 0 8px 22px rgba(13, 110, 253, 0.25);
 }
 
 .avatar-edit-badge {
@@ -280,17 +284,33 @@ body.light-theme .chat-header {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;   /* নাম বড় হলেও যেন বাটনগুলো উইন্ডোর বাইরে ঠেলে না দেয় */
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .user-info img {
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.user-info h4,
+.user-info div {
+  min-width: 0;
+}
+
+.user-info h4 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-actions {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;   /* বাটনগুলো কখনো স্ক্রিনের বাইরে চলে যাবে না */
 }
 
 .action-btn {
@@ -1284,6 +1304,9 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   gap: 10px;
   color: inherit;
   text-align: left;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 /* রুম চ্যাটের কলামের ভেতরে বাবল যেন পুরো প্রস্থ পায় */
@@ -1480,7 +1503,9 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   bottom: calc(40px + env(safe-area-inset-bottom, 0px));
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 40px;
+  padding: 0 16px;
   z-index: 6;
 }
 .call-ended-btn {
@@ -1634,10 +1659,14 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   background: rgba(255, 255, 255, 0.05);
   padding: 4px;
   border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.profile-tabs::-webkit-scrollbar { display: none; }
 body.light-theme .profile-tabs { background: rgba(0, 0, 0, 0.05); }
 .profile-tab {
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: 62px;
   padding: 8px 4px;
   border: none;
   background: transparent;
@@ -1647,11 +1676,16 @@ body.light-theme .profile-tabs { background: rgba(0, 0, 0, 0.05); }
   border-radius: 9px;
   cursor: pointer;
   opacity: 0.6;
+  white-space: nowrap;
 }
 .profile-tab.active {
   background: #0d6efd;
   color: #fff;
   opacity: 1;
+}
+
+@media (max-width: 380px) {
+  .profile-tab { font-size: 11.5px; padding: 7px 3px; min-width: 56px; }
 }
 
 .profile-gallery {
@@ -2263,4 +2297,9 @@ body.light-theme .post-comment-input { background: #f0f2f5; }
 
 @media (min-width: 768px) {
   .post-media { max-height: 480px; }
+}
+
+/* প্রোফাইলের প্রতিটা ট্যাব সুইচ করার সময় হালকা fade — আরও প্রিমিয়াম ফিল */
+.profile-tab-panel {
+  animation: fadeScaleIn 0.28s ease both;
 }
