@@ -34,8 +34,16 @@ app.use(express.static(path.join(__dirname)));
 // ================= DATA STORE (now saved to disk) =================
 // আগে সব ডেটা শুধু মেমোরিতে ছিল, তাই সার্ভার রিস্টার্ট/স্লিপ হলেই ফ্রেন্ড লিস্ট
 // মুছে যেত। এখন ডেটা app-data.json ফাইলে সেভ হয় এবং সার্ভার চালু হলে আবার লোড হয়।
-
-const DATA_FILE = path.join(__dirname, "app-data.json");
+//
+// ⚠️ গুরুত্বপূর্ণ: Render-এর ফ্রি/স্ট্যান্ডার্ড ওয়েব সার্ভিসের ডিস্ক "ephemeral" —
+// প্রতিবার নতুন ডিপ্লয় বা রিস্টার্ট হলে এই ফাইলটা মুছে যায়, ফলে আগে রেজিস্টার করা
+// সব ইউজার/পাসওয়ার্ড হারিয়ে যায় (এই কারণেই অন্য ডিভাইসে লগইন ফেইল করে, কারণ ওই
+// ডিভাইসের লোকাল ক্যাশ নেই আর সার্ভারেও ডেটা নেই)। এটা ঠিক করার আসল সমাধান হলো
+// Render Dashboard → এই সার্ভিস → "Disks" থেকে একটা Persistent Disk যোগ করে (যেমন
+// মাউন্ট পাথ "/data") এবং Environment ভ্যারিয়েবল DATA_DIR=/data সেট করে দেওয়া —
+// তাহলে ডিপ্লয়/রিস্টার্ট হলেও ইউজার ডেটা আর মুছে যাবে না।
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(DATA_DIR, "app-data.json");
 const MAX_SAVED_MESSAGES = 100; // প্রতি চ্যাটে সর্বশেষ কতগুলো মেসেজ ফাইলে রাখা হবে
 
 let users = {};              // phone -> { name, phone, password, pic }
@@ -115,6 +123,19 @@ function saveData() {
     }
   }, 1500);
 }
+
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (e) {
+  console.error("Could not prepare DATA_DIR:", e.message);
+}
+console.log(
+  process.env.DATA_DIR
+    ? `Using persistent DATA_DIR: ${DATA_DIR} (user data will survive redeploys)`
+    : `⚠️ No DATA_DIR set — using ephemeral local folder for app-data.json. ` +
+      `User accounts WILL be lost on redeploy/restart unless you add a Render ` +
+      `Persistent Disk and set the DATA_DIR env var to its mount path.`
+);
 
 loadData();
 
@@ -445,6 +466,101 @@ io.on("connection", (socket) => {
       saveData();
     }
     if (typeof callback === "function") callback({ success: true });
+  });
+
+  // ---------- FACEBOOK-স্টাইল টাইমলাইন পোস্ট (ছবি/ভিডিও/টেক্সট + লাইক + কমেন্ট) ----------
+  function notifyFriendsOfProfile(phone) {
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+    });
+  }
+
+  socket.on("create-post", ({ phone, text, media }, callback) => {
+    if (!phone || (!text && !media)) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
+
+    const post = {
+      id: "post_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      text: (text || "").slice(0, 2000),
+      media: media || null,   // { type: "image"|"video", src }
+      timestamp: Date.now(),
+      likes: [],
+      comments: []
+    };
+
+    profiles[phone].posts.unshift(post);
+    // সর্বোচ্চ ৬০টি পোস্ট রাখা হয়, তার বেশি হলে পুরনোগুলো বাদ যাবে
+    profiles[phone].posts = profiles[phone].posts.slice(0, 60);
+    saveData();
+    notifyFriendsOfProfile(phone);
+
+    if (typeof callback === "function") callback({ success: true, post });
+  });
+
+  socket.on("delete-post", ({ phone, postId }, callback) => {
+    if (profiles[phone] && Array.isArray(profiles[phone].posts)) {
+      profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== postId);
+      saveData();
+      notifyFriendsOfProfile(phone);
+    }
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  socket.on("toggle-like-post", ({ phone, postId, likerPhone }, callback) => {
+    const list = profiles[phone] && profiles[phone].posts;
+    const post = Array.isArray(list) ? list.find((p) => p.id === postId) : null;
+    if (!post) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    if (!Array.isArray(post.likes)) post.likes = [];
+    const idx = post.likes.indexOf(likerPhone);
+    let liked;
+    if (idx === -1) { post.likes.push(likerPhone); liked = true; }
+    else { post.likes.splice(idx, 1); liked = false; }
+    saveData();
+
+    // পোস্টের মালিককে জানানো (তার প্রোফাইল খোলা থাকলে লাইভ আপডেট হবে)
+    const ownerSocket = phoneToSocket[phone];
+    if (ownerSocket) io.to(ownerSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
+
+    if (typeof callback === "function") callback({ success: true, liked, likes: post.likes });
+  });
+
+  socket.on("add-comment", ({ phone, postId, comment }, callback) => {
+    const list = profiles[phone] && profiles[phone].posts;
+    const post = Array.isArray(list) ? list.find((p) => p.id === postId) : null;
+    if (!post || !comment) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    if (!Array.isArray(post.comments)) post.comments = [];
+
+    const newComment = {
+      id: "cm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      authorPhone: comment.authorPhone,
+      authorName: comment.authorName,
+      authorPic: comment.authorPic,
+      text: (comment.text || "").slice(0, 500),
+      timestamp: Date.now()
+    };
+    post.comments.push(newComment);
+    saveData();
+
+    const ownerSocket = phoneToSocket[phone];
+    if (ownerSocket) io.to(ownerSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
+    // কমেন্টকারী যদি অন্য কেউ হয়, তাকেও আপডেট পাঠানো (তার স্ক্রিনেও যেন সাথে সাথে দেখা যায়)
+    const commenterSocket = phoneToSocket[comment.authorPhone];
+    if (commenterSocket && comment.authorPhone !== phone) {
+      io.to(commenterSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
+    }
+
+    if (typeof callback === "function") callback({ success: true, comment: newComment });
   });
 
   // ---------- CALL: অডিও থেকে ভিডিওতে সুইচ ----------
