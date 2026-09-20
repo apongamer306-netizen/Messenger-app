@@ -829,3 +829,20 @@ body.light-theme .action-btn.leave-room { color: #fff; }
   .chat-actions { gap: 6px; }
   .action-btn { width: 33px; height: 33px; font-size: 13px; }
 }
+
+/* ===== MODAL LAYERING FIX =====
+   ডিরেক্ট চ্যাট স্ক্রিনের z-index ছিল 100001, আর কল মোডাল ছিল 9999।
+   তাই ডিরেক্ট মেসেজের ভেতর থেকে কল দিলে মোডালটা চ্যাট স্ক্রিনের পেছনে
+   লুকিয়ে যেত। এখন কল মোডাল ও পপআপ সবার উপরে থাকবে। */
+#callModal {
+  z-index: 200001 !important;
+}
+
+#customModalOverlay {
+  z-index: 200002 !important;
+}
+
+#mediaPreviewModal,
+#themeModal {
+  z-index: 200000 !important;
+}
