@@ -193,7 +193,7 @@ let themeModal = document.createElement("div");
 themeModal.id = "themeModal";
 themeModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; justify-content:center; align-items:center;";
 themeModal.innerHTML = `
-  <div style="background: var(--bs-body-bg, #212529); color: var(--bs-body-color, #fff); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; border: 1px solid #444;">
+  <div class="theme-modal-card" style="background: var(--bs-body-bg, #212529); color: var(--bs-body-color, #fff); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; border: 1px solid #444;">
     <h5 style="margin-top: 0; margin-bottom: 15px;"><i class="fa-solid fa-palette" style="margin-right: 8px;"></i>Select Room Theme</h5>
     <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
       <div class="theme-box" data-bg="#121212" style="width: 40px; height: 40px; background: #121212; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" title="Dark"></div>
@@ -866,6 +866,7 @@ function showDashboard() {
   authScreen.style.display = "none";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
+  document.body.classList.add("dashboard-active"); // ল্যাপটপে পেছনের আভা দেখানোর জন্য
   const latestUser = JSON.parse(localStorage.getItem("appUser"));
   if (latestUser) currentUser = latestUser;
   if (currentUser) {
@@ -1982,6 +1983,7 @@ joinRoomBtn.addEventListener("click", () => {
 function joinRoom(code, isRefresh = false) {
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
+  document.body.classList.remove("dashboard-active");
 
   const latestUser = JSON.parse(localStorage.getItem("appUser"));
   if (latestUser) currentUser = latestUser;
