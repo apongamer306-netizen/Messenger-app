@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const fs = require("fs");
 const { Server } = require("socket.io");
 const path = require("path");
 
@@ -21,21 +22,106 @@ app.use(express.json({ limit: "50mb" }));
 // Serve the frontend files (index.html, app.js, style.css) from this same folder
 app.use(express.static(path.join(__dirname)));
 
-// ================= IN-MEMORY DATA STORE =================
-// NOTE: this resets whenever the server restarts. Fine for a demo/small app;
-// swap for a real database later if you need messages/users to persist permanently.
+// ================= DATA STORE (now saved to disk) =================
+// আগে সব ডেটা শুধু মেমোরিতে ছিল, তাই সার্ভার রিস্টার্ট/স্লিপ হলেই ফ্রেন্ড লিস্ট
+// মুছে যেত। এখন ডেটা app-data.json ফাইলে সেভ হয় এবং সার্ভার চালু হলে আবার লোড হয়।
 
-const users = {};              // phone -> { name, phone, password, pic }
-const friendships = {};        // phone -> Set(phone)
-const friendRequests = {};     // phone -> Set(phone)  (requests received BY this phone)
-const blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
-const directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
-const roomMessages = {};       // roomCode -> [ messages ]
-const roomMembers = {};        // roomCode -> Map(socket.id -> { user, peerId })
+const DATA_FILE = path.join(__dirname, "app-data.json");
+const MAX_SAVED_MESSAGES = 100; // প্রতি চ্যাটে সর্বশেষ কতগুলো মেসেজ ফাইলে রাখা হবে
 
-const phoneToSocket = {};      // phone -> socket.id
-const socketToPhone = {};      // socket.id -> phone
-const socketToRoom = {};       // socket.id -> roomCode
+let users = {};              // phone -> { name, phone, password, pic }
+let friendships = {};        // phone -> Set(phone)
+let friendRequests = {};     // phone -> Set(phone)  (requests received BY this phone)
+let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
+let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
+let roomMessages = {};       // roomCode -> [ messages ]
+
+const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
+const phoneToSocket = {};    // phone -> socket.id
+const socketToPhone = {};    // socket.id -> phone
+const socketToRoom = {};     // socket.id -> roomCode
+
+function setsToArrays(obj) {
+  const out = {};
+  for (const key in obj) out[key] = Array.from(obj[key]);
+  return out;
+}
+
+function arraysToSets(obj) {
+  const out = {};
+  if (!obj) return out;
+  for (const key in obj) out[key] = new Set(obj[key] || []);
+  return out;
+}
+
+function trimMessages(store) {
+  const out = {};
+  for (const key in store) {
+    const list = store[key] || [];
+    out[key] = list.slice(-MAX_SAVED_MESSAGES);
+  }
+  return out;
+}
+
+function loadData() {
+  try {
+    if (!fs.existsSync(DATA_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    users = raw.users || {};
+    friendships = arraysToSets(raw.friendships);
+    friendRequests = arraysToSets(raw.friendRequests);
+    blockedUsers = arraysToSets(raw.blockedUsers);
+    directMessages = raw.directMessages || {};
+    roomMessages = raw.roomMessages || {};
+    console.log("Saved data loaded successfully.");
+  } catch (e) {
+    console.error("Could not load saved data:", e.message);
+  }
+}
+
+let saveTimer = null;
+function saveData() {
+  // বারবার ডিস্কে লেখা এড়াতে অল্প সময় অপেক্ষা করে একসাথে সেভ করা হয়
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      const payload = {
+        users,
+        friendships: setsToArrays(friendships),
+        friendRequests: setsToArrays(friendRequests),
+        blockedUsers: setsToArrays(blockedUsers),
+        directMessages: trimMessages(directMessages),
+        roomMessages: trimMessages(roomMessages),
+      };
+      fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
+    } catch (e) {
+      console.error("Could not save data:", e.message);
+    }
+  }, 1500);
+}
+
+loadData();
+
+// সার্ভার বন্ধ হওয়ার আগে শেষবার সেভ করা
+["SIGINT", "SIGTERM"].forEach((sig) => {
+  process.on(sig, () => {
+    try {
+      fs.writeFileSync(
+        DATA_FILE,
+        JSON.stringify({
+          users,
+          friendships: setsToArrays(friendships),
+          friendRequests: setsToArrays(friendRequests),
+          blockedUsers: setsToArrays(blockedUsers),
+          directMessages: trimMessages(directMessages),
+          roomMessages: trimMessages(roomMessages),
+        })
+      );
+    } catch (e) {}
+    process.exit(0);
+  });
+});
 
 function ensureSet(obj, key) {
   if (!obj[key]) obj[key] = new Set();
@@ -52,12 +138,17 @@ function publicUser(phone) {
   return { name: u.name, phone: u.phone, pic: u.pic };
 }
 
+function getFriendPayload(phone) {
+  return {
+    requests: Array.from(ensureSet(friendRequests, phone)).map(publicUser),
+    friends: Array.from(ensureSet(friendships, phone)).map(publicUser),
+  };
+}
+
 function sendFriendData(phone) {
   const socketId = phoneToSocket[phone];
   if (!socketId) return;
-  const requests = Array.from(ensureSet(friendRequests, phone)).map(publicUser);
-  const friends = Array.from(ensureSet(friendships, phone)).map(publicUser);
-  io.to(socketId).emit("friend-list-updated", { requests, friends });
+  io.to(socketId).emit("friend-list-updated", getFriendPayload(phone));
 }
 
 function broadcastRoomMembers(roomCode) {
@@ -81,8 +172,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("register-user", (newUser, callback) => {
-    if (newUser && newUser.phone && !users[newUser.phone]) {
-      users[newUser.phone] = newUser;
+    if (newUser && newUser.phone) {
+      users[newUser.phone] = { ...(users[newUser.phone] || {}), ...newUser };
+      saveData();
     }
     if (typeof callback === "function") callback();
   });
@@ -96,18 +188,45 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ---------- FRIEND RESTORE / SYNC ----------
+  // ক্লায়েন্ট তার ব্রাউজারে সেভ থাকা ফ্রেন্ড লিস্ট পাঠায়। সার্ভারের ডেটা কোনো
+  // কারণে মুছে গেলে এখান থেকেই আবার তৈরি হয়ে যায় — তাই ফ্রেন্ড হারায় না।
+  socket.on("sync-user-data", ({ user, friends }, callback) => {
+    if (!user || !user.phone) {
+      if (typeof callback === "function") callback({ requests: [], friends: [] });
+      return;
+    }
+
+    users[user.phone] = { ...(users[user.phone] || {}), ...user };
+    socketToPhone[socket.id] = user.phone;
+    phoneToSocket[user.phone] = socket.id;
+
+    if (Array.isArray(friends)) {
+      friends.forEach((f) => {
+        if (!f || !f.phone || f.phone === user.phone) return;
+        // বন্ধুর বেসিক তথ্য রাখা (নাম/ছবি) যদি সার্ভারে না থাকে
+        if (!users[f.phone]) {
+          users[f.phone] = { name: f.name, phone: f.phone, pic: f.pic };
+        }
+        ensureSet(friendships, user.phone).add(f.phone);
+        ensureSet(friendships, f.phone).add(user.phone);
+      });
+    }
+
+    saveData();
+    if (typeof callback === "function") callback(getFriendPayload(user.phone));
+  });
+
   // ---------- FRIENDS ----------
   socket.on("get-friend-data", ({ phone }, callback) => {
-    const requests = Array.from(ensureSet(friendRequests, phone)).map(publicUser);
-    const friends = Array.from(ensureSet(friendships, phone)).map(publicUser);
-    if (typeof callback === "function") callback({ requests, friends });
+    if (typeof callback === "function") callback(getFriendPayload(phone));
   });
 
   socket.on("send-friend-request", ({ fromUser, toUserPhone }) => {
     if (!fromUser || !toUserPhone || fromUser.phone === toUserPhone) return;
-    // keep users store fresh
     users[fromUser.phone] = { ...(users[fromUser.phone] || {}), ...fromUser };
     ensureSet(friendRequests, toUserPhone).add(fromUser.phone);
+    saveData();
 
     const targetSocket = phoneToSocket[toUserPhone];
     if (targetSocket) io.to(targetSocket).emit("receive-friend-request");
@@ -118,6 +237,7 @@ io.on("connection", (socket) => {
     ensureSet(friendships, currentUser.phone).add(friendUser.phone);
     ensureSet(friendships, friendUser.phone).add(currentUser.phone);
     ensureSet(friendRequests, currentUser.phone).delete(friendUser.phone);
+    saveData();
 
     sendFriendData(currentUser.phone);
     sendFriendData(friendUser.phone);
@@ -144,6 +264,7 @@ io.on("connection", (socket) => {
     const key = directKey(senderPhone, receiverPhone);
     if (!directMessages[key]) directMessages[key] = [];
     directMessages[key].push(msgData);
+    saveData();
 
     const targetSocket = phoneToSocket[receiverPhone];
     if (targetSocket) io.to(targetSocket).emit("receive-direct-message", msgData);
@@ -154,6 +275,7 @@ io.on("connection", (socket) => {
   socket.on("clear-direct-history", ({ senderPhone, receiverPhone }, callback) => {
     const key = directKey(senderPhone, receiverPhone);
     delete directMessages[key];
+    saveData();
     if (typeof callback === "function") callback();
   });
 
@@ -167,6 +289,7 @@ io.on("connection", (socket) => {
       set.add(targetPhone);
       isBlocked = true;
     }
+    saveData();
     if (typeof callback === "function") callback({ success: true, isBlocked });
   });
 
@@ -175,6 +298,12 @@ io.on("connection", (socket) => {
     if (!roomCode || !user) return;
     socket.join(roomCode);
     socketToRoom[socket.id] = roomCode;
+
+    if (user.phone) {
+      users[user.phone] = { ...(users[user.phone] || {}), ...user };
+      phoneToSocket[user.phone] = socket.id;
+      socketToPhone[socket.id] = user.phone;
+    }
 
     if (!roomMembers[roomCode]) roomMembers[roomCode] = new Map();
     roomMembers[roomCode].set(socket.id, { user, peerId });
@@ -202,6 +331,7 @@ io.on("connection", (socket) => {
     if (!roomCode) return;
     if (!roomMessages[roomCode]) roomMessages[roomCode] = [];
     roomMessages[roomCode].push(msgData);
+    saveData();
 
     socket.to(roomCode).emit("receive-message", msgData);
     if (typeof callback === "function") callback();
@@ -212,7 +342,7 @@ io.on("connection", (socket) => {
     socket.to(roomCode).emit("room-theme-update", themeData);
   });
 
-  // ---------- AUDIO / VIDEO CALL SIGNALING (via PeerJS + room broadcast) ----------
+  // ---------- ROOM CALL SIGNALING ----------
   socket.on("call-user", (data) => {
     if (!data || !data.roomCode) return;
     socket.to(data.roomCode).emit("incoming-call", data);
@@ -226,6 +356,28 @@ io.on("connection", (socket) => {
   socket.on("end-call", ({ roomCode }) => {
     if (!roomCode) return;
     socket.to(roomCode).emit("call-ended");
+  });
+
+  // ---------- DIRECT (FRIEND) CALL SIGNALING ----------
+  // রুম কোড ছাড়াই এক ফ্রেন্ড থেকে আরেক ফ্রেন্ডের কাছে কল পাঠানো হয়
+  socket.on("direct-call-user", (data) => {
+    if (!data || !data.toPhone) return;
+    const targetSocket = phoneToSocket[data.toPhone];
+    if (targetSocket) {
+      io.to(targetSocket).emit("direct-incoming-call", data);
+    } else {
+      io.to(socket.id).emit("direct-call-unavailable", { toPhone: data.toPhone });
+    }
+  });
+
+  socket.on("direct-call-accept", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) io.to(targetSocket).emit("direct-call-accepted");
+  });
+
+  socket.on("direct-call-end", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) io.to(targetSocket).emit("direct-call-ended");
   });
 
   // ---------- DISCONNECT CLEANUP ----------
