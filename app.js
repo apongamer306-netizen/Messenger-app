@@ -1114,13 +1114,30 @@ profileModalOverlay.innerHTML = `
       <div id="pmSub" class="profile-modal-sub">Friend on EKT Chating App</div>
 
       <div class="profile-tabs">
-        <button class="profile-tab active" data-tab="about">About</button>
+        <button class="profile-tab active" data-tab="posts">Posts</button>
+        <button class="profile-tab" data-tab="about">About</button>
         <button class="profile-tab" data-tab="photos">Photos</button>
         <button class="profile-tab" data-tab="videos">Videos</button>
         <button class="profile-tab" data-tab="audio">Audio</button>
       </div>
 
-      <div id="pmTabAbout"></div>
+      <div id="pmTabPosts">
+        <div id="pmComposer" class="post-composer" style="display:none;">
+          <div class="post-composer-row">
+            <img id="pmComposerAvatar" class="post-composer-avatar" src="https://via.placeholder.com/40" alt="">
+            <textarea id="pmComposerText" class="post-composer-input" placeholder="What's on your mind?" rows="1"></textarea>
+          </div>
+          <div id="pmComposerPreview" class="post-composer-preview" style="display:none;"></div>
+          <div class="post-composer-actions">
+            <button class="post-composer-btn" id="pmAddPhotoBtn"><i class="fa-solid fa-image" style="color:#45bd62;"></i> Photo</button>
+            <button class="post-composer-btn" id="pmAddVideoBtn"><i class="fa-solid fa-video" style="color:#f3425f;"></i> Video</button>
+            <button class="btn btn-primary post-submit-btn" id="pmSubmitPostBtn">Post</button>
+          </div>
+        </div>
+        <div id="pmPostsFeed" class="posts-feed"></div>
+      </div>
+
+      <div id="pmTabAbout" style="display:none;"></div>
       <div id="pmTabMedia" style="display:none;">
         <div id="pmUploadRow" class="profile-upload-row" style="display:none;">
           <button class="profile-upload-btn" id="pmUploadBtn"><i class="fa-solid fa-plus"></i> <span id="pmUploadLabel">Add</span></button>
@@ -1143,7 +1160,14 @@ profileFileInput.type = "file";
 profileFileInput.style.display = "none";
 document.body.appendChild(profileFileInput);
 
-let profileViewState = { phone: null, isMe: false, data: {}, tab: "about" };
+// পোস্ট কম্পোজারের ছবি/ভিডিও ইনপুট
+const postMediaInput = document.createElement("input");
+postMediaInput.type = "file";
+postMediaInput.style.display = "none";
+document.body.appendChild(postMediaInput);
+
+let profileViewState = { phone: null, isMe: false, data: {}, tab: "posts" };
+let pendingPostMedia = null; // { type, src, name } — পোস্ট করার আগে সিলেক্ট করা ছবি/ভিডিও
 
 function detailRow(icon, label, value) {
   if (!value) return "";
@@ -1153,7 +1177,261 @@ function detailRow(icon, label, value) {
           </div>`;
 }
 
-// ---------- ট্যাব রেন্ডার ----------
+// ---------- পোস্ট (Facebook-স্টাইল টাইমলাইন) ----------
+function timeAgo(ts) {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "এখনই";
+  if (min < 60) return min + "মি";
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return hr + "ঘ";
+  const day = Math.floor(hr / 24);
+  if (day < 7) return day + "দি";
+  const d = new Date(ts);
+  return d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear();
+}
+
+function renderPostsFeed() {
+  const feed = document.getElementById("pmPostsFeed");
+  const posts = profileViewState.data.posts || [];
+
+  if (!posts.length) {
+    feed.innerHTML = `<div class="profile-empty">${profileViewState.isMe ? "এখনো কিছু পোস্ট করেননি। উপর থেকে প্রথম পোস্টটি করুন!" : "এই বন্ধু এখনো কিছু পোস্ট করেননি।"}</div>`;
+    return;
+  }
+
+  feed.innerHTML = posts.map((post) => renderPostCardHtml(post)).join("");
+  posts.forEach((post) => wirePostCardEvents(post));
+}
+
+function renderPostCardHtml(post) {
+  const d = profileViewState.data;
+  const likeCount = (post.likes || []).length;
+  const commentCount = (post.comments || []).length;
+  const iLiked = currentUser && (post.likes || []).includes(currentUser.phone);
+
+  let mediaHtml = "";
+  if (post.media && post.media.src) {
+    if (post.media.type === "video") {
+      mediaHtml = `<div class="post-media-wrap previewable-media" data-type="video" data-src="${post.media.src}" data-name="post-video">
+                     <video class="post-media" preload="metadata" muted playsinline src="${post.media.src}#t=0.1"></video>
+                     <span class="video-play-badge"><i class="fa-solid fa-play"></i></span>
+                   </div>`;
+    } else {
+      mediaHtml = `<div class="post-media-wrap previewable-media" data-type="image" data-src="${post.media.src}" data-name="post-photo">
+                     <img class="post-media" src="${post.media.src}" alt="">
+                   </div>`;
+    }
+  }
+
+  const commentsHtml = (post.comments || []).map((c) => `
+    <div class="post-comment">
+      <img class="post-comment-avatar" src="${c.authorPic || 'https://via.placeholder.com/32'}" alt="">
+      <div class="post-comment-bubble">
+        <span class="post-comment-name">${escapeHtml(c.authorName || "User")}</span>
+        <span class="post-comment-text">${escapeHtml(c.text)}</span>
+      </div>
+    </div>
+  `).join("");
+
+  return `
+    <div class="post-card" data-post-id="${post.id}">
+      <div class="post-card-header">
+        <img class="post-avatar" src="${d.pic || 'https://via.placeholder.com/40'}" alt="">
+        <div class="post-header-text">
+          <span class="post-author-name">${escapeHtml(d.name || "User")}</span>
+          <span class="post-time">${timeAgo(post.timestamp)}</span>
+        </div>
+        ${profileViewState.isMe ? `<button class="post-delete-btn" data-post-del="${post.id}" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ""}
+      </div>
+      ${post.text ? `<div class="post-text">${escapeHtml(post.text)}</div>` : ""}
+      ${mediaHtml}
+      <div class="post-meta-row">
+        <span class="post-like-count">${likeCount > 0 ? "👍 " + likeCount : ""}</span>
+        <span class="post-comment-count">${commentCount > 0 ? commentCount + " comments" : ""}</span>
+      </div>
+      <div class="post-actions-row">
+        <button class="post-action-btn like-btn ${iLiked ? "liked" : ""}" data-like="${post.id}">
+          <i class="fa-solid fa-thumbs-up"></i> Like
+        </button>
+        <button class="post-action-btn comment-toggle-btn" data-toggle-comments="${post.id}">
+          <i class="fa-regular fa-comment"></i> Comment
+        </button>
+      </div>
+      <div class="post-comments-section" id="comments-${post.id}" style="display:none;">
+        <div class="post-comments-list">${commentsHtml}</div>
+        <div class="post-comment-input-row">
+          <img class="post-comment-avatar" src="${(currentUser && currentUser.pic) || 'https://via.placeholder.com/32'}" alt="">
+          <input type="text" class="post-comment-input" placeholder="Write a comment..." data-comment-input="${post.id}">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function wirePostCardEvents(post) {
+  const card = document.querySelector(`.post-card[data-post-id="${post.id}"]`);
+  if (!card) return;
+
+  const mediaEl = card.querySelector(".previewable-media");
+  if (mediaEl) {
+    mediaEl.onclick = () => {
+      openMediaPreview(mediaEl.getAttribute("data-type"), mediaEl.getAttribute("data-src"), mediaEl.getAttribute("data-name"));
+    };
+  }
+
+  const delBtn = card.querySelector("[data-post-del]");
+  if (delBtn) {
+    delBtn.onclick = async () => {
+      const ok = await showCustomModal({ title: "Delete Post", subtitle: "এই পোস্টটি মুছে ফেলতে চান?" });
+      if (ok === null) return;
+      socket.emit("delete-post", { phone: profileViewState.phone, postId: post.id }, (res) => {
+        if (res && res.success) {
+          profileViewState.data.posts = (profileViewState.data.posts || []).filter((p) => p.id !== post.id);
+          renderPostsFeed();
+        }
+      });
+    };
+  }
+
+  const likeBtn = card.querySelector("[data-like]");
+  if (likeBtn) {
+    likeBtn.onclick = () => {
+      socket.emit("toggle-like-post", { phone: profileViewState.phone, postId: post.id, likerPhone: currentUser.phone }, (res) => {
+        if (!res || !res.success) return;
+        post.likes = res.likes;
+        renderPostsFeed();
+      });
+    };
+  }
+
+  const toggleBtn = card.querySelector("[data-toggle-comments]");
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      const section = document.getElementById("comments-" + post.id);
+      if (section) section.style.display = section.style.display === "none" ? "block" : "none";
+    };
+  }
+
+  const commentInput = card.querySelector("[data-comment-input]");
+  if (commentInput) {
+    commentInput.onkeypress = (e) => {
+      if (e.key !== "Enter") return;
+      const text = commentInput.value.trim();
+      if (!text || !currentUser) return;
+      commentInput.value = "";
+      socket.emit("add-comment", {
+        phone: profileViewState.phone,
+        postId: post.id,
+        comment: { authorPhone: currentUser.phone, authorName: currentUser.name, authorPic: currentUser.pic, text }
+      }, (res) => {
+        if (res && res.success) {
+          post.comments = post.comments || [];
+          post.comments.push(res.comment);
+          renderPostsFeed();
+          const reopened = document.getElementById("comments-" + post.id);
+          if (reopened) reopened.style.display = "block";
+        }
+      });
+    };
+  }
+}
+
+// ---------- পোস্ট কম্পোজার ----------
+const pmComposer = document.getElementById("pmComposer");
+const pmComposerText = document.getElementById("pmComposerText");
+const pmComposerPreview = document.getElementById("pmComposerPreview");
+const pmComposerAvatar = document.getElementById("pmComposerAvatar");
+
+pmComposerText.addEventListener("input", () => {
+  pmComposerText.style.height = "auto";
+  pmComposerText.style.height = pmComposerText.scrollHeight + "px";
+});
+
+document.getElementById("pmAddPhotoBtn").onclick = () => {
+  postMediaInput.accept = "image/*";
+  postMediaInput.dataset.kind = "image";
+  postMediaInput.click();
+};
+document.getElementById("pmAddVideoBtn").onclick = () => {
+  postMediaInput.accept = "video/*";
+  postMediaInput.dataset.kind = "video";
+  postMediaInput.click();
+};
+
+postMediaInput.onchange = async () => {
+  const file = postMediaInput.files[0];
+  const kind = postMediaInput.dataset.kind;
+  postMediaInput.value = "";
+  if (!file || !currentUser) return;
+
+  let src;
+  try {
+    if (kind === "image") {
+      const compressed = await compressImageFile(file);
+      src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+    } else {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        await showCustomAlert("File Too Large", "ভিডিওটি অনেক বড় (১৮MB এর বেশি)।");
+        return;
+      }
+      src = await readFileAsDataUrl(file);
+    }
+  } catch (e) {
+    await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
+    return;
+  }
+
+  pendingPostMedia = { type: kind === "video" ? "video" : "image", src, name: file.name };
+  pmComposerPreview.style.display = "block";
+  pmComposerPreview.innerHTML = kind === "video"
+    ? `<video src="${src}#t=0.1" muted></video><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`
+    : `<img src="${src}" alt=""><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`;
+  document.getElementById("pmRemoveMedia").onclick = () => {
+    pendingPostMedia = null;
+    pmComposerPreview.style.display = "none";
+    pmComposerPreview.innerHTML = "";
+  };
+};
+
+document.getElementById("pmSubmitPostBtn").onclick = () => {
+  const text = pmComposerText.value.trim();
+  if (!text && !pendingPostMedia) return;
+  if (!currentUser) return;
+
+  socket.emit("create-post", {
+    phone: currentUser.phone,
+    text,
+    media: pendingPostMedia
+  }, (res) => {
+    if (res && res.success) {
+      profileViewState.data.posts = profileViewState.data.posts || [];
+      profileViewState.data.posts.unshift(res.post);
+      pmComposerText.value = "";
+      pmComposerText.style.height = "auto";
+      pendingPostMedia = null;
+      pmComposerPreview.style.display = "none";
+      pmComposerPreview.innerHTML = "";
+      renderPostsFeed();
+    } else {
+      showCustomAlert("Error", "পোস্ট করা যায়নি, আবার চেষ্টা করুন।");
+    }
+  });
+};
+
+// অন্য কেউ লাইক/কমেন্ট করলে প্রোফাইল খোলা থাকলে সাথে সাথে আপডেট হবে
+socket.on("post-updated", ({ phone, postId, likes, comments }) => {
+  if (profileViewState.phone !== phone) return;
+  const posts = profileViewState.data.posts || [];
+  const post = posts.find((p) => p.id === postId);
+  if (!post) return;
+  post.likes = likes;
+  post.comments = comments;
+  if (profileModalOverlay.classList.contains("active") && profileViewState.tab === "posts") {
+    renderPostsFeed();
+  }
+});
+
 function renderProfileAbout() {
   const d = profileViewState.data || {};
   const box = document.getElementById("pmTabAbout");
@@ -1229,9 +1507,25 @@ function switchProfileTab(tab) {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
 
+  const postsBox = document.getElementById("pmTabPosts");
   const aboutBox = document.getElementById("pmTabAbout");
   const mediaBox = document.getElementById("pmTabMedia");
   const uploadRow = document.getElementById("pmUploadRow");
+
+  if (tab === "posts") {
+    postsBox.style.display = "block";
+    aboutBox.style.display = "none";
+    mediaBox.style.display = "none";
+
+    pmComposer.style.display = profileViewState.isMe ? "block" : "none";
+    if (profileViewState.isMe && currentUser) {
+      pmComposerAvatar.src = currentUser.pic || "https://via.placeholder.com/40";
+    }
+    renderPostsFeed();
+    return;
+  }
+
+  postsBox.style.display = "none";
 
   if (tab === "about") {
     aboutBox.style.display = "block";
@@ -1329,9 +1623,16 @@ function openProfile(phone, fallback) {
   document.getElementById("pmSub").textContent = "লোড হচ্ছে...";
   document.getElementById("pmMessageBtn").style.display = isMe ? "none" : "inline-flex";
 
-  profileViewState = { phone, isMe, data: fallback || {}, tab: "about" };
+  // কম্পোজার রিসেট
+  pendingPostMedia = null;
+  pmComposerText.value = "";
+  pmComposerText.style.height = "auto";
+  pmComposerPreview.style.display = "none";
+  pmComposerPreview.innerHTML = "";
+
+  profileViewState = { phone, isMe, data: fallback || {}, tab: "posts" };
   profileModalOverlay.classList.add("active");
-  switchProfileTab("about");
+  switchProfileTab("posts");
 
   socket.emit("get-profile", { phone }, (data) => {
     if (!data) return;
@@ -2675,5 +2976,5 @@ socket.on("direct-call-ended", endCallCleanup);
 window.addEventListener("load", () => {
   setTimeout(() => {
     if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
-  }, 4600);
+  }, 5600);
 });
