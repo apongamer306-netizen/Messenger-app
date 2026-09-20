@@ -943,6 +943,7 @@ socket.on("connect", () => {
   socket.emit("set-user-socket", { phone: currentUser.phone });
   socket.emit("register-user", currentUser, () => {});
   fetchFriendData();
+  healMyProfileIfNeeded(); // সার্ভার ডেটা হারালে এই ডিভাইস থেকে "About" ফিরিয়ে আনা
   if (currentRoom) {
     socket.emit("join-room", { roomCode: currentRoom, user: currentUser, peerId: myPeerId });
   }
@@ -1121,7 +1122,7 @@ profileModalOverlay.innerHTML = `
         <button class="profile-tab" data-tab="audio">Audio</button>
       </div>
 
-      <div id="pmTabPosts">
+      <div id="pmTabPosts" class="profile-tab-panel">
         <div id="pmComposer" class="post-composer" style="display:none;">
           <div class="post-composer-row">
             <img id="pmComposerAvatar" class="post-composer-avatar" src="https://via.placeholder.com/40" alt="">
@@ -1137,8 +1138,8 @@ profileModalOverlay.innerHTML = `
         <div id="pmPostsFeed" class="posts-feed"></div>
       </div>
 
-      <div id="pmTabAbout" style="display:none;"></div>
-      <div id="pmTabMedia" style="display:none;">
+      <div id="pmTabAbout" class="profile-tab-panel" style="display:none;"></div>
+      <div id="pmTabMedia" class="profile-tab-panel" style="display:none;">
         <div id="pmUploadRow" class="profile-upload-row" style="display:none;">
           <button class="profile-upload-btn" id="pmUploadBtn"><i class="fa-solid fa-plus"></i> <span id="pmUploadLabel">Add</span></button>
         </div>
@@ -1608,7 +1609,27 @@ function saveMyProfile() {
     if (res && res.success) {
       profileViewState.data = { ...profileViewState.data, ...res.profile };
       document.getElementById("pmSub").textContent = profile.bio || "EKT Chating App";
+      // এই ডিভাইসেও একটা কপি রাখা হয় — সার্ভার কোনো কারণে ডেটা হারালেও
+      // এই ডিভাইস থেকে পরের বার কানেক্ট হলেই আবার নিজে থেকে ফিরে আসবে
+      try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
       showCustomAlert("Saved", "আপনার প্রোফাইল সেভ হয়েছে।");
+    }
+  });
+}
+
+// সার্ভারের ডেটা কোনো কারণে হারিয়ে গেলে (যেমন হোস্টিং রিস্টার্ট), এই ডিভাইসে
+// সেভ করা কপি থেকে "About" তথ্যগুলো নিজে থেকেই আবার সার্ভারে ফিরিয়ে দেওয়া হয়
+function healMyProfileIfNeeded() {
+  if (!currentUser) return;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem("myProfileAbout_" + currentUser.phone) || "null"); } catch (e) {}
+  if (!cached) return;
+
+  socket.emit("get-profile", { phone: currentUser.phone }, (data) => {
+    const hasAnyAboutField = data && (data.bio || data.location || data.work || data.education || data.about);
+    if (!hasAnyAboutField) {
+      // সার্ভারে কিছুই নেই কিন্তু এই ডিভাইসে ব্যাকআপ আছে — পুনরুদ্ধার করা হচ্ছে
+      socket.emit("save-profile", { phone: currentUser.phone, profile: cached }, () => {});
     }
   });
 }
