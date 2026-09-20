@@ -16,7 +16,7 @@
       position:fixed; inset:0; z-index:2147483647;
       display:flex; align-items:center; justify-content:center; flex-direction:column;
       background:#05070d;
-      opacity:1; transition:opacity .7s ease, visibility .7s ease;
+      opacity:1; transition:opacity 1.3s ease, visibility 1.3s ease;
       padding:env(safe-area-inset-top,0px) 20px env(safe-area-inset-bottom,0px);
       overflow:hidden;
     }
@@ -96,8 +96,8 @@
       box-shadow:0 22px 55px rgba(13,110,253,.5),
                  0 0 0 1px rgba(255,255,255,.14) inset,
                  0 1px 0 rgba(255,255,255,.4) inset;
-      animation:splashPop 1.1s cubic-bezier(.2,1.45,.35,1) both,
-                splashFloat 4s ease-in-out 1.2s infinite;
+      animation:splashPop 1.7s cubic-bezier(.2,1.3,.3,1) both,
+                splashFloat 4.5s ease-in-out 1.8s infinite;
     }
     /* glossy sweep across the icon */
     .splash-icon::before{
@@ -285,9 +285,9 @@
       var sp = document.getElementById("splashScreen");
       if (!sp || sp.classList.contains("splash-hide")) return;
       sp.classList.add("splash-hide");
-      setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 850);
+      setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 1350);
     };
-    setTimeout(window.hideSplashScreen, 5200);
+    setTimeout(window.hideSplashScreen, 6400);
   </script>
 
   <header class="navbar">
