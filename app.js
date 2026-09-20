@@ -277,7 +277,10 @@ function applyThemeForCurrentContext(themeData) {
 }
 
 function applyRoomTheme(theme) {
-  const chatArea = document.getElementById("chatMessages")?.parentNode || chatScreen;
+  // শুধুমাত্র মেসেজ বক্সের ব্যাকগ্রাউন্ড পরিবর্তন হবে — হেডার, ইনপুট বার
+  // বা বাকি স্ক্রিন আগের মতোই থাকবে।
+  const chatArea = document.getElementById("chatMessages");
+  if (!chatArea) return;
   if (theme.background) {
     chatArea.style.backgroundColor = theme.background;
     chatArea.style.backgroundImage = "none";
@@ -1679,6 +1682,18 @@ socket.on("direct-incoming-call", (data) => {
   callContext = { mode: "direct", phone: data.fromPhone };
   currentCallType = data.callType;
 
+  // কলটা যেন ড্যাশবোর্ডে না দেখিয়ে সরাসরি ওই ফ্রেন্ডের মেসেজ স্ক্রিনেই আসে
+  const callerFriend = {
+    phone: data.fromPhone,
+    name: data.callerName || "Friend",
+    pic: data.callerPic || "https://via.placeholder.com/100"
+  };
+  const alreadyInThisChat =
+    directChatScreen.classList.contains("active") &&
+    activeDirectChatFriend &&
+    activeDirectChatFriend.phone === data.fromPhone;
+  if (!alreadyInThisChat) openDirectChat(callerFriend);
+
   remoteCallName.textContent = data.callerName || "Friend";
   remoteCallAvatar.src = data.callerPic || "https://via.placeholder.com/100";
   localCallAvatar.src = (currentUser && currentUser.pic) || "https://via.placeholder.com/100";
@@ -1728,5 +1743,5 @@ socket.on("direct-call-ended", endCallCleanup);
 window.addEventListener("load", () => {
   setTimeout(() => {
     if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
-  }, 2200);
+  }, 4600);
 });
