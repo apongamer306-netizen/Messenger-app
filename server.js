@@ -39,6 +39,8 @@ const DATA_FILE = path.join(__dirname, "app-data.json");
 const MAX_SAVED_MESSAGES = 100; // প্রতি চ্যাটে সর্বশেষ কতগুলো মেসেজ ফাইলে রাখা হবে
 
 let users = {};              // phone -> { name, phone, password, pic }
+let profiles = {};           // phone -> { bio, location, work, education, relationship, items: [...] }
+let directThemes = {};       // "phoneA|phoneB" (sorted) -> themeData
 let friendships = {};        // phone -> Set(phone)
 let friendRequests = {};     // phone -> Set(phone)  (requests received BY this phone)
 let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
@@ -82,6 +84,8 @@ function loadData() {
     blockedUsers = arraysToSets(raw.blockedUsers);
     directMessages = raw.directMessages || {};
     roomMessages = raw.roomMessages || {};
+    profiles = raw.profiles || {};
+    directThemes = raw.directThemes || {};
     console.log("Saved data loaded successfully.");
   } catch (e) {
     console.error("Could not load saved data:", e.message);
@@ -102,6 +106,8 @@ function saveData() {
         blockedUsers: setsToArrays(blockedUsers),
         directMessages: trimMessages(directMessages),
         roomMessages: trimMessages(roomMessages),
+        profiles,
+        directThemes,
       };
       fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
     } catch (e) {
@@ -125,6 +131,8 @@ loadData();
           blockedUsers: setsToArrays(blockedUsers),
           directMessages: trimMessages(directMessages),
           roomMessages: trimMessages(roomMessages),
+          profiles,
+          directThemes,
         })
       );
     } catch (e) {}
@@ -372,6 +380,82 @@ io.on("connection", (socket) => {
   socket.on("set-room-theme", ({ roomCode, themeData }) => {
     if (!roomCode) return;
     socket.to(roomCode).emit("room-theme-update", themeData);
+  });
+
+  // ---------- DIRECT CHAT THEME (দুই পাশেই একসাথে বদলাবে) ----------
+  socket.on("set-direct-theme", ({ fromPhone, toPhone, themeData }) => {
+    if (!fromPhone || !toPhone) return;
+    directThemes[directKey(fromPhone, toPhone)] = themeData || {};
+    saveData();
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) {
+      io.to(targetSocket).emit("direct-theme-update", { fromPhone, themeData });
+    }
+  });
+
+  socket.on("get-direct-theme", ({ myPhone, friendPhone }, callback) => {
+    if (typeof callback === "function") {
+      callback(directThemes[directKey(myPhone, friendPhone)] || null);
+    }
+  });
+
+  // ---------- USER PROFILE (তথ্য + ছবি/ভিডিও/অডিও) ----------
+  socket.on("get-profile", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const base = publicUser(phone);
+    callback({ ...base, ...(profiles[phone] || {}) });
+  });
+
+  socket.on("save-profile", ({ phone, profile }, callback) => {
+    if (!phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    const existing = profiles[phone] || {};
+    profiles[phone] = { ...existing, ...(profile || {}) };
+    saveData();
+    if (typeof callback === "function") callback({ success: true, profile: profiles[phone] });
+  });
+
+  // প্রোফাইলে নতুন ছবি/ভিডিও/অডিও যোগ করা
+  socket.on("add-profile-item", ({ phone, item }, callback) => {
+    if (!phone || !item) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+    profiles[phone].items.unshift(item);
+    // প্রোফাইলে সর্বোচ্চ ৪০টি আইটেম রাখা হয় (ফাইল যেন বেশি বড় না হয়)
+    profiles[phone].items = profiles[phone].items.slice(0, 40);
+    saveData();
+
+    // ফ্রেন্ডদের জানানো যে নতুন কিছু পোস্ট হয়েছে
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+    });
+
+    if (typeof callback === "function") callback({ success: true, items: profiles[phone].items });
+  });
+
+  socket.on("delete-profile-item", ({ phone, itemId }, callback) => {
+    if (profiles[phone] && Array.isArray(profiles[phone].items)) {
+      profiles[phone].items = profiles[phone].items.filter((it) => it.id !== itemId);
+      saveData();
+    }
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // ---------- CALL: অডিও থেকে ভিডিওতে সুইচ ----------
+  socket.on("direct-call-upgrade", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) io.to(targetSocket).emit("direct-call-upgraded");
+  });
+
+  socket.on("direct-call-reject", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) io.to(targetSocket).emit("direct-call-rejected");
   });
 
   // ---------- ROOM CALL SIGNALING ----------
