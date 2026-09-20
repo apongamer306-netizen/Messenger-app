@@ -20,28 +20,39 @@ const socket = io({
 });
 
 // ================= WEBRTC: STUN + TURN সার্ভার =================
-// কল করলে কথা না শোনার সবচেয়ে বড় কারণ: দুই ফোন/কম্পিউটার আলাদা নেটওয়ার্কে (বিশেষ করে
-// মোবাইল ডেটায়) থাকলে সরাসরি অডিও পাঠানো যায় না। তখন TURN সার্ভার লাগে, যেটা মাঝখানে
-// থেকে অডিও পৌঁছে দেয়। আগে শুধু ডিফল্ট STUN ছিল, TURN ছিল না।
+// আলাদা নেটওয়ার্কের (যেমন ল্যাপটপ ওয়াইফাই + ফোন মোবাইল ডেটা) দুই ডিভাইসের মধ্যে অডিও/ভিডিও
+// যেতে TURN সার্ভার লাগে। এটা ছাড়া কল রিং হয়, ধরাও যায়, কিন্তু কথা/ভিডিও আসে না।
 //
-// ✅ সবচেয়ে নির্ভরযোগ্য উপায়: https://www.metered.ca এ ফ্রি অ্যাকাউন্ট খুলে (মাসে ২০ GB ফ্রি)
-// TURN Server থেকে আপনার username/credential নিয়ে নিচের কমেন্ট করা লাইনটা চালু করুন।
+// ✅ কী করবেন: https://www.metered.ca এ ফ্রি অ্যাকাউন্ট খুলুন → Dashboard → TURN Server →
+// "Generate your first credential" চাপুন → যে Username ও Password দেখাবে, ওই দুটো নিচের
+// দুই ঘরের ভেতরে বসান (কোটেশন "" এর মাঝখানে)। মাসে ২০ GB ফ্রি।
+const METERED_USERNAME = "";     // <-- এখানে Username বসান
+const METERED_CREDENTIAL = "";   // <-- এখানে Password বসান
+
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:global.stun.twilio.com:3478" },
-
-  // ---- আপনার নিজের Metered TURN (এখানে বসান, // তুলে দিন) ----
-  // { urls: "turn:global.relay.metered.ca:80", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
-  // { urls: "turn:global.relay.metered.ca:80?transport=tcp", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
-  // { urls: "turn:global.relay.metered.ca:443", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
-  // { urls: "turns:global.relay.metered.ca:443?transport=tcp", username: "YOUR_USERNAME", credential: "YOUR_CREDENTIAL" },
-
-  // ---- পাবলিক ফ্রি TURN (ব্যাকআপ; যেকোনো সময় বন্ধ বা ধীর হতে পারে) ----
-  { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-  { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-  { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+  { urls: "stun:stun.relay.metered.ca:80" }
 ];
+
+if (METERED_USERNAME && METERED_CREDENTIAL) {
+  [
+    "turn:global.relay.metered.ca:80",
+    "turn:global.relay.metered.ca:80?transport=tcp",
+    "turn:global.relay.metered.ca:443",
+    "turns:global.relay.metered.ca:443?transport=tcp"
+  ].forEach((url) =>
+    ICE_SERVERS.push({ urls: url, username: METERED_USERNAME, credential: METERED_CREDENTIAL })
+  );
+} else {
+  // ক্রেডেনশিয়াল না দিলে পাবলিক ব্যাকআপ (অনির্ভরযোগ্য — এটা প্রায়ই কাজ করে না)
+  ICE_SERVERS.push(
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+  );
+  console.warn("⚠️ Metered TURN ক্রেডেনশিয়াল দেওয়া হয়নি — আলাদা নেটওয়ার্কে কল কাজ নাও করতে পারে।");
+}
 
 // কথা পরিষ্কার শোনার জন্য: ইকো ও নয়েজ কমানো
 const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -60,6 +71,25 @@ myPeer.on("error", (err) => {
     showCustomAlert("Call Failed", "ওপাশের ব্যক্তির কল সংযোগ পাওয়া যাচ্ছে না। দুজনেই পেজ রিফ্রেশ করে আবার চেষ্টা করুন।");
   }
 });
+// সার্ভার থেকে Cloudflare TURN ক্রেডেনশিয়াল এনে চলমান Peer-এ বসানো (না পেলে উপরের ডিফল্টই থাকবে)
+async function loadIceServers() {
+  try {
+    const res = await fetch("/api/ice-servers", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && Array.isArray(data.iceServers) && data.iceServers.length) {
+      myPeer.options.config = { ...(myPeer.options.config || {}), iceServers: data.iceServers };
+      console.log("ICE servers loaded from server. TURN available:", !!data.hasTurn);
+    } else {
+      console.warn("Server-এ TURN কনফিগার করা নেই — ডিফল্ট সার্ভার ব্যবহার হচ্ছে।");
+    }
+  } catch (e) {
+    console.warn("ICE servers load failed:", e && e.message);
+  }
+}
+loadIceServers();
+setInterval(loadIceServers, 6 * 60 * 60 * 1000);
+
 let currentCall = null;
 let localStream = null;
 let currentCallType = null;
@@ -69,19 +99,55 @@ const ADMIN_ROOM_PIN = "1430909";
 let remoteAudioElement = document.createElement("audio");
 remoteAudioElement.autoplay = true;
 remoteAudioElement.setAttribute("playsinline", "");
-remoteAudioElement.style.display = "none";
+remoteAudioElement.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-10px;top:-10px;";
 document.body.appendChild(remoteAudioElement);
 
-// ব্রাউজার অটো-প্লে আটকে দিলে পরের ক্লিক/টাচেই অডিও চালু হয়ে যাবে
+// ================= মোবাইলে শব্দ বাজানোর ব্যবস্থা =================
+// মোবাইল ব্রাউজার (বিশেষ করে iPhone Safari ও Android Chrome) ইউজারের ক্লিক ছাড়া অডিও বাজতে
+// দেয় না। কল শুরু/রিসিভের বাটন চাপার মুহূর্তেই আমরা অডিও এলিমেন্টটা "আনলক" করে রাখি,
+// যাতে পরে রিমোট স্ট্রিম এলে শব্দ বাজতে পারে। তবুও আটকে গেলে স্ক্রিনে "ট্যাপ করুন" বাটন আসবে।
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
+function unlockRemoteAudio() {
+  try {
+    remoteAudioElement.muted = false;
+    if (!remoteAudioElement.srcObject) {
+      remoteAudioElement.src = SILENT_WAV;
+      const p = remoteAudioElement.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      if (!window._ektAudioCtx) window._ektAudioCtx = new AC();
+      if (window._ektAudioCtx.state === "suspended") window._ektAudioCtx.resume();
+    }
+  } catch (e) {}
+}
+
+let soundHintEl = null;
+function showSoundHint() {
+  if (!soundHintEl) {
+    soundHintEl = document.createElement("button");
+    soundHintEl.textContent = "🔊 শব্দ চালু করতে এখানে ট্যাপ করুন";
+    soundHintEl.style.cssText =
+      "position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;" +
+      "padding:12px 20px;border:none;border-radius:999px;background:#ffb300;color:#000;" +
+      "font-weight:700;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer;";
+    soundHintEl.onclick = () => {
+      remoteAudioElement.play().then(hideSoundHint).catch(() => {});
+    };
+    document.body.appendChild(soundHintEl);
+  }
+  soundHintEl.style.display = "block";
+}
+function hideSoundHint() {
+  if (soundHintEl) soundHintEl.style.display = "none";
+}
+
 function playRemoteAudio() {
   const p = remoteAudioElement.play();
-  if (p && typeof p.catch === "function") {
-    p.catch(() => {
-      const retry = () => { remoteAudioElement.play().catch(() => {}); };
-      ["click", "touchstart", "keydown"].forEach((ev) =>
-        document.addEventListener(ev, retry, { once: true })
-      );
-    });
+  if (p && typeof p.then === "function") {
+    p.then(hideSoundHint).catch(() => showSoundHint());
   }
 }
 
@@ -2815,6 +2881,7 @@ if (startAudioCallBtn) startAudioCallBtn.onclick = () => initiateCall("audio");
 if (startVideoCallBtn) startVideoCallBtn.onclick = () => initiateCall("video");
 
 async function initiateCall(type) {
+  unlockRemoteAudio();
   callContext = { mode: "room", phone: null };
   currentCallType = type;
   try {
@@ -2857,6 +2924,7 @@ socket.on("incoming-call", (data) => {
   });
 
   acceptCallBtn.onclick = async () => {
+    unlockRemoteAudio();
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: currentCallType === "video" });
       if (currentCallType === "video") localVideo.srcObject = localStream;
@@ -2891,7 +2959,13 @@ function handleCallConnection(call) {
   call.on("stream", (remoteStream) => {
     // শব্দ সবসময় আলাদা audio এলিমেন্ট দিয়ে চলবে (অডিও ও ভিডিও দুই কলেই),
     // ভিডিও এলিমেন্ট mute থাকবে — নইলে একই শব্দ দুইবার বাজে বা কোনোটাই বাজে না।
+    const remoteAudioTracks = remoteStream.getAudioTracks();
+    console.log("Remote audio tracks:", remoteAudioTracks.length,
+      remoteAudioTracks.map((t) => t.readyState + (t.muted ? "/muted" : "/live")));
+
+    remoteAudioElement.removeAttribute("src");
     remoteAudioElement.srcObject = remoteStream;
+    remoteAudioElement.muted = false;
     remoteAudioElement.volume = isSpeakerOn ? 1 : 0.25;
     playRemoteAudio();
 
@@ -2953,6 +3027,7 @@ function endCallCleanup() {
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   remoteAudioElement.srcObject = null;
+  hideSoundHint();
 
   // সাথে সাথে বন্ধ না করে হোয়াটসঅ্যাপের মতো "Call ended" স্ক্রিন দেখানো হয়
   showCallEndedScreen();
@@ -2970,6 +3045,7 @@ if (directAudioCallBtn) directAudioCallBtn.onclick = () => initiateDirectCall("a
 if (directVideoCallBtn) directVideoCallBtn.onclick = () => initiateDirectCall("video");
 
 async function initiateDirectCall(type) {
+  unlockRemoteAudio();
   if (!activeDirectChatFriend) return;
   if (!myPeerId) {
     await showCustomAlert("Please Wait", "কল সার্ভারের সাথে সংযোগ হচ্ছে, কয়েক সেকেন্ড পর আবার চেষ্টা করুন।");
@@ -3044,6 +3120,7 @@ socket.on("direct-incoming-call", (data) => {
   });
 
   acceptCallBtn.onclick = async () => {
+    unlockRemoteAudio();
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: AUDIO_CONSTRAINTS,
