@@ -1,35 +1,133 @@
+/* =====================================================================
+   EKT CHATING APP — নতুন ডিজাইন সিস্টেম
+   রঙ, ফন্ট, গোলাকার কোণা সব এক জায়গায় (নিচের ভ্যারিয়েবলে)।
+   ডার্ক = ডিফল্ট, লাইট = body.light-theme
+   ===================================================================== */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', 'Hind Siliguri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-body.dark-theme {
-  background-color: #121212;
-  color: #ffffff;
+body {
+  --bg: #090d16;
+  --surface: #121a2b;
+  --surface-2: #182238;
+  --surface-3: #202c47;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.13);
+  --text: #eaf0ff;
+  --text-2: #a7b3d0;
+  --text-3: #6f7c9c;
+  --brand: #4f8cff;
+  --brand-2: #7c5cff;
+  --brand-grad: linear-gradient(135deg, #4f8cff 0%, #7c5cff 100%);
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --bubble-other: #1b2540;
+  --bubble-other-text: #eaf0ff;
+  --glass: rgba(14, 20, 34, 0.78);
+  --overlay: rgba(4, 7, 14, 0.68);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --shadow-card: 0 18px 50px rgba(0, 0, 0, 0.42);
+  --shadow-pop: 0 14px 38px rgba(0, 0, 0, 0.5);
+  --chat-bg-1: #0b1120;
+  --chat-bg-2: #0d1426;
+  --chat-dot: rgba(255, 255, 255, 0.035);
+  --radius: 18px;
+  --ring: 0 0 0 3px rgba(79, 140, 255, 0.28);
+
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body.light-theme {
-  background-color: #f4f6f9;
-  color: #333333;
+  --bg: #eef2fb;
+  --surface: #ffffff;
+  --surface-2: #f3f6fc;
+  --surface-3: #e7edf8;
+  --line: rgba(15, 23, 42, 0.08);
+  --line-2: rgba(15, 23, 42, 0.14);
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #8391a8;
+  --bubble-other: #eaeff8;
+  --bubble-other-text: #0f172a;
+  --glass: rgba(255, 255, 255, 0.82);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --input-bg: rgba(15, 23, 42, 0.045);
+  --shadow-card: 0 18px 46px rgba(30, 50, 90, 0.12);
+  --shadow-pop: 0 14px 34px rgba(30, 50, 90, 0.18);
+  --chat-bg-1: #f4f7fd;
+  --chat-bg-2: #edf1fa;
+  --chat-dot: rgba(15, 23, 42, 0.05);
+  --ring: 0 0 0 3px rgba(79, 140, 255, 0.22);
 }
 
+/* পেছনের নরম রঙিন আভা */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 12% 8%, rgba(79, 140, 255, 0.16) 0%, rgba(79, 140, 255, 0) 70%),
+    radial-gradient(40% 36% at 92% 14%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%),
+    radial-gradient(46% 40% at 50% 104%, rgba(236, 72, 153, 0.10) 0%, rgba(236, 72, 153, 0) 70%);
+}
+body.light-theme::before {
+  background:
+    radial-gradient(42% 38% at 12% 8%, rgba(79, 140, 255, 0.20) 0%, rgba(79, 140, 255, 0) 70%),
+    radial-gradient(40% 36% at 92% 14%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%),
+    radial-gradient(46% 40% at 50% 104%, rgba(236, 72, 153, 0.10) 0%, rgba(236, 72, 153, 0) 70%);
+}
+
+::selection { background: rgba(79, 140, 255, 0.35); }
+
+button { font-family: inherit; }
+img { -webkit-user-drag: none; }
+
+/* ---------- নেভবার ---------- */
 .navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 10px 20px;
-  background-color: #1e1e1e;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--line);
 }
 
-body.light-theme .navbar {
-  background-color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+.icon-btn {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
+.icon-btn:hover { background: var(--surface-3); }
+.icon-btn:active { transform: scale(0.94); }
 
-/* হেডারের লোগো — বড় গ্রেডিয়েন্ট লেখা + টাইপিং অ্যানিমেশন */
+/* লোগো — গ্রেডিয়েন্ট লেখা + টাইপিং অ্যানিমেশন */
 .logo {
   position: relative;
   display: inline-block;
@@ -37,31 +135,24 @@ body.light-theme .navbar {
   font-size: clamp(1.3rem, 5vw, 1.9rem);
   line-height: 1.15;
   letter-spacing: 2px;
-  color: #0d6efd;
+  color: #4f8cff;
   white-space: nowrap;
 }
-
-/* অদৃশ্য কপি: পুরো লেখার জায়গা ধরে রাখে, যাতে টাইপ/মোছার সময় হেডার নড়ে না */
-.logo-sizer {
-  visibility: hidden;
-}
-
+.logo-sizer { visibility: hidden; }
 .logo-type {
   position: absolute;
   left: 0;
   top: 0;
   white-space: nowrap;
-  filter: drop-shadow(0 0 10px rgba(13, 110, 253, 0.45));
+  filter: drop-shadow(0 0 10px rgba(79, 140, 255, 0.4));
 }
-
 #logoTypeText {
-  background: linear-gradient(90deg, #2b8cff 0%, #6a4bd6 55%, #d946ef 100%);
+  background: linear-gradient(90deg, #4f8cff 0%, #7c5cff 55%, #ec4899 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
-
 .logo-cursor {
   display: inline-block;
   width: 3px;
@@ -69,986 +160,682 @@ body.light-theme .navbar {
   margin-left: 4px;
   vertical-align: -0.12em;
   border-radius: 2px;
-  background: #6a8cff;
+  background: #7c9dff;
   animation: logoCursorBlink 0.9s steps(1) infinite;
 }
-
 @keyframes logoCursorBlink {
   0%, 49%   { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
-
-body.light-theme .logo-type {
-  filter: drop-shadow(0 0 6px rgba(13, 110, 253, 0.25));
-}
-
+body.light-theme .logo-type { filter: drop-shadow(0 0 6px rgba(79, 140, 255, 0.25)); }
 @media (prefers-reduced-motion: reduce) {
   .logo-cursor { animation: none; opacity: 0; }
 }
 
-.icon-btn {
-  background: none;
-  border: none;
-  color: inherit;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
+/* ---------- মূল কন্টেইনার ও কার্ড ---------- */
 .main-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 60px);
   min-height: calc(100dvh - 60px);
-  padding: 10px;
+  padding: 16px;
   position: relative;
 }
 
-/* প্রত্যেকটা স্ক্রিন সুইচেই একটা হালকা fade + rise অ্যানিমেশন হবে — প্রিমিয়াম ফিল */
 @keyframes screenFadeSlide {
   from { opacity: 0; transform: translateY(18px) scale(0.985); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.94) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
 
 .card-screen {
-  background-color: #1e1e1e;
-  border-radius: 16px;
-  padding: 25px;
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 30px 26px 26px;
   width: 100%;
-  max-width: 380px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  max-width: 400px;
+  box-shadow: var(--shadow-card);
   text-align: center;
-  animation: screenFadeSlide 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: screenFadeSlide 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-body.light-theme .card-screen {
-  background-color: #ffffff;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-}
-
-/* ---------- ড্যাশবোর্ড: ল্যাপটপে পুরো স্ক্রিন জুড়ে সুন্দর ব্যাকগ্রাউন্ড, বাটন-কার্ড বড় ---------- */
-#dashboardScreen { position: relative; z-index: 1; }
-
-/* কার্ডের পেছনে পুরো ভিউপোর্ট জুড়ে হালকা রঙিন আভা — "খালি কালো জায়গা" আর লাগবে না */
-.main-container::before {
+.card-screen::before {
   content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  background:
-    radial-gradient(40% 34% at 18% 20%, rgba(13,110,253,.14) 0%, rgba(13,110,253,0) 70%),
-    radial-gradient(36% 30% at 84% 18%, rgba(111,66,193,.13) 0%, rgba(111,66,193,0) 70%),
-    radial-gradient(42% 36% at 50% 92%, rgba(232,62,140,.10) 0%, rgba(232,62,140,0) 70%);
+  position: absolute;
+  inset: 0 28px auto 28px;
+  height: 3px;
+  border-radius: 0 0 6px 6px;
+  background: var(--brand-grad);
+  opacity: 0.95;
 }
-body.dashboard-active .main-container::before { opacity: 1; }
-
-@media (min-width: 768px) {
-  #dashboardScreen {
-    max-width: 460px;
-    padding: 34px 30px;
-  }
-  #dashboardScreen .avatar-container { width: 108px; height: 108px; }
-  #dashboardScreen #dashboardUserName { font-size: 20px; }
-  #dashboardScreen .btn { padding: 14px; font-size: 15px; }
-  #dashboardScreen .btn i { font-size: 15px; }
+.card-screen h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  margin-bottom: 4px;
 }
+.card-screen p { color: var(--text-2); }
 
-@media (min-width: 1200px) {
-  #dashboardScreen {
-    max-width: 520px;
-    padding: 40px 36px;
-  }
-  #dashboardScreen .avatar-container { width: 124px; height: 124px; }
-  #dashboardScreen .avatar-edit-badge { width: 36px; height: 36px; font-size: 14px; }
-  #dashboardScreen #dashboardUserName { font-size: 22px; }
-  #dashboardScreen .btn { padding: 16px; font-size: 16px; border-radius: 10px; }
+.auth-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 14px;
+  border-radius: 20px;
+  background: var(--brand-grad);
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 28px rgba(79, 140, 255, 0.4);
 }
 
+/* ---------- ইনপুট ---------- */
 .input-wrapper {
   position: relative;
-  margin-bottom: 15px;
+  margin-bottom: 14px;
   width: 100%;
 }
-
-.input-wrapper input {
+.input-wrapper input,
+.modal-input,
+.profile-edit-field {
   width: 100%;
-  padding: 12px 40px 12px 15px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background-color: #2a2a2a;
-  color: #fff;
-  font-size: 14px;
+  padding: 13px 44px 13px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line-2);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 14.5px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
-
-body.light-theme .input-wrapper input {
-  background-color: #f8f9fa;
-  border: 1px solid #ced4da;
-  color: #000;
+.input-wrapper input::placeholder { color: var(--text-3); }
+.input-wrapper input:focus,
+.profile-edit-field:focus {
+  border-color: var(--brand);
+  box-shadow: var(--ring);
+  background: var(--surface-2);
 }
-
-.toggle-eye {
+.toggle-eye,
+.password-toggle-icon {
   position: absolute;
-  right: 15px;
+  right: 16px;
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
-  color: #aaa;
+  color: var(--text-3);
+  transition: color 0.2s ease;
 }
+.toggle-eye:hover { color: var(--text); }
 
+/* ---------- বাটন ---------- */
 .btn {
   width: 100%;
-  padding: 12px;
+  padding: 13px 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease, background 0.2s ease;
 }
-
-.btn:hover {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.26);
-}
-
+.btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn:active { transform: scale(0.97); }
 .btn-primary {
-  background: linear-gradient(135deg, #2f8dff, #0d6efd 55%, #6f42c1);
-  color: white;
+  background: var(--brand-grad);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(79, 140, 255, 0.32);
 }
-
+.btn-secondary {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+}
 .btn-danger {
-  background: linear-gradient(135deg, #ff5a68, #dc3545);
-  color: white;
+  background: linear-gradient(135deg, #f97373, #ef4444);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.28);
 }
+.btn-sm { padding: 9px 18px; font-size: 13px; width: auto; border-radius: 12px; }
 
-.auth-toggle-text {
-  font-size: 13px;
-  margin-top: 10px;
-}
-
-.auth-toggle-text a {
-  color: #0d6efd;
-  text-decoration: none;
-}
-
+.auth-toggle-text { font-size: 13px; margin-top: 14px; color: var(--text-2); }
+.auth-toggle-text a { color: var(--brand); font-weight: 600; text-decoration: none; }
+.auth-toggle-text a:hover { text-decoration: underline; }
 .footer-text {
-  font-size: 11px;
-  margin-top: 20px;
-  opacity: 0.5;
-  letter-spacing: 1px;
+  font-size: 10.5px;
+  margin-top: 22px;
+  color: var(--text-3);
+  letter-spacing: 1.6px;
+  font-weight: 600;
+}
+
+/* ---------- থ্রি-ডট বাটন ও ড্রপডাউন মেনু (সব জায়গায় এক) ---------- */
+.direct-menu-container { position: relative; }
+
+.dots-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--input-bg);
+  color: var(--text-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.dots-btn:hover { background: var(--surface-3); color: var(--text); }
+.dots-btn:active { transform: scale(0.94); }
+
+.direct-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 210px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  box-shadow: var(--shadow-pop);
+  padding: 6px;
+  z-index: 120;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+  text-align: left;
+}
+.direct-dropdown-menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+.menu-item i {
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.menu-item:hover { background: var(--surface-3); }
+.menu-danger,
+.menu-danger i { color: #f87171; }
+.menu-danger:hover { background: rgba(239, 68, 68, 0.12); }
+.menu-sep { height: 1px; background: var(--line); margin: 5px 4px; }
+
+/* ---------- ড্যাশবোর্ড ---------- */
+#dashboardScreen { max-width: 420px; padding-top: 22px; }
+.dash-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dash-eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 
 .profile-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
-
 .avatar-container {
   position: relative;
-  width: 90px;
-  height: 90px;
-  margin-bottom: 10px;
+  width: 104px;
+  height: 104px;
+  margin-bottom: 12px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--brand-grad);
+  box-shadow: 0 14px 34px rgba(79, 140, 255, 0.32);
 }
-
 .avatar-container img {
   width: 100%;
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid rgba(13, 110, 253, 0.55);
-  box-shadow: 0 0 0 4px rgba(111, 66, 193, 0.14), 0 8px 22px rgba(13, 110, 253, 0.25);
+  border: 3px solid var(--surface);
+  background: var(--surface-2);
+  display: block;
 }
-
 .avatar-edit-badge {
   position: absolute;
-  bottom: 0;
+  bottom: 2px;
   right: 0;
-  background: #0d6efd;
+  background: var(--brand-grad);
   color: #fff;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
+  border: 3px solid var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 12px;
-}
-
-.chat-container {
-  /* এখন রুম চ্যাটও ডিরেক্ট চ্যাটের মতোই পুরো ব্রাউজার উইন্ডো জুড়ে বসবে —
-     ছোট্ট একটা বক্স হয়ে মাঝখানে ভাসবে না, চারপাশে খালি কালো জায়গাও থাকবে না */
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  width: 100%;
-  max-width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  background: #1e1e1e;
-  border-radius: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  animation: screenFadeSlide 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-body.light-theme .chat-container {
-  background: #ffffff;
-}
-
-/* --- স্পেশাল রুমের ব্যাকগ্রাউন্ড ফিটিং --- */
-.chat-container.special-room-chat .chat-messages {
-  background-image: url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
-  background-repeat: no-repeat !important;
-  background-position: center !important;
-  background-size: cover !important; 
-}
-
-@media screen and (max-width: 768px) {
-  .chat-container.special-room-chat .chat-messages {
-    background-size: 100% 100% !important; 
-  }
-}
-
-.chat-header {
-  padding: 15px;
-  background: #2a2a2a;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-body.light-theme .chat-header {
-  background: #f1f3f5;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;   /* নাম বড় হলেও যেন বাটনগুলো উইন্ডোর বাইরে ঠেলে না দেয় */
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.user-info img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.user-info h4,
-.user-info div {
-  min-width: 0;
-}
-
-.user-info h4 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-actions {
-  display: flex;
-  gap: 10px;
-  flex-shrink: 0;   /* বাটনগুলো কখনো স্ক্রিনের বাইরে চলে যাবে না */
-}
-
-.action-btn {
-  background: #333;
-  border: none;
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-body.light-theme .action-btn {
-  background: #dee2e6;
-  color: #333;
-}
-
-.chat-messages {
-  flex: 1;
-  padding: 15px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.chat-input-area {
-  padding: 12px;
-  background: #2a2a2a;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-body.light-theme .chat-input-area {
-  background: #f1f3f5;
-}
-
-.chat-input-area input {
-  flex: 1;
-  padding: 10px 15px;
-  border-radius: 20px;
-  border: none;
-  outline: none;
-  background: #333;
-  color: #fff;
-}
-
-body.light-theme .chat-input-area input {
-  background: #ffffff;
-  border: 1px solid #ced4da;
-  color: #000;
-}
-
-.attach-btn, .send-btn {
-  background: #0d6efd;
-  color: white;
-  border: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.call-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.call-box {
-  background: #1e1e1e;
-  padding: 30px;
-  border-radius: 16px;
-  text-align: center;
-  width: 90%;
-  max-width: 400px;
-}
-
-.call-profile-grid {
-  display: flex;
-  justify-content: space-around;
-  margin: 20px 0;
-}
-
-.call-avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.call-controls {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-
-.btn-call {
-  padding: 10px 20px;
-  border-radius: 30px;
-  border: none;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.btn-call.accept { background: #198754; }
-.btn-call.reject { background: #dc3545; }
-
-.video-grid {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.video-grid video {
-  width: 50%;
-  border-radius: 8px;
-  background: #000;
-}
-/* ============================================================
-   PREMIUM FRIEND SYSTEM — icon, slide-up panel, full-screen DM
-   ============================================================ */
-
-/* Friend button on the Dashboard — same size/shape as "Create Room" */
-.friend-req-badge {
-  display: none;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #ff4d5e, #dc3545);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  align-items: center;
-  justify-content: center;
-  margin-left: 4px;
-}
-.friend-req-badge.show { display: inline-flex; }
-
-
-/* ---------- Friends panel (overlay) ---------- */
-.friends-panel-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  padding-top: calc(20px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  z-index: 100000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-.friends-panel-overlay.active { opacity: 1; pointer-events: auto; }
-
-.friends-panel {
-  width: 100%;
-  max-width: 420px;
-  max-height: 82vh;
-  background: #1e1e1e;
-  color: #fff;
-  border-radius: 22px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.55);
-  transform: scale(0.92) translateY(12px);
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.friends-panel-overlay.active .friends-panel { transform: scale(1) translateY(0); }
-body.light-theme .friends-panel { background: #ffffff; color: #222; }
-
-.friends-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 22px 16px;
-  background: linear-gradient(135deg, rgba(13,110,253,0.18), rgba(111,66,193,0.18));
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-body.light-theme .friends-panel-header { border-bottom: 1px solid rgba(0,0,0,0.06); }
-
-.friends-panel-header h3 {
-  font-size: 17px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #4facfe, #6f42c1);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.friends-panel-header h3 i { color: #4facfe; -webkit-text-fill-color: #4facfe; }
-
-.friends-panel-header p {
-  font-size: 12.5px;
-  opacity: 0.7;
-  margin-top: 3px;
-}
-
-.friends-panel-close {
-  background: rgba(255,255,255,0.08);
-  border: none;
-  color: inherit;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.2s;
-  flex-shrink: 0;
-}
-.friends-panel-close:hover { background: rgba(220,53,69,0.25); color: #ff6b7a; }
-body.light-theme .friends-panel-close { background: rgba(0,0,0,0.06); }
-
-.friends-panel-body {
-  padding: 18px 20px 22px;
-  overflow-y: auto;
-}
-
-.friends-panel-body h4 {
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  opacity: 0.55;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.friend-requests-section { display: none; margin-bottom: 22px; }
-.friend-requests-section.has-requests { display: block; }
-
-.friend-requests-list, .friends-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.friend-request-card, .friend-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.05);
-  transition: 0.2s ease;
-}
-body.light-theme .friend-request-card,
-body.light-theme .friend-card { background: rgba(0,0,0,0.035); }
-
-.friend-request-card img, .friend-card img {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #0d6efd;
-  flex-shrink: 0;
-}
-
-.friend-request-info, .friend-card-info {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.friend-request-name, .friend-card-name {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.friend-request-sub, .friend-card-sub {
-  font-size: 11.5px;
-  opacity: 0.6;
-  margin-top: 1px;
-}
-
-.fr-accept-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, #22c55e, #198754);
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(25,135,84,0.35);
   transition: transform 0.15s ease;
 }
-.fr-accept-btn:hover { transform: scale(1.08); }
+.avatar-edit-badge:hover { transform: scale(1.08); }
 
-.friend-card { cursor: pointer; }
-.friend-card:hover {
-  background: rgba(13,110,253,0.12);
-  transform: translateX(2px);
-}
-
-.friend-card-chat-icon {
-  color: #0d6efd;
-  font-size: 15px;
-  background: rgba(13,110,253,0.12);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+.dash-name-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.friends-empty-state {
-  text-align: center;
-  padding: 30px 15px;
-  opacity: 0.6;
-}
-.friends-empty-state i {
-  font-size: 32px;
-  margin-bottom: 10px;
-  color: #0d6efd;
-  opacity: 0.6;
-}
-.friends-empty-state p {
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-/* ---------- Full-screen direct chat ---------- */
-.direct-chat-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 100001;
-  background: #1e1e1e;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.direct-chat-screen.active { transform: translateX(0); }
-body.light-theme .direct-chat-screen { background: #ffffff; }
-
-.direct-chat-header { flex-shrink: 0; }
-
-.direct-back-btn {
-  background: rgba(255,255,255,0.08);
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  margin-right: 4px;
-}
-.direct-back-btn:hover { background: rgba(255,255,255,0.15); }
-body.light-theme .direct-back-btn { background: rgba(0,0,0,0.06); }
-
-.direct-chat-status {
-  font-size: 11px;
-  opacity: 0.55;
-}
-
-.direct-menu-container { position: relative; }
-
-.direct-dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 44px;
-  background: #2b2b2b;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
-  width: 190px;
-  overflow: hidden;
-  z-index: 100;
-  opacity: 0;
-  transform: translateY(-8px);
-  pointer-events: none;
-  transition: 0.18s ease;
-}
-.direct-dropdown-menu.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
-body.light-theme .direct-dropdown-menu { background: #ffffff; border: 1px solid rgba(0,0,0,0.08); }
-
-.direct-dropdown-menu div {
-  padding: 11px 14px;
-  font-size: 13px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background 0.15s;
-}
-.direct-dropdown-menu div:hover { background: rgba(255,255,255,0.08); }
-body.light-theme .direct-dropdown-menu div:hover { background: rgba(0,0,0,0.05); }
-#menuBlockUser { color: #ff6b7a; }
-
-/* Shared premium chat bubble style (used by direct chat) */
-.msg-row {
-  display: flex;
-  align-items: flex-end;
   gap: 8px;
   max-width: 100%;
 }
-.msg-row.me { justify-content: flex-end; }
-/* শুধু অ্যাভাটারের ছবিই ছোট গোল হবে — মেসেজের ছবি/ভিডিও নয় */
-.msg-row .msg-avatar img {
+#dashboardUserName {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-name-btn {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--brand);
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
+  background: var(--input-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
 }
-.msg-bubble {
-  max-width: 72%;
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 14px;
-  line-height: 1.4;
-  word-break: break-word;
-  background: #333;
-  color: #fff;
-}
-.msg-row.me .msg-bubble {
-  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
-  color: #fff;
-  border-bottom-right-radius: 4px;
-}
-.msg-row:not(.me) .msg-bubble { border-bottom-left-radius: 4px; }
-body.light-theme .msg-row:not(.me) .msg-bubble { background: #e9ecef; color: #222; }
+.edit-name-btn:hover { background: var(--surface-3); }
 
-/* Unread-message dot on a friend card in the Friends panel */
-.friend-card-unread-dot {
+.dash-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.dash-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.dash-tile:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-2);
+  background: var(--surface-3);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+.dash-tile:active { transform: scale(0.97); }
+.tile-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+}
+.tile-label { font-size: 14.5px; font-weight: 600; }
+.tile-friends .tile-icon { background: linear-gradient(135deg, #a78bfa, #7c5cff); box-shadow: 0 8px 18px rgba(124, 92, 255, 0.35); }
+.tile-profile .tile-icon { background: linear-gradient(135deg, #22d3ee, #0ea5b7); box-shadow: 0 8px 18px rgba(14, 165, 183, 0.32); }
+.tile-create  .tile-icon { background: linear-gradient(135deg, #60a5fa, #3b82f6); box-shadow: 0 8px 18px rgba(59, 130, 246, 0.35); }
+.tile-join    .tile-icon { background: linear-gradient(135deg, #4ade80, #16a34a); box-shadow: 0 8px 18px rgba(22, 163, 74, 0.32); }
+
+.friend-req-badge {
+  display: none;
+  position: absolute;
+  top: 12px;
+  right: 12px;
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ff4d5e, #dc3545);
+  background: linear-gradient(135deg, #fb7185, #ef4444);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  box-shadow: 0 6px 14px rgba(239, 68, 68, 0.4);
+}
+.friend-req-badge.show { display: inline-flex; }
+
+@media (min-width: 768px) {
+  #dashboardScreen { max-width: 460px; padding: 26px 30px 28px; }
+  .avatar-container { width: 116px; height: 116px; }
+  #dashboardUserName { font-size: 23px; }
+  .dash-tile { padding: 18px; }
 }
 
-/* পুরনো মিডিয়া স্টাইল সরিয়ে নিচের MESSENGER UI ব্লকে নতুন করে লেখা হয়েছে */
 
-/* ---------- Toast notifications for incoming friend messages ---------- */
-.toast-container {
+/* =====================================================================
+   চ্যাট স্ক্রিন (রুম + ডিরেক্ট) — হেডার, মেসেজ, ইনপুট
+   ===================================================================== */
+.chat-container {
   position: fixed;
-  top: calc(14px + env(safe-area-inset-top, 0px));
-  left: 50%;
-  transform: translateX(-50%);
+  inset: 0;
+  z-index: 3000;
   width: 100%;
-  max-width: 380px;
-  padding: 0 14px;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  z-index: 200000;
-  pointer-events: none;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  animation: screenFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.message-toast {
+.direct-chat-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.42s;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.direct-chat-screen.active {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
+}
+
+/* ---------- হেডার ---------- */
+.chat-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px max(12px, calc((100% - 980px) / 2));
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 20;
+}
+.user-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #1e1e1e;
-  color: #fff;
-  border-radius: 16px;
-  padding: 12px 14px;
-  box-shadow: 0 14px 34px rgba(0,0,0,0.45);
-  border: 1px solid rgba(255,255,255,0.08);
-  opacity: 0;
-  transform: translateY(-16px) scale(0.96);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  pointer-events: auto;
-  cursor: pointer;
+  min-width: 0;
+  flex: 1 1 auto;
 }
-.message-toast.show { opacity: 1; transform: translateY(0) scale(1); }
-body.light-theme .message-toast {
-  background: #ffffff;
-  color: #222;
-  border: 1px solid rgba(0,0,0,0.06);
-}
-
-.message-toast img {
-  width: 40px;
-  height: 40px;
+.user-info img {
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid #0d6efd;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(79, 140, 255, 0.55);
 }
-
-.message-toast-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.message-toast-name { font-size: 13.5px; font-weight: 700; }
-.message-toast-text {
-  font-size: 12.5px;
-  opacity: 0.75;
-  white-space: nowrap;
+.user-info > div,
+.header-profile-btn > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.user-info h4 {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.user-info span,
+.direct-chat-status {
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.header-profile-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px 2px 2px;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  transition: background 0.2s ease;
+}
+.header-profile-btn:hover { background: var(--input-bg); }
 
-/* ===== CALL BUTTONS (room header + direct chat header) ===== */
-.action-btn.call-audio,
-.action-btn.call-video {
+.direct-back-btn { flex-shrink: 0; }
+
+.chat-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+.action-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--input-bg);
+  color: var(--text-2);
+  font-size: 15px;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease;
 }
+.action-btn:hover { background: var(--surface-3); color: var(--text); }
+.action-btn:active { transform: scale(0.93); }
+.action-btn.call-audio { background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.28); color: #22c55e; }
+.action-btn.call-video { background: rgba(79, 140, 255, 0.14); border-color: rgba(79, 140, 255, 0.3); color: #6ea3ff; }
+.action-btn.call-audio:hover { background: rgba(34, 197, 94, 0.24); color: #22c55e; }
+.action-btn.call-video:hover { background: rgba(79, 140, 255, 0.24); color: #6ea3ff; }
 
-.action-btn.call-audio {
-  background: linear-gradient(135deg, #198754, #157347);
-  color: #fff;
-}
-
-.action-btn.call-video {
-  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
-  color: #fff;
-}
-
-.action-btn.leave-room {
-  background: linear-gradient(135deg, #dc3545, #b02a37);
-  color: #fff;
-}
-
-.action-btn.call-audio:hover,
-.action-btn.call-video:hover,
-.action-btn.leave-room:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
-}
-
-.action-btn.call-audio:active,
-.action-btn.call-video:active { transform: scale(0.94); }
-
-body.light-theme .action-btn.call-audio,
-body.light-theme .action-btn.call-video,
-body.light-theme .action-btn.leave-room { color: #fff; }
-
-/* ছোট স্ক্রিনে হেডারের বাটনগুলো যেন গাদাগাদি না লাগে */
 @media (max-width: 420px) {
   .chat-actions { gap: 6px; }
-  .action-btn { width: 33px; height: 33px; font-size: 13px; }
+  .action-btn { width: 37px; height: 37px; font-size: 14px; }
 }
 
-/* ===== MODAL LAYERING FIX =====
-   ডিরেক্ট চ্যাট স্ক্রিনের z-index ছিল 100001, আর কল মোডাল ছিল 9999।
-   তাই ডিরেক্ট মেসেজের ভেতর থেকে কল দিলে মোডালটা চ্যাট স্ক্রিনের পেছনে
-   লুকিয়ে যেত। এখন কল মোডাল ও পপআপ সবার উপরে থাকবে। */
-#callModal {
-  z-index: 200001 !important;
+/* রুম মেম্বার বার */
+.room-members-bar {
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 8px max(12px, calc((100% - 980px) / 2));
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.room-members-bar::-webkit-scrollbar { display: none; }
+.room-members-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.room-members-label i { margin-right: 4px; }
+.room-members-list { display: inline-flex; gap: 8px; }
+.member-avatar-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.member-avatar-card img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+.member-avatar-card i { font-size: 10px; color: var(--brand); }
+.member-avatar-card:hover { background: rgba(79, 140, 255, 0.14); border-color: rgba(79, 140, 255, 0.4); }
+
+/* ---------- মেসেজ এরিয়া ---------- */
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px max(12px, calc((100% - 980px) / 2)) 10px;
+  background-color: var(--chat-bg-1);
+  background-image:
+    radial-gradient(var(--chat-dot) 1px, transparent 1px),
+    radial-gradient(70% 50% at 85% 0%, rgba(124, 92, 255, 0.07) 0%, transparent 70%),
+    radial-gradient(60% 45% at 5% 100%, rgba(79, 140, 255, 0.07) 0%, transparent 70%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.chat-messages::-webkit-scrollbar { width: 8px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; }
+
+.chat-container.special-room-chat .chat-messages {
+  background-image: url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+@media screen and (max-width: 768px) {
+  .chat-container.special-room-chat .chat-messages { background-size: 100% 100% !important; }
 }
 
-#customModalOverlay {
-  z-index: 200002 !important;
-}
-
-#mediaPreviewModal,
-#themeModal {
-  z-index: 200000 !important;
-}
-
-
-/* =======================================================================
-   ===============  MESSENGER-STYLE CHAT UI (নতুন)  ======================
-   ছবি/ভিডিও সুন্দরভাবে দেখানো, মেসেজ গ্রুপিং, Sent / Delivered / Seen
-   স্ট্যাটাস, এবং ফোন + ল্যাপটপ দুই জায়গাতেই ঠিকঠাক ফিট হওয়া।
-   ======================================================================= */
-
-/* ---------- মেসেজ রো ও অ্যাভাটার ---------- */
 .msg-row {
   display: flex;
   align-items: flex-end;
   gap: 8px;
   max-width: 100%;
-  margin: 0;
+  animation: bubblePop 0.22s ease both;
 }
+@keyframes bubblePop {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-row.me { justify-content: flex-end; }
 .msg-row.group-mid,
-.msg-row.group-end { margin-top: -6px; }
+.msg-row.group-end { margin-top: -5px; }
 
-.msg-avatar {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  align-self: flex-end;
-}
-/* একই মানুষের পরপর মেসেজে শুধু শেষ মেসেজের পাশে ছবি দেখাবে (মেসেঞ্জারের মতো) */
+.msg-avatar { width: 30px; height: 30px; flex-shrink: 0; align-self: flex-end; }
+.msg-row .msg-avatar img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; display: block; }
 .msg-row:not(.group-end) .msg-avatar img { visibility: hidden; }
 
-/* ---------- বাবল ---------- */
 .msg-bubble {
   position: relative;
-  max-width: 72%;
-  padding: 9px 13px;
-  border-radius: 18px;
+  max-width: 74%;
+  padding: 9px 14px;
+  border-radius: 20px;
   font-size: 14.5px;
-  line-height: 1.42;
+  line-height: 1.45;
   word-break: break-word;
   white-space: pre-wrap;
-  background: #303030;
-  color: #fff;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+  border: 1px solid var(--line);
 }
 .msg-row.me .msg-bubble {
-  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  background: var(--brand-grad);
   color: #fff;
+  border: none;
+  box-shadow: 0 6px 16px rgba(79, 140, 255, 0.22);
 }
 
-/* মেসেঞ্জারের মতো গ্রুপ করা কোণা */
-.msg-row.me .msg-bubble            { border-radius: 18px 18px 18px 18px; }
-.msg-row.me.group-start .msg-bubble{ border-bottom-right-radius: 5px; }
-.msg-row.me.group-mid   .msg-bubble{ border-radius: 18px 5px 5px 18px; }
-.msg-row.me.group-end   .msg-bubble{ border-radius: 18px 5px 18px 18px; }
-.msg-row.me.group-start.group-end .msg-bubble { border-radius: 18px; }
+.msg-row.me .msg-bubble             { border-radius: 20px; }
+.msg-row.me.group-start .msg-bubble { border-bottom-right-radius: 6px; }
+.msg-row.me.group-mid   .msg-bubble { border-radius: 20px 6px 6px 20px; }
+.msg-row.me.group-end   .msg-bubble { border-radius: 20px 6px 20px 20px; }
+.msg-row.me.group-start.group-end .msg-bubble { border-radius: 20px; }
+.msg-row:not(.me) .msg-bubble { border-radius: 20px; }
+.msg-row:not(.me).group-start .msg-bubble { border-bottom-left-radius: 6px; }
+.msg-row:not(.me).group-mid   .msg-bubble { border-radius: 6px 20px 20px 6px; }
+.msg-row:not(.me).group-end   .msg-bubble { border-radius: 6px 20px 20px 20px; }
+.msg-row:not(.me).group-start.group-end .msg-bubble { border-radius: 20px; }
 
-.msg-row:not(.me).group-start .msg-bubble{ border-bottom-left-radius: 5px; }
-.msg-row:not(.me).group-mid   .msg-bubble{ border-radius: 5px 18px 18px 5px; }
-.msg-row:not(.me).group-end   .msg-bubble{ border-radius: 5px 18px 18px 18px; }
-.msg-row:not(.me).group-start.group-end .msg-bubble { border-radius: 18px; }
-
-body.light-theme .msg-row:not(.me) .msg-bubble { background: #e9ebee; color: #1c1e21; }
-
-/* পাঠানো হচ্ছে এমন মেসেজ একটু হালকা দেখাবে */
 .msg-row.pending .msg-bubble { opacity: 0.6; }
 
-/* ---------- ছবি / ভিডিও বাবল (এখানেই আগের কালো বক্সের সমস্যা ঠিক হয়েছে) ---------- */
+.room-msg-col .msg-bubble { max-width: 100%; }
+.room-msg-col.me { align-items: flex-end; }
+.room-msg-col .media-wrap { max-width: 300px; }
+.room-sender-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--brand);
+  margin: 0 0 3px 8px;
+}
+
+/* ছবি / ভিডিও বাবল */
 .msg-bubble.media-bubble {
   padding: 0;
   background: transparent !important;
-  border-radius: 18px;
+  border: none;
+  box-shadow: none !important;
+  border-radius: 20px;
   overflow: hidden;
-  max-width: 68%;
+  max-width: 70%;
   line-height: 0;
 }
-
 .media-wrap {
   position: relative;
   display: block;
   width: 100%;
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--input-bg);
   line-height: 0;
 }
-body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
-
 .media-wrap .msg-media {
   display: block;
   width: 100%;
@@ -1056,21 +843,13 @@ body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
   max-width: 100%;
   max-height: 340px;
   object-fit: cover;
-  border-radius: 18px;
-  background: transparent;
+  border-radius: 20px;
   border: none;
   outline: none;
 }
-
-/* ভিডিওর সাইডে যে অদ্ভুত বর্ডার/কালো ফাঁকা জায়গা দেখাত, সেটা এখানে বন্ধ */
 .media-wrap.video-wrap { background: #000; }
-.media-wrap.video-wrap .msg-media {
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  max-height: 320px;
-}
+.media-wrap.video-wrap .msg-media { aspect-ratio: 4 / 3; object-fit: cover; max-height: 320px; }
 .media-wrap video::-webkit-media-controls { display: none !important; }
-
 .video-play-badge {
   position: absolute;
   inset: 0;
@@ -1091,11 +870,9 @@ body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
   transition: transform 0.18s ease;
 }
 .media-wrap.video-wrap:hover .video-play-badge { transform: scale(1.08); }
-
-/* ছবি লোড হওয়ার আগে হালকা শিমার — কালো বক্স আর দেখাবে না */
 .media-wrap.loading {
   min-height: 150px;
-  background: linear-gradient(100deg, rgba(255,255,255,.05) 30%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.05) 70%);
+  background: linear-gradient(100deg, var(--input-bg) 30%, var(--line-2) 50%, var(--input-bg) 70%);
   background-size: 250% 100%;
   animation: mediaShimmer 1.2s linear infinite;
 }
@@ -1104,13 +881,7 @@ body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
   100% { background-position: -60% 0; }
 }
 
-/* ---------- অডিও ও ফাইল ---------- */
-.msg-audio {
-  width: 230px;
-  max-width: 100%;
-  height: 40px;
-  display: block;
-}
+.msg-audio { width: 230px; max-width: 100%; height: 40px; display: block; }
 .msg-file-link {
   color: inherit;
   text-decoration: none;
@@ -1122,28 +893,35 @@ body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
 }
 .msg-file-link i { font-size: 17px; opacity: 0.9; }
 .msg-file-link span { text-decoration: underline; }
+.audio-chip { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; min-width: 170px; }
+.audio-chip-play {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.msg-row:not(.me) .audio-chip-play { background: rgba(79, 140, 255, 0.18); color: var(--brand); }
+.audio-chip-name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
 
-/* ---------- সময়ের ডিভাইডার ---------- */
 .msg-time-divider {
   align-self: center;
-  font-size: 11.5px;
+  margin: 12px 0 6px;
+  padding: 4px 12px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  opacity: 0.5;
-  padding: 10px 0 4px;
-  text-align: center;
-  width: 100%;
+  color: var(--text-3);
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: 999px;
 }
 
-/* ---------- Sent / Delivered / Seen (মেসেঞ্জারের মতো) ---------- */
-.msg-status-row {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 3px 2px 2px;
-  min-height: 16px;
-}
-
+.msg-status-row { display: flex; justify-content: flex-end; align-items: center; padding: 3px 2px 2px; min-height: 16px; }
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -1151,25 +929,18 @@ body.light-theme .media-wrap { background: rgba(0, 0, 0, 0.04); }
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.2px;
-  opacity: 0.6;
+  color: var(--text-3);
 }
 .status-chip i { font-size: 11.5px; }
-
 .msg-status-row .seen-avatar {
   width: 15px;
   height: 15px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--line-2);
 }
-body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15); }
 
-/* টাইপিং ইন্ডিকেটর */
-.typing-row .msg-bubble {
-  display: inline-flex;
-  gap: 4px;
-  padding: 12px 14px;
-}
+.typing-row .msg-bubble { display: inline-flex; gap: 4px; padding: 12px 14px; }
 .typing-row .msg-bubble span {
   width: 7px; height: 7px; border-radius: 50%;
   background: currentColor; opacity: .45;
@@ -1182,206 +953,785 @@ body.light-theme .msg-status-row .seen-avatar { border-color: rgba(0, 0, 0, 0.15
   40%      { transform: translateY(-5px); opacity: .95; }
 }
 
-/* =======================================================================
-   =====================  রেসপন্সিভ লেআউট  ===============================
-   ফোন  → পুরো স্ক্রিন জুড়ে ফিট, মাঝখানে ছোট আইকন
-   ল্যাপটপ/পিসি → পুরো ব্রাউজার উইন্ডো জুড়ে ছড়িয়ে, আইকন/লেখা একটু বড়
-   ডিরেক্ট চ্যাট আর রুম চ্যাট — দুটোই এখন একই নিয়মে ফুল-স্ক্রিন
-   ======================================================================= */
-
-/* iOS/অ্যান্ড্রয়েডে অ্যাড্রেস বার লুকালেও উচ্চতা ঠিক থাকবে */
-.direct-chat-screen .chat-messages,
-.chat-container .chat-messages {
-  padding: 14px 12px 8px;
-  gap: 2px;
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ---- ফোন (ছোট স্ক্রিন): সব কিছু এক্কেবারে এজ-টু-এজ ফিট ---- */
-@media (max-width: 767px) {
-  .main-container { padding: 0; }
-
-  .direct-chat-screen .chat-header,
-  .chat-container .chat-header { padding: 10px 12px; }
-  .direct-chat-screen .user-info img,
-  .chat-container .user-info img { width: 36px; height: 36px; }
-  .direct-chat-screen #directChatName,
-  .chat-container #chatUserName { font-size: 15px; }
-
-  .msg-bubble { max-width: 78%; font-size: 14.5px; }
-  .msg-bubble.media-bubble { max-width: 74%; }
-  .media-wrap .msg-media { max-height: 300px; }
-
-  .direct-chat-screen .chat-input-area,
-  .chat-container .chat-input-area { padding: 9px 10px; gap: 8px; }
-  .chat-input-area input { font-size: 15px; padding: 10px 14px; } /* 15px+ = iOS-এ জুম হয় না */
-}
-
-/* ---- ল্যাপটপ / ডেস্কটপ: পুরো ব্রাউজার উইন্ডো জুড়ে, আইকন একটু বড় ---- */
 @media (min-width: 768px) {
-  /* ল্যাপটপে চ্যাট পুরো উইন্ডো জুড়ে ছড়িয়ে থাকবে (মাঝখানে সরু কলাম বা ছোট বক্স নয়) */
-  .direct-chat-screen .chat-header,
-  .direct-chat-screen .chat-input-area,
-  .chat-container .chat-header,
-  .chat-container .chat-input-area {
-    padding-left: 26px;
-    padding-right: 26px;
-  }
-  .direct-chat-screen .chat-header,
-  .chat-container .chat-header { padding-top: 14px; padding-bottom: 14px; }
-
-  .direct-chat-screen .chat-messages,
-  .chat-container .chat-messages {
-    padding: 20px 26px 12px;
-  }
-
-  .msg-bubble { max-width: 60%; font-size: 15px; }
+  .msg-bubble { max-width: 62%; font-size: 15px; }
   .msg-bubble.media-bubble { max-width: 340px; }
   .media-wrap .msg-media { max-height: 400px; }
-
-  .direct-chat-screen .user-info img,
-  .chat-container .user-info img { width: 44px; height: 44px; }
-  .direct-chat-screen #directChatName,
-  .chat-container #chatUserName { font-size: 17px; }
-
-  .chat-input-area input { padding: 13px 20px; font-size: 15px; }
-  .attach-btn, .send-btn { width: 44px; height: 44px; font-size: 15px; }
-  .action-btn { width: 40px; height: 40px; font-size: 15px; }
+  .user-info img { width: 46px; height: 46px; }
+  .user-info h4 { font-size: 17px; }
+  .action-btn { width: 42px; height: 42px; }
 }
 
-/* ---- বড় মনিটর: বাবলের প্রস্থ সীমিত (পড়তে সুবিধা), বাকিটা স্ক্রিন জুড়েই থাকে ---- */
-@media (min-width: 1400px) {
-  .direct-chat-screen .chat-header,
-  .direct-chat-screen .chat-input-area,
-  .chat-container .chat-header,
-  .chat-container .chat-input-area { padding-left: 40px; padding-right: 40px; }
-  .direct-chat-screen .chat-messages,
-  .chat-container .chat-messages { padding: 24px 40px 14px; }
-  .msg-bubble { max-width: 52%; }
+/* ---------- ইনপুট বার ---------- */
+.chat-input-area {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px max(12px, calc((100% - 980px) / 2)) 12px;
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-top: 1px solid var(--line);
 }
-
-/* স্ক্রলবার সুন্দর করা */
-.chat-messages::-webkit-scrollbar { width: 8px; }
-.chat-messages::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
+.chat-input-area input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
-body.light-theme .chat-messages::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.16); }
+.chat-input-area input[type="text"]::placeholder { color: var(--text-3); }
+.chat-input-area input[type="text"]:focus {
+  border-color: var(--brand);
+  box-shadow: var(--ring);
+  background: var(--surface-2);
+}
+.attach-btn,
+.send-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: transform 0.15s ease, filter 0.2s ease, background 0.2s ease;
+}
+.attach-btn { background: var(--input-bg); color: var(--text-2); border: 1px solid var(--line); }
+.attach-btn:hover { background: var(--surface-3); color: var(--text); }
+.send-btn { background: var(--brand-grad); color: #fff; box-shadow: 0 8px 20px rgba(79, 140, 255, 0.4); }
+.send-btn:hover { filter: brightness(1.1); }
+.attach-btn:active, .send-btn:active { transform: scale(0.92); }
 
-/* ---------- ফ্রেন্ড প্রোফাইল মোডাল ---------- */
+/* চ্যাট লোডিং */
+.chat-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+.spinner-border {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--line-2);
+  border-top-color: var(--brand);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* =====================================================================
+   ফ্রেন্ড প্যানেল + টোস্ট
+   ===================================================================== */
+.friends-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 100000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.friends-panel-overlay.active { opacity: 1; pointer-events: auto; }
+.friends-panel {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  max-height: 88dvh;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 28px 28px 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-card);
+  transform: translateY(60px);
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.friends-panel-overlay.active .friends-panel { transform: translateY(0); }
+@media (min-width: 600px) {
+  .friends-panel-overlay { align-items: center; padding: 20px; }
+  .friends-panel { border-radius: 28px; max-height: 82vh; transform: scale(0.95) translateY(16px); }
+  .friends-panel-overlay.active .friends-panel { transform: scale(1) translateY(0); }
+}
+.friends-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 22px 16px;
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.16), rgba(124, 92, 255, 0.16));
+  border-bottom: 1px solid var(--line);
+}
+.friends-panel-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.friends-panel-header h3 i { color: var(--brand); font-size: 16px; }
+.friends-panel-header p { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
+.friends-panel-close {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.friends-panel-close:hover { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+.friends-panel-body { padding: 18px 18px 22px; overflow-y: auto; }
+.friends-panel-body h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-3);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.friend-requests-section { display: none; margin-bottom: 22px; }
+.friend-requests-section.has-requests { display: block; }
+.friend-requests-list, .friends-list { display: flex; flex-direction: column; gap: 8px; }
+
+.friend-request-card, .friend-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  animation: fadeScaleIn 0.25s ease both;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.friend-request-card img, .friend-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px rgba(79, 140, 255, 0.5);
+}
+.friend-request-info, .friend-card-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.friend-request-name, .friend-card-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.friend-request-sub, .friend-card-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.friend-card { cursor: pointer; }
+.friend-card:hover { background: var(--surface-3); border-color: rgba(79, 140, 255, 0.35); transform: translateX(2px); }
+.friend-card:active, .friend-request-card:active { transform: scale(0.98); }
+
+.fr-accept-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #4ade80, #16a34a);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.35);
+  transition: transform 0.15s ease;
+}
+.fr-accept-btn:hover { transform: scale(1.08); }
+
+.friend-card-unread-dot {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fb7185, #ef4444);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.friend-card-profile-btn {
+  background: rgba(79, 140, 255, 0.14);
+  border: none;
+  color: #6ea3ff;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, transform 0.15s ease;
+}
+.friend-card-profile-btn:hover { background: rgba(79, 140, 255, 0.28); }
+.friend-card-profile-btn:active { transform: scale(0.9); }
+
+.friends-empty-state { text-align: center; padding: 34px 16px; color: var(--text-3); }
+.friends-empty-state i { font-size: 34px; margin-bottom: 12px; color: var(--brand); opacity: 0.7; }
+.friends-empty-state p { font-size: 13px; line-height: 1.6; }
+
+.toast-container {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 400px;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200000;
+  pointer-events: none;
+}
+.message-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--line-2);
+  opacity: 0;
+  transform: translateY(-16px) scale(0.96);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.message-toast.show { opacity: 1; transform: translateY(0) scale(1); }
+.message-toast img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px rgba(79, 140, 255, 0.55);
+}
+.message-toast-body { display: flex; flex-direction: column; min-width: 0; }
+.message-toast-name { font-size: 13.5px; font-weight: 700; }
+.message-toast-text { font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.mini-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 16px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 300000;
+  pointer-events: none;
+}
+.mini-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* =====================================================================
+   প্রোফাইল মোডাল, গ্যালারি, পোস্ট ফিড
+   ===================================================================== */
 .profile-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 200003;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 18px;
+  padding: 16px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s ease;
 }
 .profile-modal-overlay.active { opacity: 1; pointer-events: auto; }
-
 .profile-modal {
   width: 100%;
-  max-width: 400px;
-  max-height: 88vh;
+  max-width: 480px;
+  max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
-  background: #1e1e1e;
-  color: #fff;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-  transform: scale(0.92) translateY(14px);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  transform: scale(0.94) translateY(16px);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+@media (min-width: 768px) { .profile-modal { max-width: 540px; } }
 .profile-modal-overlay.active .profile-modal { transform: scale(1) translateY(0); }
-body.light-theme .profile-modal { background: #fff; color: #1c1e21; }
+.profile-modal::-webkit-scrollbar { width: 6px; }
+.profile-modal::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 6px; }
 
 .profile-modal-cover {
-  height: 110px;
-  background: linear-gradient(135deg, #0d6efd, #6f42c1, #e83e8c);
+  height: 118px;
   position: relative;
+  background:
+    radial-gradient(60% 90% at 20% 0%, rgba(255, 255, 255, 0.22) 0%, transparent 60%),
+    linear-gradient(135deg, #4f8cff 0%, #7c5cff 55%, #ec4899 100%);
 }
 .profile-modal-avatar {
-  width: 92px; height: 92px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid #1e1e1e;
+  border: 4px solid var(--surface);
   position: absolute;
   left: 50%;
-  bottom: -46px;
+  bottom: -48px;
   transform: translateX(-50%);
-  background: #1e1e1e;
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
-body.light-theme .profile-modal-avatar { border-color: #fff; background: #fff; }
-
-.profile-modal-body { padding: 58px 20px 20px; text-align: center; }
-.profile-modal-name { font-size: 19px; font-weight: 800; margin-bottom: 3px; }
-.profile-modal-sub { font-size: 12.5px; opacity: 0.6; margin-bottom: 16px; }
+.profile-modal-body { padding: 60px 20px 20px; text-align: center; }
+.profile-modal-name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 3px; }
+.profile-modal-sub { font-size: 12.5px; color: var(--text-3); margin-bottom: 16px; }
 
 .profile-detail-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
   text-align: left;
-  padding: 11px 13px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
   margin-bottom: 8px;
   font-size: 13.5px;
 }
-body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
-.profile-detail-row i { width: 18px; text-align: center; opacity: 0.75; color: #0d6efd; }
-.profile-detail-row .pd-label { opacity: 0.55; font-size: 11.5px; display: block; }
+.profile-detail-row i { width: 20px; text-align: center; color: var(--brand); }
+.profile-detail-row .pd-label { color: var(--text-3); font-size: 11.5px; display: block; }
 .profile-detail-row .pd-value { font-weight: 600; }
+.profile-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+.profile-modal-actions .btn { flex: 1; padding: 12px; font-size: 13.5px; }
 
-.profile-modal-actions { display: flex; gap: 10px; margin-top: 14px; }
-.profile-modal-actions .btn { padding: 11px; font-size: 13.5px; }
-
-.header-profile-btn {
-  background: none;
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 14px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  padding: 4px;
+  border-radius: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.profile-tabs::-webkit-scrollbar { display: none; }
+.profile-tab {
+  flex: 1 0 auto;
+  min-width: 64px;
+  padding: 9px 6px;
   border: none;
-  padding: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.profile-tab:hover { color: var(--text); }
+.profile-tab.active { background: var(--brand-grad); color: #fff; box-shadow: 0 6px 16px rgba(79, 140, 255, 0.3); }
+@media (max-width: 380px) { .profile-tab { font-size: 11.5px; padding: 8px 4px; min-width: 56px; } }
+.profile-tab-panel { animation: fadeScaleIn 0.28s ease both; }
+
+.profile-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.profile-gallery-item {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--surface-2);
+  transition: transform 0.15s ease;
+}
+.profile-gallery-item:hover { transform: scale(1.02); }
+.profile-gallery-item img,
+.profile-gallery-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.profile-gallery-item .pg-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-gallery-item.audio-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--brand);
+  background: rgba(79, 140, 255, 0.12);
+}
+.profile-gallery-item .pg-delete {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.92);
+  color: #fff;
+  border: none;
+  font-size: 10px;
+  cursor: pointer;
+  display: none;
+}
+.profile-gallery.editable .pg-delete { display: block; }
+.profile-empty { grid-column: 1 / -1; text-align: center; padding: 28px 10px; color: var(--text-3); font-size: 12.5px; }
+
+.profile-upload-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.profile-upload-btn {
+  flex: 1;
+  padding: 11px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--line-2);
+  background: var(--input-bg);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: inherit;
+  justify-content: center;
+  gap: 7px;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.profile-upload-btn:hover { border-color: var(--brand); color: var(--brand); background: rgba(79, 140, 255, 0.08); }
+.profile-edit-field { padding: 11px 14px; font-size: 13.5px; margin-bottom: 8px; }
+textarea.profile-edit-field { resize: vertical; min-height: 64px; font-family: inherit; }
+
+/* ---------- পোস্ট কম্পোজার ---------- */
+.post-composer {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 12px;
+  margin-bottom: 14px;
   text-align: left;
-  min-width: 0;
-  flex: 1 1 auto;
+}
+.post-composer-row { display: flex; align-items: flex-start; gap: 10px; }
+.post-composer-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.post-composer-input {
+  flex: 1;
+  border: 1px solid transparent;
+  background: var(--input-bg);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 10px 14px;
+  font-size: 14.5px;
+  resize: none;
+  max-height: 160px;
+  font-family: inherit;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.post-composer-input::placeholder { color: var(--text-3); }
+.post-composer-input:focus { border-color: var(--brand); box-shadow: var(--ring); }
+.post-composer-preview {
+  position: relative;
+  margin-top: 10px;
+  border-radius: 14px;
   overflow: hidden;
+  max-height: 260px;
+  background: #000;
 }
-
-/* রুম চ্যাটের কলামের ভেতরে বাবল যেন পুরো প্রস্থ পায় */
-.room-msg-col .msg-bubble { max-width: 100%; }
-.room-msg-col.me { align-items: flex-end; }
-.room-msg-col .media-wrap { max-width: 300px; }
-
-
-/* =======================================================================
-   ===========  WHATSAPP-STYLE FULL SCREEN CALL SCREEN  ==================
-   ======================================================================= */
-
-#callModal.call-modal {
-  background: #0b141a;
-  padding: 0;
+.post-composer-preview img,
+.post-composer-preview video { width: 100%; max-height: 260px; object-fit: contain; display: block; background: #000; }
+.post-preview-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.post-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.post-composer-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.2s ease;
+}
+.post-composer-btn:hover { background: var(--input-bg); }
+.post-submit-btn { flex: 0 0 auto; width: auto; padding: 9px 24px; font-size: 13px; border-radius: 12px; }
 
+/* ---------- পোস্ট ফিড ---------- */
+.posts-feed { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.post-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 14px 14px 6px;
+  animation: fadeScaleIn 0.25s ease both;
+}
+.post-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.post-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.post-header-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.post-author-name { font-size: 14px; font-weight: 700; line-height: 1.25; }
+.post-time { font-size: 11.5px; color: var(--text-3); }
+.post-text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px; }
+.post-media-wrap {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0 0 8px;
+  cursor: pointer;
+  background: #000;
+}
+.post-media { width: 100%; max-height: 420px; object-fit: contain; display: block; background: #000; }
+@media (min-width: 768px) { .post-media { max-height: 480px; } }
+.post-meta-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); padding: 4px 2px 8px; }
+.post-actions-row { display: flex; border-top: 1px solid var(--line); padding-top: 4px; }
+.post-action-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 4px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.post-action-btn:hover { background: var(--input-bg); color: var(--text); }
+.post-action-btn.liked { color: var(--brand); }
+
+/* পোস্টের থ্রি-ডট */
+.post-more { position: relative; flex-shrink: 0; }
+.post-more-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+.post-more-btn:hover { background: var(--input-bg); color: var(--text); }
+.post-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 170px;
+  background: var(--surface-3);
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  box-shadow: var(--shadow-pop);
+  padding: 5px;
+  z-index: 30;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.97);
+  transform-origin: top right;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+}
+.post-more-menu.open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
+.post-more-menu .menu-item:hover { background: var(--input-bg); }
+
+.post-comments-section { border-top: 1px solid var(--line); margin-top: 4px; padding: 10px 0; animation: fadeScaleIn 0.2s ease both; }
+.post-comments-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.post-comment { display: flex; align-items: flex-start; gap: 8px; }
+.post-comment-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.post-comment-bubble { background: var(--input-bg); border-radius: 16px; padding: 7px 13px; font-size: 13px; max-width: 84%; }
+.post-comment-name { display: block; font-weight: 700; font-size: 12px; margin-bottom: 1px; }
+.post-comment-text { word-break: break-word; }
+.post-comment-input-row { display: flex; align-items: center; gap: 8px; }
+.post-comment-input {
+  flex: 1;
+  border: 1px solid transparent;
+  background: var(--input-bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.post-comment-input:focus { border-color: var(--brand); box-shadow: var(--ring); }
+
+
+/* =====================================================================
+   পপআপ / মডাল / থিম / মিডিয়া প্রিভিউ
+   ===================================================================== */
+.call-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 9999;
+}
+#callModal { z-index: 200001 !important; }
+#customModalOverlay { z-index: 200002 !important; }
+#mediaPreviewModal, #themeModal { z-index: 200000 !important; }
+
+#customModalOverlay .card-screen { max-width: 360px; margin: auto; padding: 28px 22px 22px; }
+#customModalOverlay h2 { font-size: 19px; }
+#modalActionContainer .btn { padding: 12px; }
+
+#themeModal {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+.theme-modal-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 24px 22px 20px;
+  box-shadow: var(--shadow-card);
+  animation: fadeScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.theme-modal-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.theme-modal-title i { color: var(--brand); }
+.theme-modal-sub { font-size: 12.5px; color: var(--text-3); margin: 4px 0 16px; }
+.theme-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.theme-box {
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  cursor: pointer;
+  border: 2px solid var(--line-2);
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.theme-box:hover { transform: scale(1.06); border-color: var(--brand); box-shadow: var(--ring); }
+.theme-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border-radius: 16px;
+  border: 1.5px dashed var(--line-2);
+  background: var(--input-bg);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 18px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.theme-upload:hover { border-color: var(--brand); color: var(--brand); }
+.theme-upload input { display: none; }
+.theme-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* =====================================================================
+   কল স্ক্রিন (ফুল স্ক্রিন)
+   ===================================================================== */
+#callModal.call-modal { background: #070b14; padding: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
 #callModal .call-box {
   position: relative;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   max-width: none;
-  background: radial-gradient(120% 90% at 50% 12%, #1d2a32 0%, #0b141a 62%);
+  background: radial-gradient(120% 90% at 50% 10%, #16223b 0%, #070b14 64%);
   border-radius: 0;
   padding: 0;
   display: flex;
@@ -1389,21 +1739,21 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  text-align: center;
 }
-
-/* ---- ভিডিও লেয়ার ---- */
-#callVideoGrid.video-grid {
+#callModal .call-box::before {
+  content: "";
   position: absolute;
   inset: 0;
-  display: block;
-  background: #000;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60% 45% at 50% 38%, rgba(79, 140, 255, 0.14) 0%, rgba(79, 140, 255, 0) 70%),
+    radial-gradient(90% 60% at 50% 112%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%);
 }
-#callVideoGrid .call-remote-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #000;
-}
+
+#callVideoGrid.video-grid { position: absolute; inset: 0; display: block; background: #000; z-index: 1; animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+#callVideoGrid .call-remote-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
 #callVideoGrid .call-local-video {
   position: absolute;
   right: 16px;
@@ -1411,7 +1761,7 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   width: 118px;
   height: 168px;
   object-fit: cover;
-  border-radius: 14px;
+  border-radius: 18px;
   border: 2px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
   background: #111;
@@ -1421,7 +1771,6 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   #callVideoGrid .call-local-video { width: 190px; height: 130px; right: 24px; top: 24px; }
 }
 
-/* ---- প্রোফাইল / রিংিং ভিউ ---- */
 #callProfileGrid.call-profile-grid {
   display: flex;
   flex-direction: column;
@@ -1431,67 +1780,51 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   z-index: 2;
   text-align: center;
   padding: 0 20px;
+  animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-.call-avatar-ring {
-  position: relative;
-  width: 148px;
-  height: 148px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 22px;
-}
+#callProfileGrid .call-profile-item { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center; }
+.call-avatar-ring { position: relative; width: 168px; height: 168px; display: flex; align-items: center; justify-content: center; margin: 0 auto 26px; flex-shrink: 0; }
 .call-avatar-ring::before,
 .call-avatar-ring::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid rgba(37, 211, 102, 0.45);
-  animation: callPulse 2.4s ease-out infinite;
+  border: 1.5px solid rgba(79, 140, 255, 0.5);
+  animation: callPulse 2.8s ease-out infinite;
 }
-.call-avatar-ring::after { animation-delay: 1.2s; }
+.call-avatar-ring::after { animation-delay: 1.4s; }
 @keyframes callPulse {
   0%   { transform: scale(0.82); opacity: 0.9; }
-  100% { transform: scale(1.35); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
 }
-/* কানেক্ট হয়ে গেলে রিং থেমে যাবে */
 #callModal.connected .call-avatar-ring::before,
 #callModal.connected .call-avatar-ring::after { animation: none; opacity: 0; }
-
 .call-avatar {
-  width: 128px;
-  height: 128px;
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid rgba(255, 255, 255, 0.15);
-  background: #223;
+  background: #1b2540;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12), 0 0 46px rgba(79, 140, 255, 0.3), 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+#callModal.connected .call-avatar {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14), 0 0 42px rgba(34, 197, 94, 0.22), 0 22px 55px rgba(0, 0, 0, 0.55);
+}
+.call-username { display: block; width: 100%; font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 0.3px; line-height: 1.25; text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55); }
+.call-status-text { display: block; margin-top: 10px; font-size: 14.5px; letter-spacing: 0.4px; color: rgba(255, 255, 255, 0.6); min-height: 20px; }
+.call-timer { display: block; margin-top: 10px; font-size: 17px; font-weight: 600; letter-spacing: 1.2px; color: #4ade80; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) {
+  .call-avatar-ring { width: 142px; height: 142px; margin-bottom: 22px; }
+  .call-avatar { width: 126px; height: 126px; }
+  .call-username { font-size: 24px; }
+}
+@media (min-width: 900px) {
+  .call-avatar-ring { width: 190px; height: 190px; margin-bottom: 30px; }
+  .call-avatar { width: 170px; height: 170px; }
+  .call-username { font-size: 31px; }
 }
 
-.call-username {
-  font-size: 26px;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: 0.3px;
-}
-.call-status-text {
-  display: block;
-  margin-top: 8px;
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.62);
-  min-height: 20px;
-}
-.call-timer {
-  display: block;
-  margin-top: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #25d366;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---- ভিডিও কলে উপরের বার ---- */
 .call-top-bar {
   position: absolute;
   top: calc(18px + env(safe-area-inset-top, 0px));
@@ -1506,32 +1839,30 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
 #callTopName { font-size: 17px; font-weight: 600; }
 #callTopTimer { font-size: 13px; opacity: 0.75; font-variant-numeric: tabular-nums; }
 
-/* ---- নিচের কন্ট্রোল বার ---- */
 #callModal .call-controls {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(38px + env(safe-area-inset-bottom, 0px));
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 18px;
   z-index: 5;
   padding: 0 16px;
   flex-wrap: wrap;
 }
-
 .call-ctrl-btn {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   cursor: pointer;
   font-size: 19px;
   color: #fff;
-  background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1539,14 +1870,17 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
 }
 .call-ctrl-btn:hover { background: rgba(255, 255, 255, 0.22); }
 .call-ctrl-btn:active { transform: scale(0.92); }
-.call-ctrl-btn.active { background: #fff; color: #0b141a; }
+.call-ctrl-btn.active { background: #fff; color: #0b1120; }
+.call-ctrl-btn.accept { background: #22c55e; border: none; width: 64px; height: 64px; font-size: 22px; box-shadow: 0 10px 26px rgba(34, 197, 94, 0.4); }
+.call-ctrl-btn.accept:hover { background: #1fb556; }
+.call-ctrl-btn.end { background: #ef4444; border: none; width: 64px; height: 64px; font-size: 22px; box-shadow: 0 10px 26px rgba(239, 68, 68, 0.4); }
+.call-ctrl-btn.end:hover { background: #dc3838; }
+@media (max-width: 380px) {
+  .call-ctrl-btn { width: 50px; height: 50px; font-size: 17px; }
+  .call-ctrl-btn.accept, .call-ctrl-btn.end { width: 56px; height: 56px; }
+  #callModal .call-controls { gap: 12px; }
+}
 
-.call-ctrl-btn.accept { background: #25d366; width: 62px; height: 62px; font-size: 22px; }
-.call-ctrl-btn.accept:hover { background: #22c35e; }
-.call-ctrl-btn.end { background: #f0353d; width: 62px; height: 62px; font-size: 22px; }
-.call-ctrl-btn.end:hover { background: #d92b33; }
-
-/* ---- কল শেষ হওয়ার স্ক্রিন ---- */
 .call-ended-actions {
   position: absolute;
   left: 0;
@@ -1571,8 +1905,8 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   gap: 8px;
 }
 .call-ended-btn .ce-icon {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.16);
   display: flex;
@@ -1581,28 +1915,18 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   font-size: 17px;
   transition: transform 0.15s ease;
 }
-.call-ended-btn .ce-icon.green { background: #25d366; }
+.call-ended-btn .ce-icon.green { background: #22c55e; }
 .call-ended-btn:active .ce-icon { transform: scale(0.92); }
+@media (max-width: 380px) { .call-ended-actions { gap: 26px; } }
 
-/* ছোট ফোনে বাটনগুলো একটু ছোট */
-@media (max-width: 380px) {
-  .call-ctrl-btn { width: 50px; height: 50px; font-size: 17px; }
-  .call-ctrl-btn.accept, .call-ctrl-btn.end { width: 56px; height: 56px; }
-  #callModal .call-controls { gap: 12px; }
-  .call-ended-actions { gap: 26px; }
-}
-
-
-/* =======================================================================
-   ==============  MEDIA PREVIEW (ছবি / ভিডিও / অডিও প্লেয়ার)  ===========
-   ======================================================================= */
-
+/* =====================================================================
+   মিডিয়া প্রিভিউ (ছবি / ভিডিও / অডিও)
+   ===================================================================== */
 #mediaPreviewModal {
-  background: rgba(0, 0, 0, 0.94) !important;
+  background: rgba(3, 5, 10, 0.95) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-
 .media-preview-topbar {
   position: absolute;
   top: calc(14px + env(safe-area-inset-top, 0px));
@@ -1614,24 +1938,12 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   padding: 0 16px;
   z-index: 5;
 }
-
-.media-preview-title {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13.5px;
-  font-weight: 600;
-  max-width: 55%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+.media-preview-title { color: rgba(255, 255, 255, 0.85); font-size: 13.5px; font-weight: 600; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-preview-tools { display: flex; gap: 10px; }
-
-/* ডাউনলোড ও ক্লোজ — নিচের চওড়া নীল বারের বদলে এখন কোণায় গোল আইকন */
 .media-tool-btn {
   width: 42px;
   height: 42px;
-  border-radius: 50%;
+  border-radius: 14px;
   border: none;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
@@ -1647,37 +1959,33 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
 }
 .media-tool-btn:hover { background: rgba(255, 255, 255, 0.26); }
 .media-tool-btn:active { transform: scale(0.92); }
-
-#mediaPreviewContent {
-  max-width: 94vw !important;
-  max-height: 84vh !important;
-}
+#mediaPreviewContent { max-width: 94vw !important; max-height: 84vh !important; }
 #mediaPreviewContent img,
 #mediaPreviewContent video {
   max-width: 94vw;
   max-height: 84vh;
-  border-radius: 14px;
+  border-radius: 16px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   background: #000;
+  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-/* অডিও প্লেয়ার কার্ড */
 .audio-player-card {
   width: min(420px, 90vw);
-  background: #1b1f24;
+  background: #141c2f;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 26px 22px;
+  border-radius: 26px;
+  padding: 28px 22px;
   text-align: center;
   color: #fff;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .audio-player-card .ap-disc {
   width: 96px;
   height: 96px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0d6efd, #6f42c1);
+  background: var(--brand-grad);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1685,672 +1993,13 @@ body.light-theme .profile-detail-row { background: rgba(0, 0, 0, 0.04); }
   animation: apSpin 7s linear infinite;
 }
 @keyframes apSpin { to { transform: rotate(360deg); } }
-.audio-player-card .ap-name {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 14px;
-  word-break: break-word;
-}
+.audio-player-card .ap-name { font-size: 14px; font-weight: 600; margin-bottom: 14px; word-break: break-word; }
 .audio-player-card audio { width: 100%; }
 
-
-/* =======================================================================
-   =====================  PROFILE PAGE / GALLERY  ========================
-   ======================================================================= */
-
-.profile-modal { max-width: 460px; }
-@media (min-width: 768px) {
-  .profile-modal { max-width: 520px; }
-}
-
-.profile-tabs {
-  display: flex;
-  gap: 6px;
-  margin: 16px 0 12px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 4px;
-  border-radius: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.profile-tabs::-webkit-scrollbar { display: none; }
-body.light-theme .profile-tabs { background: rgba(0, 0, 0, 0.05); }
-.profile-tab {
-  flex: 1 0 auto;
-  min-width: 62px;
-  padding: 8px 4px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  border-radius: 9px;
-  cursor: pointer;
-  opacity: 0.6;
-  white-space: nowrap;
-}
-.profile-tab.active {
-  background: #0d6efd;
-  color: #fff;
-  opacity: 1;
-}
-
-@media (max-width: 380px) {
-  .profile-tab { font-size: 11.5px; padding: 7px 3px; min-width: 56px; }
-}
-
-.profile-gallery {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.profile-gallery-item {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 10px;
-  overflow: hidden;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.06);
-}
-.profile-gallery-item img,
-.profile-gallery-item video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.profile-gallery-item .pg-badge {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.profile-gallery-item.audio-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #0d6efd;
-  background: rgba(13, 110, 253, 0.12);
-}
-.profile-gallery-item .pg-delete {
-  position: absolute;
-  left: 5px;
-  top: 5px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(220, 53, 69, 0.9);
-  color: #fff;
-  border: none;
-  font-size: 10px;
-  cursor: pointer;
-  display: none;
-}
-.profile-gallery.editable .pg-delete { display: block; }
-
-.profile-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 26px 10px;
-  opacity: 0.55;
-  font-size: 12.5px;
-}
-
-.profile-upload-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.profile-upload-btn {
-  flex: 1;
-  padding: 9px;
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-body.light-theme .profile-upload-btn { border-color: rgba(0, 0, 0, 0.15); background: rgba(0, 0, 0, 0.03); }
-.profile-upload-btn:hover { border-color: #0d6efd; color: #0d6efd; }
-
-.profile-edit-field {
-  width: 100%;
-  padding: 10px 13px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  font-size: 13.5px;
-  margin-bottom: 8px;
-}
-body.light-theme .profile-edit-field { border-color: rgba(0, 0, 0, 0.12); background: #f6f7f9; }
-textarea.profile-edit-field { resize: vertical; min-height: 64px; }
-
-.profile-modal-actions .btn { flex: 1; }
-
-/* অডিও মেসেজ চিপ */
-.audio-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  min-width: 170px;
-}
-.audio-chip-play {
-  width: 34px; height: 34px; flex-shrink: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px;
-}
-.audio-chip-name {
-  font-size: 12.5px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 190px;
-}
-
-/* ফ্রেন্ড লিস্টে প্রোফাইল আইকন */
-.friend-card-profile-btn {
-  background: rgba(13, 110, 253, 0.14);
-  border: none;
-  color: #4d9bff;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  font-size: 16px;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.18s ease, transform 0.15s ease;
-}
-.friend-card-profile-btn:hover { background: rgba(13, 110, 253, 0.3); }
-.friend-card-profile-btn:active { transform: scale(0.9); }
-
-
-/* =======================================================================
-   =========  CALL SCREEN POLISH — প্রোফাইল একদম মাঝখানে  ================
-   সমস্যা ছিল: .call-profile-item একটা সাধারণ ব্লক, তাই ভেতরের গোল ছবিটা
-   বাঁ দিকে চেপে থাকত আর নামটা সেন্টারে — দুটো এক লাইনে পড়ত না।
-   ======================================================================= */
-
-#callProfileGrid .call-profile-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  text-align: center;
-  gap: 0;
-}
-
-/* ছবি এখন নামের ঠিক উপরে, একদম সেন্টারে */
-#callProfileGrid .call-avatar-ring {
-  width: 168px;
-  height: 168px;
-  margin: 0 auto 26px;
-  flex-shrink: 0;
-}
-
-#callProfileGrid .call-avatar {
-  width: 150px;
-  height: 150px;
-  border: 0;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.10),
-    0 0 46px rgba(37, 211, 102, 0.22),
-    0 22px 55px rgba(0, 0, 0, 0.55);
-}
-
-/* কানেক্ট হওয়ার পর গ্লো সবুজ থেকে নরম নীলচে হয়ে যায় */
-#callModal.connected #callProfileGrid .call-avatar {
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.12),
-    0 0 42px rgba(90, 160, 255, 0.20),
-    0 22px 55px rgba(0, 0, 0, 0.55);
-}
-
-/* রিংগুলো আরও নরম ও ধীর */
-#callProfileGrid .call-avatar-ring::before,
-#callProfileGrid .call-avatar-ring::after {
-  border-width: 1.5px;
-  border-color: rgba(37, 211, 102, 0.35);
-  animation-duration: 2.8s;
-}
-
-#callProfileGrid .call-username {
-  display: block;
-  width: 100%;
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  line-height: 1.25;
-  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55);
-}
-
-#callProfileGrid .call-status-text {
-  margin-top: 10px;
-  font-size: 14.5px;
-  letter-spacing: 0.4px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-#callProfileGrid .call-timer {
-  margin-top: 10px;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 1.2px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-/* কল স্ক্রিনের ব্যাকগ্রাউন্ডে নরম আলো — একদম সমতল কালো লাগবে না */
-#callModal .call-box::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(60% 45% at 50% 38%, rgba(37, 211, 102, 0.10) 0%, rgba(37, 211, 102, 0) 70%),
-    radial-gradient(90% 60% at 50% 110%, rgba(13, 110, 253, 0.10) 0%, rgba(13, 110, 253, 0) 70%);
-  z-index: 0;
-}
-
-/* কন্ট্রোল বারটা একটু আলাদা করে বসানো */
-#callModal .call-controls {
-  gap: 18px;
-  bottom: calc(38px + env(safe-area-inset-bottom, 0px));
-}
-.call-ctrl-btn {
-  background: rgba(255, 255, 255, 0.11);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-.call-ctrl-btn.accept,
-.call-ctrl-btn.end { border: none; }
-.call-ctrl-btn.end { box-shadow: 0 10px 26px rgba(240, 53, 61, 0.32); }
-.call-ctrl-btn.accept { box-shadow: 0 10px 26px rgba(37, 211, 102, 0.32); }
-
-/* ছোট ফোনে ছবি একটু ছোট, তবু সেন্টারেই */
-@media (max-width: 420px) {
-  #callProfileGrid .call-avatar-ring { width: 142px; height: 142px; margin-bottom: 22px; }
-  #callProfileGrid .call-avatar { width: 126px; height: 126px; }
-  #callProfileGrid .call-username { font-size: 24px; }
-}
-
-/* ল্যাপটপে একটু বড় ও বেশি জায়গা নিয়ে */
-@media (min-width: 900px) {
-  #callProfileGrid .call-avatar-ring { width: 190px; height: 190px; margin-bottom: 30px; }
-  #callProfileGrid .call-avatar { width: 170px; height: 170px; }
-  #callProfileGrid .call-username { font-size: 31px; }
-}
-
-
-/* =======================================================================
-   =======================  UNIVERSAL PAGE ANIMATIONS  ===================
-   সব মডাল/পপআপেও হালকা fade+scale অ্যানিমেশন — প্রিমিয়াম ফিল
-   ======================================================================= */
-
-@keyframes fadeScaleIn {
-  from { opacity: 0; transform: scale(0.93) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.theme-modal-card {
-  animation: fadeScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-#mediaPreviewContent img,
-#mediaPreviewContent video,
-.audio-player-card {
-  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* কল স্ক্রিনের ভেতরের কন্টেন্টেও হালকা fade-in */
-#callProfileGrid.call-profile-grid,
-#callVideoGrid.video-grid {
-  animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* বাটনে হালকা প্রেস ফিডব্যাক — পুরো অ্যাপ জুড়ে প্রিমিয়াম অনুভূতি */
-.btn, .action-btn, .attach-btn, .send-btn,
-.friend-card, .friend-request-card,
-.profile-gallery-item {
-  transition: transform 0.14s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-}
-.btn:active, .action-btn:active, .attach-btn:active, .send-btn:active {
-  transform: scale(0.96);
-}
-.friend-card:active, .friend-request-card:active {
-  transform: scale(0.98);
-}
-
-/* মেসেজ বাবল ঢোকার সময় হালকা pop */
-@keyframes bubblePop {
-  from { opacity: 0; transform: translateY(6px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.msg-row { animation: bubblePop 0.22s ease both; }
-
-/* ফ্রেন্ড কার্ড ও রিকোয়েস্ট কার্ড তালিকায় ঢোকার সময় হালকা fade */
-.friend-card, .friend-request-card {
-  animation: fadeScaleIn 0.25s ease both;
-}
-
-
-/* =======================================================================
-   =================  FACEBOOK-STYLE PROFILE POSTS FEED  =================
-   ======================================================================= */
-
-/* ---------- কম্পোজার ("What's on your mind?") ---------- */
-.post-composer {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 12px;
-  margin-bottom: 14px;
-}
-body.light-theme .post-composer {
-  background: #f0f2f5;
-  border-color: rgba(0, 0, 0, 0.06);
-}
-
-.post-composer-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.post-composer-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.post-composer-input {
-  flex: 1;
-  border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  border-radius: 18px;
-  padding: 9px 14px;
-  font-size: 14.5px;
-  resize: none;
-  max-height: 160px;
-  font-family: inherit;
-  line-height: 1.4;
-}
-body.light-theme .post-composer-input { background: #e4e6eb; }
-.post-composer-input:focus { outline: none; }
-
-.post-composer-preview {
-  position: relative;
-  margin-top: 10px;
-  border-radius: 12px;
-  overflow: hidden;
-  max-height: 260px;
-  background: #000;
-}
-.post-composer-preview img,
-.post-composer-preview video {
-  width: 100%;
-  max-height: 260px;
-  object-fit: contain;
-  display: block;
-  background: #000;
-}
-.post-preview-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.post-composer-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-body.light-theme .post-composer-actions { border-top-color: rgba(0, 0, 0, 0.08); }
-
-.post-composer-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  color: inherit;
-  opacity: 0.85;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 7px 6px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.post-composer-btn:hover { background: rgba(255, 255, 255, 0.06); }
-body.light-theme .post-composer-btn:hover { background: rgba(0, 0, 0, 0.05); }
-
-.post-submit-btn {
-  flex: 0 0 auto;
-  padding: 8px 22px;
-  font-size: 13px;
-}
-
-/* ---------- ফিড ---------- */
-.posts-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.post-card {
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  padding: 12px 12px 6px;
-  animation: fadeScaleIn 0.25s ease both;
-}
-body.light-theme .post-card {
-  background: #fff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
-
-.post-card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.post-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.post-header-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-.post-author-name {
-  font-size: 13.5px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-.post-time {
-  font-size: 11px;
-  opacity: 0.55;
-}
-.post-delete-btn {
-  background: none;
-  border: none;
-  color: #dc3545;
-  opacity: 0.7;
-  cursor: pointer;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.post-delete-btn:hover { opacity: 1; background: rgba(220, 53, 69, 0.12); }
-
-.post-text {
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin-bottom: 8px;
-}
-
-.post-media-wrap {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  margin: 0 -12px 8px;
-  cursor: pointer;
-  background: #000;
-}
-.post-media {
-  width: 100%;
-  max-height: 420px;
-  object-fit: contain;
-  display: block;
-  background: #000;
-}
-
-.post-meta-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  opacity: 0.6;
-  padding: 4px 2px 6px;
-}
-
-.post-actions-row {
-  display: flex;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 3px;
-}
-body.light-theme .post-actions-row { border-top-color: rgba(0, 0, 0, 0.08); }
-
-.post-action-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  color: inherit;
-  opacity: 0.75;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-}
-.post-action-btn:hover { background: rgba(255, 255, 255, 0.05); opacity: 1; }
-body.light-theme .post-action-btn:hover { background: rgba(0, 0, 0, 0.04); }
-.post-action-btn.liked { color: #0d6efd; opacity: 1; }
-
-/* ---------- কমেন্ট সেকশন ---------- */
-.post-comments-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 4px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  animation: fadeScaleIn 0.2s ease both;
-}
-body.light-theme .post-comments-section { border-top-color: rgba(0, 0, 0, 0.08); }
-
-.post-comments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.post-comment {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.post-comment-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.post-comment-bubble {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 6px 12px;
-  font-size: 13px;
-  max-width: 82%;
-}
-body.light-theme .post-comment-bubble { background: #f0f2f5; }
-.post-comment-name {
-  display: block;
-  font-weight: 700;
-  font-size: 12px;
-  margin-bottom: 1px;
-}
-.post-comment-text { word-break: break-word; }
-
-.post-comment-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.post-comment-input {
-  flex: 1;
-  border: none;
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  border-radius: 16px;
-  padding: 7px 14px;
-  font-size: 13px;
-}
-body.light-theme .post-comment-input { background: #f0f2f5; }
-.post-comment-input:focus { outline: none; }
-
-@media (min-width: 768px) {
-  .post-media { max-height: 480px; }
-}
-
-/* প্রোফাইলের প্রতিটা ট্যাব সুইচ করার সময় হালকা fade — আরও প্রিমিয়াম ফিল */
-.profile-tab-panel {
-  animation: fadeScaleIn 0.28s ease both;
+/* ---------- ছোট স্ক্রিন ---------- */
+@media (max-width: 767px) {
+  .main-container { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
