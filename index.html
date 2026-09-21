@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EKT CHATING APP</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232b8cff'/%3E%3Cstop offset='1' stop-color='%236a4bd6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M32 15c-10.5 0-19 7-19 15.5 0 4.6 2.5 8.7 6.4 11.5L18 50l8.5-4.2c1.7.4 3.5.7 5.5.7 10.5 0 19-7 19-15.5S42.5 15 32 15z' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap">
+  <meta name="theme-color" content="#0a0e17">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
@@ -297,7 +301,7 @@
       <span class="logo-type" aria-hidden="true"><span id="logoTypeText">EKT CHATING APP</span><span class="logo-cursor"></span></span>
     </div>
     <div class="nav-controls">
-      <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
+      <button id="themeToggleBtn" class="icon-btn" aria-label="Switch theme"><i class="fa-solid fa-moon"></i></button>
     </div>
   </header>
 
@@ -336,6 +340,7 @@
 
     <!-- Screen 1: Master Key / Access Screen -->
     <div id="masterKeyScreen" class="card-screen">
+      <div class="auth-icon"><i class="fa-solid fa-shield-halved"></i></div>
       <h2 id="masterTitle">Welcome</h2>
       <p id="masterSubtitle" style="font-size: 13px; opacity: 0.8; margin-bottom: 15px;">You can enter directly or set a security password</p>
 
@@ -359,6 +364,7 @@
 
     <!-- Screen 2: Auth Screen -->
     <div id="authScreen" class="card-screen" style="display: none;">
+      <div class="auth-icon"><i class="fa-solid fa-comments"></i></div>
       <h2 id="authTitle">Login Account</h2>
       
       <div id="signupFields" style="display: none;">
@@ -385,37 +391,47 @@
       <p class="footer-text">DEVELOPED BY EYAMIN</p>
     </div>
 
-    <!-- Screen 3: Premium Clean Dashboard Screen -->
+    <!-- Screen 3: Dashboard -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
+      <div class="dash-topbar">
+        <span class="dash-eyebrow">Home</span>
+        <div class="direct-menu-container">
+          <button id="dashMenuToggle" class="dots-btn" aria-label="More options"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+          <div id="dashDropdownMenu" class="direct-dropdown-menu">
+            <button id="setPinBtn" type="button" class="menu-item"><i class="fa-solid fa-key"></i><span id="setPinBtnText">Set Security PIN</span></button>
+            <button id="removePinBtn" type="button" class="menu-item"><i class="fa-solid fa-lock-open"></i><span>Remove Security PIN</span></button>
+            <div class="menu-sep"></div>
+            <button id="logoutBtn" type="button" class="menu-item menu-danger"><i class="fa-solid fa-power-off"></i><span>Logout</span></button>
+          </div>
+        </div>
+      </div>
+
       <div class="profile-header">
         <div class="avatar-container">
           <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture">
           <label for="avatarUpload" class="avatar-edit-badge"><i class="fa-solid fa-camera"></i></label>
           <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
         </div>
-        <h3 id="dashboardUserName">User Name</h3>
+        <div class="dash-name-row"><h3 id="dashboardUserName">User Name</h3></div>
       </div>
 
-      <!-- Action Buttons Section -->
-      <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 15px;">
-        <button id="createRoomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0d6efd, #0b5ed7);">
-          <i class="fa-solid fa-plus-circle" style="margin-right: 8px;"></i>Create Room
+      <div class="dash-actions">
+        <button id="friendIconBtn" type="button" class="dash-tile tile-friends">
+          <span class="tile-icon"><i class="fa-solid fa-user-group"></i></span>
+          <span class="tile-label">Friends</span>
+          <span id="friendReqBadge" class="friend-req-badge">0</span>
         </button>
-
-        <button id="joinRoomBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #198754, #157347);">
-          <i class="fa-solid fa-right-to-bracket" style="margin-right: 8px;"></i>Join Room
+        <button id="myProfileBtn" type="button" class="dash-tile tile-profile">
+          <span class="tile-icon"><i class="fa-solid fa-id-badge"></i></span>
+          <span class="tile-label">My Profile</span>
         </button>
-        
-        <button id="setPinBtn" class="btn btn-secondary" style="background-color: #343a40; color: #fff;">
-          <i class="fa-solid fa-key" style="margin-right: 8px;"></i><span id="setPinBtnText">Set Security PIN</span>
+        <button id="createRoomBtn" type="button" class="dash-tile tile-create">
+          <span class="tile-icon"><i class="fa-solid fa-plus"></i></span>
+          <span class="tile-label">Create Room</span>
         </button>
-        
-        <button id="removePinBtn" class="btn btn-secondary" style="background-color: #495057; color: #fff;">
-          <i class="fa-solid fa-trash-can" style="margin-right: 8px;"></i>Remove Security PIN
-        </button>
-
-        <button id="logoutBtn" class="btn btn-danger" style="margin-top: 5px;">
-          <i class="fa-solid fa-power-off" style="margin-right: 8px;"></i>Logout
+        <button id="joinRoomBtn" type="button" class="dash-tile tile-join">
+          <span class="tile-icon"><i class="fa-solid fa-right-to-bracket"></i></span>
+          <span class="tile-label">Join Room</span>
         </button>
       </div>
 
@@ -433,9 +449,17 @@
           </div>
         </div>
         <div class="chat-actions">
-          <button id="startAudioCallBtn" class="action-btn call-audio"><i class="fa-solid fa-phone"></i></button>
-          <button id="startVideoCallBtn" class="action-btn call-video"><i class="fa-solid fa-video"></i></button>
-          <button id="leaveRoomBtn" class="action-btn leave-room"><i class="fa-solid fa-right-from-bracket"></i></button>
+          <button id="startAudioCallBtn" class="action-btn call-audio" title="Audio call"><i class="fa-solid fa-phone"></i></button>
+          <button id="startVideoCallBtn" class="action-btn call-video" title="Video call"><i class="fa-solid fa-video"></i></button>
+          <div class="direct-menu-container">
+            <button id="roomMenuToggle" class="action-btn" title="More"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+            <div id="roomDropdownMenu" class="direct-dropdown-menu">
+              <div id="menuRoomTheme" class="menu-item"><i class="fa-solid fa-palette"></i><span>Theme</span></div>
+              <div id="menuCopyRoomCode" class="menu-item"><i class="fa-regular fa-copy"></i><span>Copy room code</span></div>
+              <div class="menu-sep"></div>
+              <div id="leaveRoomBtn" class="menu-item menu-danger"><i class="fa-solid fa-right-from-bracket"></i><span>Leave room</span></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -519,7 +543,7 @@
 
         <div id="modalActionContainer" style="display: flex; flex-direction: column; gap: 10px; width: 100%; justify-content: center; margin-top: 15px;">
           <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-          <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+          <button id="modalCancelBtn" class="btn btn-secondary">Cancel</button>
         </div>
       </div>
     </div>
