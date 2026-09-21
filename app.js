@@ -193,8 +193,7 @@ let editNameBtn = document.getElementById("editNameBtn");
 if (!editNameBtn && dashboardUserName) {
   editNameBtn = document.createElement("i");
   editNameBtn.id = "editNameBtn";
-  editNameBtn.className = "fa-solid fa-pen-to-square";
-  editNameBtn.style.cssText = "margin-left: 8px; cursor: pointer; color: #0d6efd; font-size: 14px;";
+  editNameBtn.className = "fa-solid fa-pen-to-square edit-name-btn";
   dashboardUserName.parentNode.appendChild(editNameBtn);
 }
 
@@ -220,6 +219,12 @@ if (!myProfileBtn && createRoomBtn) {
   myProfileBtn.style.cssText = "background: linear-gradient(135deg, #0aa2c0, #0b7e93); display: flex; align-items: center; justify-content: center; gap: 8px;";
   myProfileBtn.innerHTML = `<i class="fa-solid fa-id-badge"></i> My Profile`;
   createRoomBtn.parentNode.insertBefore(myProfileBtn, friendIconBtn || createRoomBtn);
+  myProfileBtn.onclick = () => {
+    if (currentUser) openProfile(currentUser.phone, currentUser);
+  };
+}
+
+if (myProfileBtn && !myProfileBtn.onclick) {
   myProfileBtn.onclick = () => {
     if (currentUser) openProfile(currentUser.phone, currentUser);
   };
@@ -274,9 +279,11 @@ directChatScreen.innerHTML = `
       <div class="direct-menu-container">
         <button id="directMenuToggle" class="action-btn"><i class="fa-solid fa-ellipsis-vertical"></i></button>
         <div id="directDropdownMenu" class="direct-dropdown-menu">
-          <div id="menuDirectTheme"><i class="fa-solid fa-palette"></i> Theme</div>
-          <div id="menuClearChat"><i class="fa-solid fa-trash"></i> Clear Chat</div>
-          <div id="menuBlockUser"><i class="fa-solid fa-ban"></i> Block User</div>
+          <div id="menuViewProfile" class="menu-item"><i class="fa-solid fa-circle-user"></i><span>View profile</span></div>
+          <div id="menuDirectTheme" class="menu-item"><i class="fa-solid fa-palette"></i><span>Theme</span></div>
+          <div class="menu-sep"></div>
+          <div id="menuClearChat" class="menu-item"><i class="fa-solid fa-broom"></i><span>Clear chat</span></div>
+          <div id="menuBlockUser" class="menu-item menu-danger"><i class="fa-solid fa-ban"></i><span>Block user</span></div>
         </div>
       </div>
     </div>
@@ -301,30 +308,37 @@ document.body.appendChild(toastContainer);
 // রুম মেম্বার হেডার ব্যানার
 const roomMembersHeader = document.createElement("div");
 roomMembersHeader.id = "roomMembersHeader";
-roomMembersHeader.style.cssText = "display:none; background: rgba(0,0,0,0.4); padding: 8px 15px; border-bottom: 1px solid #444; align-items: center; gap: 10px; overflow-x: auto; white-space: nowrap;";
-roomMembersHeader.innerHTML = `<span style="font-size: 12px; color: #adb5bd; font-weight: bold;">Room Members:</span> <div id="roomMembersAvatars" style="display: inline-flex; gap: 8px;"></div>`;
+roomMembersHeader.className = "room-members-bar";
+roomMembersHeader.style.display = "none";
+roomMembersHeader.innerHTML = `<span class="room-members-label"><i class="fa-solid fa-users"></i> Members</span><div id="roomMembersAvatars" class="room-members-list"></div>`;
 if (chatScreen) {
-  chatScreen.insertBefore(roomMembersHeader, chatScreen.firstChild);
+  const _roomMsgArea = chatScreen.querySelector("#chatMessages");
+  chatScreen.insertBefore(roomMembersHeader, _roomMsgArea || chatScreen.firstChild);
 }
 
 // ================= থিম সিস্টেম মোডাল এবং হেডার বাটন তৈরি =================
 let themeModal = document.createElement("div");
 themeModal.id = "themeModal";
-themeModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; justify-content:center; align-items:center;";
+themeModal.style.display = "none";
 themeModal.innerHTML = `
-  <div class="theme-modal-card" style="background: var(--bs-body-bg, #212529); color: var(--bs-body-color, #fff); width: 90%; max-width: 400px; padding: 20px; border-radius: 12px; border: 1px solid #444;">
-    <h5 style="margin-top: 0; margin-bottom: 15px;"><i class="fa-solid fa-palette" style="margin-right: 8px;"></i>Select Room Theme</h5>
-    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-      <div class="theme-box" data-bg="#121212" style="width: 40px; height: 40px; background: #121212; border-radius: 50%; border: 2px solid #fff; cursor: pointer;" title="Dark"></div>
-      <div class="theme-box" data-bg="#f8f9fa" data-color="#212529" style="width: 40px; height: 40px; background: #f8f9fa; border-radius: 50%; border: 2px solid #ccc; cursor: pointer;" title="Light"></div>
-      <div class="theme-box" data-bg="#0f172a" style="width: 40px; height: 40px; background: #0f172a; border-radius: 50%; border: 2px solid #3b82f6; cursor: pointer;" title="Navy"></div>
-      <div class="theme-box" data-bg="#3b1d31" style="width: 40px; height: 40px; background: #3b1d31; border-radius: 50%; border: 2px solid #e83e8c; cursor: pointer;" title="Berry"></div>
+  <div class="theme-modal-card">
+    <h5 class="theme-modal-title"><i class="fa-solid fa-palette"></i> Chat theme</h5>
+    <p class="theme-modal-sub">চ্যাটের ব্যাকগ্রাউন্ড বেছে নিন</p>
+    <div class="theme-swatches">
+      <div class="theme-box" data-bg="#121212" style="background:#121212" title="Dark"></div>
+      <div class="theme-box" data-bg="#f8f9fa" data-color="#212529" style="background:#f8f9fa" title="Light"></div>
+      <div class="theme-box" data-bg="#0f172a" style="background:#0f172a" title="Navy"></div>
+      <div class="theme-box" data-bg="#3b1d31" style="background:#3b1d31" title="Berry"></div>
+      <div class="theme-box" data-bg="#0b2a26" style="background:#0b2a26" title="Forest"></div>
+      <div class="theme-box" data-bg="#241638" style="background:#241638" title="Violet"></div>
+      <div class="theme-box" data-bg="#2a1c14" style="background:#2a1c14" title="Mocha"></div>
+      <div class="theme-box" data-bg="#0a0e17" style="background:#0a0e17" title="Midnight"></div>
     </div>
-    <div style="margin-bottom: 15px;">
-      <label style="font-size: 13px; display: block; margin-bottom: 5px;">Or Upload Custom Background Image:</label>
-      <input type="file" id="customThemeImageInput" accept="image/*" class="form-control form-control-sm" />
-    </div>
-    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+    <label class="theme-upload" for="customThemeImageInput">
+      <i class="fa-solid fa-image"></i><span>নিজের ছবি ব্যাকগ্রাউন্ড হিসেবে দিন</span>
+      <input type="file" id="customThemeImageInput" accept="image/*" />
+    </label>
+    <div class="theme-modal-actions">
       <button id="resetThemeBtn" class="btn btn-secondary btn-sm">Reset</button>
       <button id="closeThemeModal" class="btn btn-primary btn-sm">Close</button>
     </div>
@@ -517,29 +531,18 @@ document.head.insertAdjacentHTML("beforeend", `
       z-index: 10;
       color: #6c757d;
     }
-    .member-avatar-card {
-      display: inline-flex;
-      align-items: center;
-      background: rgba(255,255,255,0.08);
-      padding: 3px 10px;
-      border-radius: 20px;
-      gap: 6px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .member-avatar-card:hover { background: rgba(13, 110, 253, 0.3); }
   </style>
 `);
 
 const chatLoadingOverlay = document.createElement("div");
 chatLoadingOverlay.id = "chatLoadingOverlay";
-chatLoadingOverlay.style.cssText = "display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,18,18,0.85); z-index:10; justify-content:center; align-items:center; flex-direction:column;";
+chatLoadingOverlay.className = "chat-loading-overlay";
+chatLoadingOverlay.style.display = "none";
 chatLoadingOverlay.innerHTML = `
-  <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
-  <span style="color: #fff; margin-top: 8px; font-size: 13px;">চ্যাট লোড হচ্ছে...</span>
+  <div class="spinner-border" role="status"></div>
+  <span>চ্যাট লোড হচ্ছে...</span>
 `;
 if (chatMessages && chatMessages.parentNode) {
-  chatMessages.parentNode.style.position = "relative";
   chatMessages.parentNode.appendChild(chatLoadingOverlay);
 }
 
@@ -704,7 +707,7 @@ function showCustomModal(options) {
   modalActionContainer.innerHTML = `
     <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
       <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-      <button id="modalCancelBtn" class="btn btn-secondary" style="background-color: #6c757d; color: #fff;">Cancel</button>
+      <button id="modalCancelBtn" class="btn btn-secondary">Cancel</button>
     </div>
   `;
 
@@ -870,7 +873,7 @@ function updateDashboardPinUI() {
   const savedPin = localStorage.getItem("appMasterPin");
   if (savedPin) {
     setPinBtnText.textContent = "Change Security PIN";
-    removePinBtn.style.display = "block";
+    removePinBtn.style.display = "";
   } else {
     setPinBtnText.textContent = "Set Security PIN";
     removePinBtn.style.display = "none";
@@ -1267,7 +1270,7 @@ profileModalOverlay.innerHTML = `
 
       <div class="profile-modal-actions">
         <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
-        <button id="pmCloseBtn" class="btn btn-secondary" style="background:#495057; color:#fff;">Close</button>
+        <button id="pmCloseBtn" class="btn btn-secondary">Close</button>
       </div>
     </div>
   </div>
@@ -1354,6 +1357,13 @@ function renderPostCardHtml(post) {
     </div>
   `).join("");
 
+  const moreItems =
+    (post.text ? `<div class="menu-item" data-post-copy><i class="fa-regular fa-copy"></i><span>Copy text</span></div>` : "") +
+    (profileViewState.isMe ? `<div class="menu-item menu-danger" data-post-del="${post.id}"><i class="fa-solid fa-trash"></i><span>Delete post</span></div>` : "");
+  const moreHtml = moreItems
+    ? `<div class="post-more"><button class="post-more-btn" data-post-more title="More"><i class="fa-solid fa-ellipsis"></i></button><div class="post-more-menu">${moreItems}</div></div>`
+    : "";
+
   return `
     <div class="post-card" data-post-id="${post.id}">
       <div class="post-card-header">
@@ -1362,7 +1372,7 @@ function renderPostCardHtml(post) {
           <span class="post-author-name">${escapeHtml(d.name || "User")}</span>
           <span class="post-time">${timeAgo(post.timestamp)}</span>
         </div>
-        ${profileViewState.isMe ? `<button class="post-delete-btn" data-post-del="${post.id}" title="Delete"><i class="fa-solid fa-trash"></i></button>` : ""}
+        ${moreHtml}
       </div>
       ${post.text ? `<div class="post-text">${escapeHtml(post.text)}</div>` : ""}
       ${mediaHtml}
@@ -1411,6 +1421,23 @@ function wirePostCardEvents(post) {
           renderPostsFeed();
         }
       });
+    };
+  }
+
+  const moreBtn = card.querySelector("[data-post-more]");
+  const moreMenu = card.querySelector(".post-more-menu");
+  if (moreBtn && moreMenu) {
+    moreBtn.onclick = (e) => {
+      e.stopPropagation();
+      document.querySelectorAll(".post-more-menu.open").forEach((m) => { if (m !== moreMenu) m.classList.remove("open"); });
+      moreMenu.classList.toggle("open");
+    };
+  }
+  const copyPostBtn = card.querySelector("[data-post-copy]");
+  if (copyPostBtn) {
+    copyPostBtn.onclick = async () => {
+      const ok = await copyText(post.text || "");
+      showMiniToast(ok ? "Copied" : "Couldn't copy");
     };
   }
 
@@ -1860,14 +1887,83 @@ document.getElementById("menuBlockUser").onclick = () => {
     if (res.success) {
       if (res.isBlocked) {
         await showCustomAlert("Blocked", "ইউজারকে ব্লক করা হয়েছে। তিনি আর মেসেজ পাঠাতে পারবেন না।");
-        document.getElementById("menuBlockUser").innerHTML = `<i class="fa-solid fa-user-check"></i> Unblock User`;
+        document.getElementById("menuBlockUser").innerHTML = `<i class="fa-solid fa-user-check"></i><span>Unblock user</span>`;
       } else {
         await showCustomAlert("Unblocked", "ইউজারকে আনব্লক করা হয়েছে।");
-        document.getElementById("menuBlockUser").innerHTML = `<i class="fa-solid fa-ban"></i> Block User`;
+        document.getElementById("menuBlockUser").innerHTML = `<i class="fa-solid fa-ban"></i><span>Block user</span>`;
       }
     }
   });
 };
+
+// ================= ছোট টোস্ট + কপি হেল্পার + থ্রি-ডট মেনুর অতিরিক্ত অ্যাকশন =================
+function showMiniToast(text) {
+  const t = document.createElement("div");
+  t.className = "mini-toast";
+  t.textContent = text;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => {
+    t.classList.remove("show");
+    setTimeout(() => t.remove(), 300);
+  }, 1800);
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed; opacity:0; left:-1000px;";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+// ড্যাশবোর্ডের থ্রি-ডট মেনু (Security PIN ও Logout এখন এর ভেতরে)
+const dashMenuToggle = document.getElementById("dashMenuToggle");
+const dashDropdownMenu = document.getElementById("dashDropdownMenu");
+if (dashMenuToggle && dashDropdownMenu) {
+  dashMenuToggle.onclick = (e) => {
+    e.stopPropagation();
+    dashDropdownMenu.classList.toggle("open");
+  };
+}
+
+// ডিরেক্ট চ্যাটের থ্রি-ডট মেনুতে "View profile"
+const menuViewProfile = document.getElementById("menuViewProfile");
+if (menuViewProfile) {
+  menuViewProfile.onclick = () => {
+    if (activeDirectChatFriend) openFriendProfile(activeDirectChatFriend);
+  };
+}
+
+// রুম চ্যাটের থ্রি-ডট মেনুতে "Copy room code"
+const menuCopyRoomCode = document.getElementById("menuCopyRoomCode");
+if (menuCopyRoomCode) {
+  menuCopyRoomCode.onclick = async () => {
+    if (!currentRoom || currentRoom === ADMIN_ROOM_PIN) {
+      showMiniToast("এই রুমের কোড কপি করা যাবে না");
+      return;
+    }
+    const ok = await copyText(currentRoom);
+    showMiniToast(ok ? "Room code copied" : "Couldn't copy");
+  };
+}
+
+// পোস্টের থ্রি-ডট মেনু বাইরে ক্লিক করলে বন্ধ হবে
+document.addEventListener("click", () => {
+  document.querySelectorAll(".post-more-menu.open").forEach((m) => m.classList.remove("open"));
+});
 
 function loadDirectChatHistory() {
   if (!activeDirectChatFriend) return;
@@ -2340,9 +2436,9 @@ socket.on("room-members-update", (members) => {
       const card = document.createElement("div");
       card.className = "member-avatar-card";
       card.innerHTML = `
-        <img src="${member.pic || 'https://via.placeholder.com/40'}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />
-        <span style="font-size: 12px; color: #fff;">${member.name}</span>
-        ${member.phone !== currentUser.phone ? '<i class="fa-solid fa-user-plus" style="font-size: 10px; color: #0d6efd;" title="Add Friend"></i>' : ''}
+        <img src="${member.pic || 'https://via.placeholder.com/40'}" alt="" />
+        <span>${member.name}</span>
+        ${member.phone !== currentUser.phone ? '<i class="fa-solid fa-user-plus" title="Add Friend"></i>' : ''}
       `;
       if (member.phone !== currentUser.phone) {
         card.onclick = async () => {
@@ -2609,6 +2705,7 @@ function appendChatMessage(msg, isMyMessage = false, initialStatus = "Sent") {
     msgDiv.innerHTML = `
       ${avatarImg}
       <div style="display:flex; flex-direction:column; align-items:flex-start; max-width:78%;" class="room-msg-col">
+        <span class="room-sender-name">${escapeHtml(msg.sender || "")}</span>
         ${bubble}
       </div>
     `;
