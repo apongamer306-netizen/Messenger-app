@@ -292,11 +292,45 @@
   </script>
 
   <header class="navbar">
-    <div class="logo">EKT CHATING APP</div>
+    <div class="logo" aria-label="EKT CHATING APP">
+      <span class="logo-sizer" aria-hidden="true">EKT CHATING APP</span>
+      <span class="logo-type" aria-hidden="true"><span id="logoTypeText">EKT CHATING APP</span><span class="logo-cursor"></span></span>
+    </div>
     <div class="nav-controls">
       <button id="themeToggleBtn" class="icon-btn"><i class="fa-solid fa-moon"></i></button>
     </div>
   </header>
+
+  <script>
+    // হেডারের লোগো টাইপিং অ্যানিমেশন: অক্ষর একটা একটা করে উঠবে → পুরো লেখা কিছুক্ষণ থাকবে → একটা একটা করে মুছবে → আবার শুরু
+    (function () {
+      var FULL = "EKT CHATING APP";
+      var el = document.getElementById("logoTypeText");
+      if (!el) return;
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) { el.textContent = FULL; return; }   // যাদের ফোনে অ্যানিমেশন বন্ধ, তাদের জন্য স্থির লেখা
+      var TYPE_MS = 120;    // প্রতি অক্ষর ওঠার সময়
+      var ERASE_MS = 60;    // প্রতি অক্ষর মোছার সময়
+      var HOLD_MS = 2400;   // পুরো লেখা দেখানোর সময়
+      var GAP_MS = 500;     // পুরো মুছে যাওয়ার পর বিরতি
+      var i = 0, erasing = false;
+      el.textContent = "";
+      function tick() {
+        if (!erasing) {
+          i++;
+          el.textContent = FULL.slice(0, i);
+          if (i >= FULL.length) { erasing = true; setTimeout(tick, HOLD_MS); return; }
+          setTimeout(tick, TYPE_MS);
+        } else {
+          i--;
+          el.textContent = FULL.slice(0, i);
+          if (i <= 0) { erasing = false; setTimeout(tick, GAP_MS); return; }
+          setTimeout(tick, ERASE_MS);
+        }
+      }
+      setTimeout(tick, 300);
+    })();
+  </script>
 
   <main class="main-container">
 
