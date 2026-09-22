@@ -3503,9 +3503,9 @@ socket.on("direct-call-ended", endCallCleanup);
   });
 })();
 
-// স্প্ল্যাশ স্ক্রিন — অ্যাপ প্রস্তুত হলে সরিয়ে দেওয়া (index.html-এর টাইমারের ব্যাকআপ)
+// স্প্ল্যাশ স্ক্রিন — ব্যাকআপ (index.html নিজেই নেটওয়ার্ক অনুযায়ী হিড করে)
 window.addEventListener("load", () => {
   setTimeout(() => {
     if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
-  }, 5600);
+  }, 6500);
 });
