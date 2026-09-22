@@ -1234,7 +1234,7 @@ profileModalOverlay.innerHTML = `
     </div>
     <div class="profile-modal-body">
       <div id="pmName" class="profile-modal-name">Friend</div>
-      <div id="pmSub" class="profile-modal-sub">Friend on EKT Chating App</div>
+      <div id="pmSub" class="profile-modal-sub">Friend on EKT Chatter</div>
 
       <div class="profile-tabs">
         <button class="profile-tab active" data-tab="posts">Posts</button>
@@ -1754,7 +1754,7 @@ function saveMyProfile() {
   socket.emit("save-profile", { phone: currentUser.phone, profile }, (res) => {
     if (res && res.success) {
       profileViewState.data = { ...profileViewState.data, ...res.profile };
-      document.getElementById("pmSub").textContent = profile.bio || "EKT Chating App";
+      document.getElementById("pmSub").textContent = profile.bio || "EKT Chatter";
       // এই ডিভাইসেও একটা কপি রাখা হয় — সার্ভার কোনো কারণে ডেটা হারালেও
       // এই ডিভাইস থেকে পরের বার কানেক্ট হলেই আবার নিজে থেকে ফিরে আসবে
       try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
@@ -1806,7 +1806,7 @@ function openProfile(phone, fallback) {
     profileViewState.data = data;
     document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
     document.getElementById("pmName").textContent = data.name || "Profile";
-    document.getElementById("pmSub").textContent = data.bio || (isMe ? "আপনার প্রোফাইল" : "EKT Chating App");
+    document.getElementById("pmSub").textContent = data.bio || (isMe ? "আপনার প্রোফাইল" : "EKT Chatter");
     switchProfileTab(profileViewState.tab);
   });
 }
