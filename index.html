@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EKT CHATING APP</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232b8cff'/%3E%3Cstop offset='1' stop-color='%236a4bd6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M32 15c-10.5 0-19 7-19 15.5 0 4.6 2.5 8.7 6.4 11.5L18 50l8.5-4.2c1.7.4 3.5.7 5.5.7 10.5 0 19-7 19-15.5S42.5 15 32 15z' fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='0.55' stop-color='%237c5cff'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3Cfilter id='s' x='-40%25' y='-40%25' width='180%25' height='180%25'%3E%3CfeDropShadow dx='0' dy='1.5' stdDeviation='1.6' flood-color='%232a1a55' flood-opacity='0.45'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cg filter='url(%23s)'%3E%3Cpath d='M14 25c0-7.2 6.3-13 15.5-13S45 17.8 45 25s-6.3 13-15.5 13c-2 0-3.9-.3-5.6-.8L15 40l1.9-7.4C15.1 30.6 14 27.9 14 25z' fill='white'/%3E%3C/g%3E%3Ctext x='29' y='31' font-family='Arial,Helvetica,sans-serif' font-weight='800' font-size='19' text-anchor='middle' fill='url(%23g)'%3EE%3C/text%3E%3Ccircle cx='47' cy='15' r='4.5' fill='%23ffd166'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Pacifico&display=swap">
   <meta name="theme-color" content="#0a0e17">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -248,7 +248,7 @@
       <div class="splash-loader"><i></i></div>
     </div>
 
-    <p class="splash-footer">DEVELOPED BY EYAMIN</p>
+    <p class="splash-footer dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
   </div>
 
   <script>
@@ -297,44 +297,13 @@
 
   <header class="navbar">
     <div class="logo" aria-label="EKT CHATING APP">
-      <span class="logo-sizer" aria-hidden="true">EKT CHATING APP</span>
-      <span class="logo-type" aria-hidden="true"><span id="logoTypeText">EKT CHATING APP</span><span class="logo-cursor"></span></span>
+      <span class="logo-shine" id="logoShineText" aria-hidden="true">EKT CHATING APP</span>
     </div>
     <div class="nav-controls">
       <button id="themeToggleBtn" class="icon-btn" aria-label="Switch theme"><i class="fa-solid fa-moon"></i></button>
     </div>
   </header>
 
-  <script>
-    // হেডারের লোগো টাইপিং অ্যানিমেশন: অক্ষর একটা একটা করে উঠবে → পুরো লেখা কিছুক্ষণ থাকবে → একটা একটা করে মুছবে → আবার শুরু
-    (function () {
-      var FULL = "EKT CHATING APP";
-      var el = document.getElementById("logoTypeText");
-      if (!el) return;
-      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduce) { el.textContent = FULL; return; }   // যাদের ফোনে অ্যানিমেশন বন্ধ, তাদের জন্য স্থির লেখা
-      var TYPE_MS = 120;    // প্রতি অক্ষর ওঠার সময়
-      var ERASE_MS = 60;    // প্রতি অক্ষর মোছার সময়
-      var HOLD_MS = 2400;   // পুরো লেখা দেখানোর সময়
-      var GAP_MS = 500;     // পুরো মুছে যাওয়ার পর বিরতি
-      var i = 0, erasing = false;
-      el.textContent = "";
-      function tick() {
-        if (!erasing) {
-          i++;
-          el.textContent = FULL.slice(0, i);
-          if (i >= FULL.length) { erasing = true; setTimeout(tick, HOLD_MS); return; }
-          setTimeout(tick, TYPE_MS);
-        } else {
-          i--;
-          el.textContent = FULL.slice(0, i);
-          if (i <= 0) { erasing = false; setTimeout(tick, GAP_MS); return; }
-          setTimeout(tick, ERASE_MS);
-        }
-      }
-      setTimeout(tick, 300);
-    })();
-  </script>
 
   <main class="main-container">
 
@@ -359,7 +328,7 @@
         <a href="#" id="masterToggleLink">Create Password</a>
       </p>
 
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
+      <p class="footer-text dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
     </div>
 
     <!-- Screen 2: Auth Screen -->
@@ -388,7 +357,7 @@
         <span id="authToggleMsg">Don't have an account?</span>
         <a href="#" id="authToggleLink">Sign Up</a>
       </p>
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
+      <p class="footer-text dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
     </div>
 
     <!-- Screen 3: Dashboard -->
@@ -435,7 +404,7 @@
         </button>
       </div>
 
-      <p class="footer-text">DEVELOPED BY EYAMIN</p>
+      <p class="footer-text dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
     </div>
 
     <!-- Screen 4: Chat Room -->
@@ -551,5 +520,32 @@
   </main>
 
   <script src="app.js"></script>
+  <script>
+    // "Developed by Eyamin" — যেখানেই দেখা যায় (স্প্ল্যাশ ও প্রতিটা কার্ড স্ক্রিন), একই টাইপ →
+    // কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ চলবে, প্রতিটার নিজস্ব টাইমার আলাদা।
+    (function () {
+      var FULL = "Developed by Eyamin";
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var TYPE_MS = 90, ERASE_MS = 45, HOLD_MS = 2000, GAP_MS = 650;
+      document.querySelectorAll(".dev-credit-text").forEach(function (el, order) {
+        if (reduce) { el.textContent = FULL; return; }
+        var i = 0, erasing = false;
+        function tick() {
+          if (!erasing) {
+            i++;
+            el.textContent = FULL.slice(0, i);
+            if (i >= FULL.length) { erasing = true; setTimeout(tick, HOLD_MS); return; }
+            setTimeout(tick, TYPE_MS);
+          } else {
+            i--;
+            el.textContent = FULL.slice(0, i);
+            if (i <= 0) { erasing = false; setTimeout(tick, GAP_MS); return; }
+            setTimeout(tick, ERASE_MS);
+          }
+        }
+        setTimeout(tick, 250 + order * 120);
+      });
+    })();
+  </script>
 </body>
 </html>
