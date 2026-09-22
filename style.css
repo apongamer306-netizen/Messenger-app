@@ -8,7 +8,15 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Inter', 'Hind Siliguri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Poppins', 'Inter', 'Hind Siliguri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-style: italic;
+}
+
+/* ফন্ট-অসম্বল আইকনগুলো (Font Awesome) যেন ইটালিকে বাঁকা না হয়ে যায়,
+   তাই আইকন গ্লিফ সবসময় normal রাখা হলো */
+i[class*="fa-"], .fa, .fa-solid, .fa-regular, .fa-brands,
+i[class*="fa-"]::before, .fa-solid::before, .fa-regular::before, .fa-brands::before {
+  font-style: normal !important;
 }
 
 body {
@@ -411,6 +419,116 @@ img { -webkit-user-drag: none; }
   text-transform: uppercase;
   color: var(--text-3);
 }
+
+/* ---------- রিপোর্ট ও অ্যাডমিন প্যানেল আইকন (ড্যাশবোর্ড টপবার) ---------- */
+.dash-topbar-icons { display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
+.topbar-icon-btn {
+  position: relative;
+  width: 38px; height: 38px; border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--input-bg);
+  color: var(--text-2);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; font-style: normal;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+.topbar-icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.topbar-icon-btn:active { transform: scale(0.94); }
+#openReportBtn:hover { color: var(--amber); }
+#openAdminPanelBtn:hover { color: var(--brand); }
+
+.admin-report-badge {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 800; font-style: normal;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.admin-report-badge.inline { position: static; margin-left: 6px; box-shadow: none; }
+
+/* ---------- রিপোর্ট মোডাল ---------- */
+.report-modal-card, .admin-panel-card { max-width: 380px; margin: auto; text-align: center; }
+.report-modal-card h2, .admin-panel-card h2 { font-size: 19px; margin-bottom: 6px; }
+.report-modal-sub { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5; }
+.report-textarea {
+  width: 100%; background: var(--input-bg); border: 1px solid var(--line-2);
+  border-radius: 14px; padding: 12px 14px; color: var(--text);
+  font-size: 13.5px; resize: vertical; min-height: 100px;
+}
+.report-textarea:focus { outline: none; border-color: var(--brand); }
+.report-waiting-spinner {
+  width: 64px; height: 64px; margin: 4px auto 16px; border-radius: 50%;
+  background: var(--brand-grad); display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 24px; box-shadow: var(--shadow-pop);
+  animation: reportWaitPulse 1.6s ease-in-out infinite;
+}
+@keyframes reportWaitPulse { 0%,100%{ transform: scale(1); opacity: 1; } 50%{ transform: scale(1.08); opacity: .85; } }
+
+/* ---------- অ্যাডমিন প্যানেল ---------- */
+.admin-panel-card { max-width: 420px; text-align: left; max-height: 82vh; overflow-y: auto; }
+.admin-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.admin-panel-header h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0; }
+.admin-close-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--input-bg); color: var(--text-2); cursor: pointer; font-size: 14px;
+}
+.admin-close-btn:hover { background: var(--surface-3); color: var(--text); }
+
+.admin-tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--input-bg); padding: 4px; border-radius: 14px; }
+.admin-tab-btn {
+  flex: 1; padding: 9px 8px; border: none; border-radius: 11px; background: transparent;
+  color: var(--text-2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  transition: background .18s ease, color .18s ease;
+}
+.admin-tab-btn.active { background: var(--brand-grad); color: #fff; }
+
+.admin-users-list, .admin-reports-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
+.admin-user-row-wrap { border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.admin-user-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; cursor: pointer;
+}
+.admin-user-row img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+.admin-user-row .au-info { flex: 1; min-width: 0; }
+.admin-user-row .au-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.admin-user-row .au-phone { font-size: 11.5px; color: var(--text-3); }
+.au-chevron { font-size: 12px; color: var(--text-3); transition: transform .2s ease; }
+.admin-user-details { padding: 4px 12px 12px 56px; border-top: 1px solid var(--line); }
+.au-detail-row { font-size: 12px; color: var(--text-2); padding: 4px 0; line-height: 1.5; }
+.au-detail-row i { width: 16px; color: var(--brand); margin-right: 6px; }
+.au-detail-label { font-weight: 700; color: var(--text); }
+.admin-empty-note { font-size: 12.5px; color: var(--text-3); text-align: center; padding: 18px 6px; }
+
+.admin-site-info {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-2); line-height: 1.6;
+}
+.admin-site-info i { color: var(--brand); margin-right: 6px; }
+.admin-section-title { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; }
+.admin-report-row {
+  padding: 11px 12px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line);
+}
+.admin-report-row.pending { border-color: rgba(245, 158, 11, .4); }
+.admin-report-row .ar-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.admin-report-row .ar-name { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.admin-report-row .ar-time { font-size: 10.5px; color: var(--text-3); }
+.admin-report-row .ar-msg { font-size: 12.5px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
+.admin-report-row .ar-actions { display: flex; gap: 8px; }
+.admin-report-row .ar-actions button {
+  flex: 1; padding: 7px; border-radius: 9px; border: none; font-size: 11.5px; font-weight: 700; cursor: pointer;
+}
+.ar-resolve-btn { background: var(--green); color: #fff; }
+.ar-dismiss-btn { background: var(--input-bg); color: var(--text-2); border: 1px solid var(--line) !important; }
+.ar-status-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: rgba(245, 158, 11, .16); color: var(--amber);
+}
+.ar-status-tag.resolved { background: rgba(34, 197, 94, .16); color: var(--green); }
+.ar-status-tag.dismissed { background: rgba(148, 163, 184, .16); color: var(--text-3); }
 
 .profile-header {
   display: flex;
