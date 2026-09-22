@@ -54,6 +54,12 @@ let friendRequests = {};     // phone -> Set(phone)  (requests received BY this 
 let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
 let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
 let roomMessages = {};       // roomCode -> [ messages ]
+let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
+
+// ================= অ্যাডমিন প্যানেল =================
+// অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
+// ভ্যারিয়েবল ADMIN_PASSWORD সেট করে এটা পরিবর্তন করা যাবে (নিরাপত্তার জন্য উত্তম)।
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Tawsiya Loved Me";
 
 const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
 const phoneToSocket = {};    // phone -> socket.id
@@ -94,6 +100,7 @@ function loadData() {
     roomMessages = raw.roomMessages || {};
     profiles = raw.profiles || {};
     directThemes = raw.directThemes || {};
+    reports = raw.reports || [];
     console.log("Saved data loaded successfully.");
   } catch (e) {
     console.error("Could not load saved data:", e.message);
@@ -116,6 +123,7 @@ function saveData() {
         roomMessages: trimMessages(roomMessages),
         profiles,
         directThemes,
+        reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
       };
       fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
     } catch (e) {
@@ -154,6 +162,7 @@ loadData();
           roomMessages: trimMessages(roomMessages),
           profiles,
           directThemes,
+          reports: reports.slice(-300),
         })
       );
     } catch (e) {}
@@ -224,6 +233,75 @@ io.on("connection", (socket) => {
     } else {
       if (typeof callback === "function") callback({ success: false });
     }
+  });
+
+  // ---------- রিপোর্ট সিস্টেম ----------
+  // যে কেউ একটা সমস্যা রিপোর্ট করলে সেটা লিস্টে যোগ হয় এবং সাথে সাথে
+  // অ্যাডমিন প্যানেল খোলা থাকলে সেখানে রিয়েল-টাইমে নোটিফিকেশন যায়।
+  socket.on("submit-report", ({ fromPhone, fromName, message }, callback) => {
+    const text = (message || "").toString().trim();
+    if (!text) {
+      if (typeof callback === "function") callback({ success: false, error: "Empty report" });
+      return;
+    }
+    const report = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      fromPhone: fromPhone || "unknown",
+      fromName: fromName || "Unknown",
+      message: text.slice(0, 1000),
+      time: Date.now(),
+      status: "pending", // pending | resolved | dismissed
+    };
+    reports.push(report);
+    saveData();
+    io.emit("admin-new-report", report); // অ্যাডমিন প্যানেল খোলা থাকলে সে-ই কেবল দেখাবে
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // ---------- অ্যাডমিন প্যানেল ----------
+  socket.on("admin-login", ({ password }, callback) => {
+    if (typeof callback !== "function") return;
+    if (password === ADMIN_PASSWORD) {
+      const userList = Object.values(users).map((u) => {
+        const p = profiles[u.phone] || {};
+        return {
+          name: u.name,
+          phone: u.phone,
+          pic: u.pic || "https://via.placeholder.com/80",
+          bio: p.bio || "",
+          location: p.location || "",
+          work: p.work || "",
+          education: p.education || "",
+          relationship: p.relationship || "",
+          friendCount: ensureSet(friendships, u.phone).size,
+        };
+      });
+      callback({ success: true, users: userList, reports: reports.slice().reverse() });
+    } else {
+      callback({ success: false });
+    }
+  });
+
+  socket.on("admin-report-action", ({ password, reportId, action }, callback) => {
+    if (password !== ADMIN_PASSWORD) {
+      if (typeof callback === "function") callback({ success: false, error: "Unauthorized" });
+      return;
+    }
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) {
+      if (typeof callback === "function") callback({ success: false, error: "Not found" });
+      return;
+    }
+    report.status = action === "resolve" ? "resolved" : "dismissed";
+    saveData();
+
+    // যে ইউজার রিপোর্ট করেছিল, তাকে জানিয়ে দেওয়া (সে অনলাইনে থাকলে)
+    const reporterSocket = phoneToSocket[report.fromPhone];
+    if (reporterSocket) {
+      io.to(reporterSocket).emit("report-status-update", { reportId: report.id, status: report.status });
+    }
+
+    if (typeof callback === "function") callback({ success: true, report });
   });
 
   // ---------- FRIEND RESTORE / SYNC ----------
