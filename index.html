@@ -87,8 +87,8 @@
       display:flex; align-items:center; justify-content:center;
       background:linear-gradient(150deg,#39a0ff 0%,#7a45d6 55%,#ff6fb0 100%);
       box-shadow:0 24px 60px rgba(90,80,255,.45), 0 0 0 1px rgba(255,255,255,.14) inset;
-      animation:splashBlobPop .9s cubic-bezier(.2,1.4,.3,1) both,
-                splashBlobMorph 5s ease-in-out 1s infinite;
+      animation:splashBlobPop .55s cubic-bezier(.2,1.4,.3,1) both,
+                splashBlobMorph 5s ease-in-out .7s infinite;
     }
     @keyframes splashBlobPop{
       0%  { transform:scale(0) rotate(-90deg); opacity:0; border-radius:50%; }
@@ -105,12 +105,12 @@
       content:""; position:absolute; inset:0; border-radius:inherit; overflow:hidden;
       background:linear-gradient(115deg, transparent 36%, rgba(255,255,255,.45) 50%, transparent 64%);
       background-size:240% 100%;
-      animation:splashSheen 3s ease-in-out 1.2s infinite;
+      animation:splashSheen 3s ease-in-out .5s infinite;
     }
     @keyframes splashSheen{
       0%{ background-position:170% 0; } 55%{ background-position:-70% 0; } 100%{ background-position:-70% 0; }
     }
-    .splash-blob i{ position:relative; font-size:40px; color:#fff; opacity:.97; animation:splashIconFloat 3.2s ease-in-out 1s infinite; }
+    .splash-blob i{ position:relative; font-size:40px; color:#fff; opacity:.97; animation:splashIconFloat 3.2s ease-in-out .6s infinite; }
     @keyframes splashIconFloat{ 0%,100%{ transform:translateY(0) rotate(0); } 50%{ transform:translateY(-4px) rotate(-6deg); } }
 
     /* ---- app name: প্রতিটা অক্ষর ফ্লিপ করে জায়গামতো বসবে ---- */
@@ -145,41 +145,43 @@
     .splash-divider{
       width:0; height:2px; margin:16px auto 0; border-radius:2px;
       background:linear-gradient(90deg, transparent, #2b8bff, #a56cff, #ff6fb0, transparent);
-      animation:splashDivider .9s ease 1.7s forwards;
+      animation:splashDivider .7s ease 1.1s forwards;
     }
     @keyframes splashDivider{ to{ width:210px; } }
 
     .splash-sub{
       margin:14px 0 0; font-size:11.5px; letter-spacing:6px; color:#a9c0e2;
       font-style:normal;
-      opacity:0; animation:splashFadeUp .8s ease 1.95s forwards;
+      opacity:0; animation:splashFadeUp .6s ease 1.2s forwards;
       font-family:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
     }
     @keyframes splashFadeUp{ from{ opacity:0; transform:translateY(12px);} to{ opacity:.92; transform:translateY(0);} }
 
     /* ---- বৃত্তাকার প্রোগ্রেস রিং, ভেতরে লাইভ পার্সেন্ট ---- */
+    /* Immediately visible so % is never stuck hidden at 100 */
     .splash-progress{
-      margin:28px auto 0; opacity:0; animation:splashFadeUp .7s ease 2.1s forwards;
+      margin:28px auto 0; opacity:1;
     }
     .splash-ring{
       --pct:0;
-      position:relative; width:70px; height:70px; border-radius:50%;
-      background:conic-gradient(from -90deg, #4f8cff calc(var(--pct) * 1%), rgba(255,255,255,.1) 0);
+      position:relative; width:76px; height:76px; border-radius:50%;
+      background:conic-gradient(from -90deg, #4f8cff calc(var(--pct) * 1%), rgba(255,255,255,.12) 0);
       display:flex; align-items:center; justify-content:center;
-      filter:drop-shadow(0 8px 22px rgba(79,140,255,.4));
+      filter:drop-shadow(0 8px 22px rgba(79,140,255,.45));
       margin:0 auto;
     }
-    .splash-ring::before{ content:""; position:absolute; inset:6px; border-radius:50%; background:#05070d; }
+    .splash-ring::before{ content:""; position:absolute; inset:7px; border-radius:50%; background:#05070d; }
     .splash-ring span{
-      position:relative; z-index:1; font-size:13px; font-weight:700; letter-spacing:.5px;
-      color:#eaf0ff; font-style:normal;
+      position:relative; z-index:1; font-size:14px; font-weight:800; letter-spacing:.4px;
+      color:#eaf0ff; font-style:normal; font-variant-numeric:tabular-nums;
+      min-width:2.6em; text-align:center;
     }
 
     .splash-footer{
       position:absolute; bottom:28px; left:0; right:0; z-index:2;
       margin:0; font-size:10.5px; letter-spacing:3px; color:#7d90ad;
       font-style:normal;
-      opacity:0; animation:splashFadeUp .8s ease 2.5s forwards;
+      opacity:0; animation:splashFadeUp .6s ease 1.4s forwards;
       font-family:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
     }
 
@@ -231,46 +233,128 @@
 
   <script>
     (function () {
-      // Build the app name letter-by-letter so each one can flip in, in sequence.
+      // Password show/hide (master key, login, admin, modal)
+      window.togglePasswordVisibility = function (inputId, iconEl) {
+        var input = document.getElementById(inputId);
+        if (!input) return;
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        if (iconEl) {
+          iconEl.classList.toggle("fa-eye", !show);
+          iconEl.classList.toggle("fa-eye-slash", show);
+        }
+      };
+
+      // App name letters — start faster so page does not feel frozen
       var el = document.getElementById("splashTitle");
       if (el) {
         var name = "EKT CHATTER";
         for (var i = 0; i < name.length; i++) {
           var s = document.createElement("span");
           s.textContent = name[i];
-          s.style.animationDelay = (0.55 + i * 0.075) + "s, " + (1.4 + i * 0.05) + "s";
+          s.style.animationDelay = (0.12 + i * 0.055) + "s, " + (0.7 + i * 0.04) + "s";
           el.appendChild(s);
         }
       }
 
-      // লাইভ পার্সেন্ট রিং — ০% থেকে ১০০% পর্যন্ত ভরে ওঠে
+      // Network-aware progress: fast net fills quicker; slow net slower. Visible from 0%.
       var ring = document.getElementById("splashRing");
       var ringText = document.getElementById("splashRingText");
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (ring && ringText) {
-        if (reduce) {
+      var splashDone = false;
+      var hideScheduled = false;
+
+      window.hideSplashScreen = function () {
+        if (splashDone) return;
+        splashDone = true;
+        var sp = document.getElementById("splashScreen");
+        if (!sp || sp.classList.contains("splash-hide")) return;
+        if (ring && ringText) {
           ring.style.setProperty("--pct", 100);
           ringText.textContent = "100%";
-        } else {
-          var pct = 0;
-          var timer = setInterval(function () {
-            pct += Math.random() * 9 + 3;
-            if (pct >= 100) { pct = 100; clearInterval(timer); }
-            ring.style.setProperty("--pct", pct);
-            ringText.textContent = Math.round(pct) + "%";
-          }, 140);
         }
-      }
-    })();
+        sp.classList.add("splash-hide");
+        setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
+      };
 
-    // Hide the splash after the animation finishes (app.js also calls this as a backup).
-    window.hideSplashScreen = function () {
-      var sp = document.getElementById("splashScreen");
-      if (!sp || sp.classList.contains("splash-hide")) return;
-      sp.classList.add("splash-hide");
-      setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 1150);
-    };
-    setTimeout(window.hideSplashScreen, 5200);
+      function scheduleHide(ms) {
+        if (hideScheduled) return;
+        hideScheduled = true;
+        setTimeout(window.hideSplashScreen, ms);
+      }
+
+      if (!ring || !ringText) {
+        scheduleHide(2800);
+        return;
+      }
+
+      if (reduce) {
+        ring.style.setProperty("--pct", 100);
+        ringText.textContent = "100%";
+        scheduleHide(400);
+        return;
+      }
+
+      var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      var et = conn && conn.effectiveType ? conn.effectiveType : "";
+      var downlink = conn && typeof conn.downlink === "number" ? conn.downlink : 0;
+      var tickMs = 90, stepMin = 4, stepMax = 10;
+      if (et === "slow-2g" || et === "2g") { tickMs = 220; stepMin = 1.2; stepMax = 3; }
+      else if (et === "3g") { tickMs = 150; stepMin = 2; stepMax = 5; }
+      else if (et === "4g") { tickMs = 70; stepMin = 5; stepMax = 12; }
+      if (downlink > 0) {
+        if (downlink < 0.5) { tickMs = Math.max(tickMs, 200); stepMin = Math.min(stepMin, 1.5); }
+        else if (downlink >= 5) { tickMs = Math.min(tickMs, 55); stepMax = Math.max(stepMax, 14); }
+      }
+
+      var pct = 0;
+      var loadReady = document.readyState === "complete";
+      var fontsReady = false;
+      var minHold = Math.max(1600, tickMs * 18);
+      var startedAt = Date.now();
+
+      function setPct(v) {
+        pct = Math.max(0, Math.min(100, v));
+        ring.style.setProperty("--pct", pct);
+        ringText.textContent = Math.round(pct) + "%";
+      }
+      setPct(0);
+
+      if (!loadReady) {
+        window.addEventListener("load", function () { loadReady = true; });
+      }
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () { fontsReady = true; }).catch(function () { fontsReady = true; });
+      } else {
+        fontsReady = true;
+      }
+
+      var timer = setInterval(function () {
+        if (splashDone) { clearInterval(timer); return; }
+        var ceiling = 92;
+        if (loadReady) ceiling = 97;
+        if (loadReady && fontsReady) ceiling = 99;
+        var step = stepMin + Math.random() * (stepMax - stepMin);
+        if (pct > 85) step *= 0.45;
+        if (pct > 95) step *= 0.35;
+        var next = pct + step;
+        if (next > ceiling) next = ceiling;
+        setPct(next);
+        var elapsed = Date.now() - startedAt;
+        if (loadReady && fontsReady && pct >= 99 && elapsed >= minHold) {
+          setPct(100);
+          clearInterval(timer);
+          scheduleHide(320);
+        }
+      }, tickMs);
+
+      setTimeout(function () {
+        if (splashDone) return;
+        setPct(100);
+        clearInterval(timer);
+        scheduleHide(200);
+      }, 6000);
+    })();
   </script>
 
   <header class="navbar">
@@ -343,13 +427,6 @@
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="dash-topbar">
         <span class="dash-eyebrow">Home</span>
-        <div class="dash-topbar-icons">
-          <button id="openReportBtn" type="button" class="topbar-icon-btn" title="Report a problem"><i class="fa-solid fa-flag"></i></button>
-          <button id="openAdminPanelBtn" type="button" class="topbar-icon-btn" title="Admin Panel">
-            <i class="fa-solid fa-user-shield"></i>
-            <span id="adminReportBadge" class="admin-report-badge" style="display:none;">0</span>
-          </button>
-        </div>
         <div class="direct-menu-container">
           <button id="dashMenuToggle" class="dots-btn" aria-label="More options"><i class="fa-solid fa-ellipsis-vertical"></i></button>
           <div id="dashDropdownMenu" class="direct-dropdown-menu">
@@ -387,6 +464,15 @@
         <button id="joinRoomBtn" type="button" class="dash-tile tile-join">
           <span class="tile-icon"><i class="fa-solid fa-right-to-bracket"></i></span>
           <span class="tile-label">Join Room</span>
+        </button>
+        <button id="openReportBtn" type="button" class="dash-tile tile-report">
+          <span class="tile-icon"><i class="fa-solid fa-flag"></i></span>
+          <span class="tile-label">Report</span>
+        </button>
+        <button id="openAdminPanelBtn" type="button" class="dash-tile tile-admin">
+          <span class="tile-icon"><i class="fa-solid fa-user-shield"></i></span>
+          <span class="tile-label">Admin</span>
+          <span id="adminReportBadge" class="friend-req-badge">0</span>
         </button>
       </div>
 
