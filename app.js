@@ -3244,6 +3244,265 @@ socket.on("direct-incoming-call", (data) => {
 socket.on("direct-call-accepted", () => { markCallConnected(); });
 socket.on("direct-call-ended", endCallCleanup);
 
+// ============================================================
+//  রিপোর্ট সিস্টেম + অ্যাডমিন প্যানেল
+// ============================================================
+(function () {
+  var reportModalOverlay = document.getElementById("reportModalOverlay");
+  var reportFormView = document.getElementById("reportFormView");
+  var reportWaitingView = document.getElementById("reportWaitingView");
+  var reportMessageInput = document.getElementById("reportMessageInput");
+  var openReportBtn = document.getElementById("openReportBtn");
+  var reportSubmitBtn = document.getElementById("reportSubmitBtn");
+  var reportCancelBtn = document.getElementById("reportCancelBtn");
+  var reportWaitingCloseBtn = document.getElementById("reportWaitingCloseBtn");
+
+  var adminPanelOverlay = document.getElementById("adminPanelOverlay");
+  var adminGateView = document.getElementById("adminGateView");
+  var adminDashboardView = document.getElementById("adminDashboardView");
+  var adminPasswordInput = document.getElementById("adminPasswordInput");
+  var openAdminPanelBtn = document.getElementById("openAdminPanelBtn");
+  var adminUnlockBtn = document.getElementById("adminUnlockBtn");
+  var adminGateCancelBtn = document.getElementById("adminGateCancelBtn");
+  var adminCloseBtn = document.getElementById("adminCloseBtn");
+  var adminTabUsers = document.getElementById("adminTabUsers");
+  var adminTabNotifications = document.getElementById("adminTabNotifications");
+  var adminUsersPanel = document.getElementById("adminUsersPanel");
+  var adminNotificationsPanel = document.getElementById("adminNotificationsPanel");
+  var adminUsersList = document.getElementById("adminUsersList");
+  var adminReportsList = document.getElementById("adminReportsList");
+  var adminReportBadge = document.getElementById("adminReportBadge");
+  var adminNotifBadge = document.getElementById("adminNotifBadge");
+
+  if (!reportModalOverlay || !adminPanelOverlay) return; // পুরনো পেজে থাকলে স্কিপ
+
+  var adminSessionPassword = null; // আনলক হওয়ার পর অ্যাকশনের জন্য মনে রাখা হয়
+  var pendingReportsCount = 0;
+
+  function esc(s) {
+    return (s || "").toString()
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function bumpBadge() {
+    pendingReportsCount++;
+    [adminReportBadge, adminNotifBadge].forEach(function (b) {
+      if (!b) return;
+      b.textContent = pendingReportsCount > 99 ? "99+" : pendingReportsCount;
+      b.style.display = "flex";
+    });
+  }
+  function clearBadge() {
+    pendingReportsCount = 0;
+    [adminReportBadge, adminNotifBadge].forEach(function (b) { if (b) b.style.display = "none"; });
+  }
+
+  // ---------- রিপোর্ট মোডাল ----------
+  if (openReportBtn) {
+    openReportBtn.addEventListener("click", function () {
+      reportMessageInput.value = "";
+      reportFormView.style.display = "block";
+      reportWaitingView.style.display = "none";
+      reportModalOverlay.style.display = "flex";
+    });
+  }
+  if (reportCancelBtn) {
+    reportCancelBtn.addEventListener("click", function () { reportModalOverlay.style.display = "none"; });
+  }
+  if (reportWaitingCloseBtn) {
+    reportWaitingCloseBtn.addEventListener("click", function () { reportModalOverlay.style.display = "none"; });
+  }
+  if (reportSubmitBtn) {
+    reportSubmitBtn.addEventListener("click", async function () {
+      var text = reportMessageInput.value.trim();
+      if (!text) {
+        await showCustomAlert("Input Error", "অনুগ্রহ করে রিপোর্টের বিবরণ লিখুন!");
+        return;
+      }
+      var fromPhone = currentUser ? currentUser.phone : "guest";
+      var fromName = currentUser ? currentUser.name : "Guest";
+      reportSubmitBtn.disabled = true;
+      socket.emit("submit-report", { fromPhone: fromPhone, fromName: fromName, message: text }, function (res) {
+        reportSubmitBtn.disabled = false;
+        if (res && res.success) {
+          reportFormView.style.display = "none";
+          reportWaitingView.style.display = "block";
+        } else {
+          showCustomAlert("Error", "রিপোর্ট পাঠানো যায়নি, আবার চেষ্টা করুন।");
+        }
+      });
+    });
+  }
+
+  // ---------- অ্যাডমিন প্যানেল গেট ----------
+  if (openAdminPanelBtn) {
+    openAdminPanelBtn.addEventListener("click", function () {
+      adminPasswordInput.value = "";
+      adminGateView.style.display = "block";
+      adminDashboardView.style.display = "none";
+      adminPanelOverlay.style.display = "flex";
+    });
+  }
+  if (adminGateCancelBtn) {
+    adminGateCancelBtn.addEventListener("click", function () { adminPanelOverlay.style.display = "none"; });
+  }
+  if (adminCloseBtn) {
+    adminCloseBtn.addEventListener("click", function () { adminPanelOverlay.style.display = "none"; });
+  }
+  if (adminUnlockBtn) {
+    adminUnlockBtn.addEventListener("click", function () {
+      var pwd = adminPasswordInput.value;
+      if (!pwd) return;
+      adminUnlockBtn.disabled = true;
+      socket.emit("admin-login", { password: pwd }, function (res) {
+        adminUnlockBtn.disabled = false;
+        if (res && res.success) {
+          adminSessionPassword = pwd;
+          adminGateView.style.display = "none";
+          adminDashboardView.style.display = "block";
+          renderAdminUsers(res.users || []);
+          renderAdminReports(res.reports || []);
+          clearBadge();
+        } else {
+          showCustomAlert("Access Denied", "ভুল অ্যাডমিন পাসওয়ার্ড!");
+        }
+      });
+    });
+  }
+
+  if (adminTabUsers && adminTabNotifications) {
+    adminTabUsers.addEventListener("click", function () {
+      adminTabUsers.classList.add("active");
+      adminTabNotifications.classList.remove("active");
+      adminUsersPanel.style.display = "block";
+      adminNotificationsPanel.style.display = "none";
+    });
+    adminTabNotifications.addEventListener("click", function () {
+      adminTabNotifications.classList.add("active");
+      adminTabUsers.classList.remove("active");
+      adminNotificationsPanel.style.display = "block";
+      adminUsersPanel.style.display = "none";
+      clearBadge();
+    });
+  }
+
+  function fieldRow(icon, label, value) {
+    if (!value) return "";
+    return '<div class="au-detail-row"><i class="fa-solid ' + icon + '"></i><span class="au-detail-label">' + label + ':</span> <span>' + esc(value) + '</span></div>';
+  }
+
+  function renderAdminUsers(list) {
+    if (!adminUsersList) return;
+    if (!list.length) {
+      adminUsersList.innerHTML = '<div class="admin-empty-note">এখনো কোনো ইউজার ডাটা নেই।</div>';
+      return;
+    }
+    adminUsersList.innerHTML = list.map(function (u, idx) {
+      var details = fieldRow("fa-quote-left", "Bio", u.bio) +
+        fieldRow("fa-location-dot", "Location", u.location) +
+        fieldRow("fa-briefcase", "Work", u.work) +
+        fieldRow("fa-graduation-cap", "Education", u.education) +
+        fieldRow("fa-heart", "Relationship", u.relationship) +
+        '<div class="au-detail-row"><i class="fa-solid fa-user-group"></i><span class="au-detail-label">Friends:</span> <span>' + (u.friendCount || 0) + '</span></div>';
+      return '<div class="admin-user-row-wrap">' +
+        '<div class="admin-user-row" data-toggle="' + idx + '">' +
+        '<img src="' + esc(u.pic) + '" alt="">' +
+        '<div class="au-info"><div class="au-name">' + esc(u.name) + '</div>' +
+        '<div class="au-phone">' + esc(u.phone) + '</div></div>' +
+        '<i class="fa-solid fa-chevron-down au-chevron"></i>' +
+        '</div>' +
+        '<div class="admin-user-details" id="auDetails' + idx + '" style="display:none;">' + (details || '<div class="admin-empty-note">এই ইউজার এখনো প্রোফাইল তথ্য দেননি।</div>') + '</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  function timeAgoLabel(ts) {
+    var diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return "এখনই";
+    if (diff < 3600) return Math.floor(diff / 60) + " মিনিট আগে";
+    if (diff < 86400) return Math.floor(diff / 3600) + " ঘণ্টা আগে";
+    return Math.floor(diff / 86400) + " দিন আগে";
+  }
+
+  function renderAdminReports(list) {
+    if (!adminReportsList) return;
+    if (!list.length) {
+      adminReportsList.innerHTML = '<div class="admin-empty-note">এখনো কোনো রিপোর্ট আসেনি।</div>';
+      return;
+    }
+    adminReportsList.innerHTML = list.map(function (r) {
+      var statusTag = r.status === "resolved"
+        ? '<span class="ar-status-tag resolved">Resolved</span>'
+        : r.status === "dismissed"
+          ? '<span class="ar-status-tag dismissed">Dismissed</span>'
+          : '<span class="ar-status-tag">Pending</span>';
+      var actions = r.status === "pending"
+        ? '<div class="ar-actions">' +
+          '<button class="ar-resolve-btn" data-id="' + esc(r.id) + '" data-action="resolve">Resolve</button>' +
+          '<button class="ar-dismiss-btn" data-id="' + esc(r.id) + '" data-action="dismiss">Dismiss</button>' +
+          '</div>'
+        : '';
+      return '<div class="admin-report-row ' + (r.status === "pending" ? "pending" : "") + '">' +
+        '<div class="ar-top"><span class="ar-name">' + esc(r.fromName) + ' &middot; ' + esc(r.fromPhone) + '</span>' +
+        '<span class="ar-time">' + timeAgoLabel(r.time) + '</span></div>' +
+        '<div class="ar-msg">' + esc(r.message) + '</div>' +
+        statusTag + actions +
+        '</div>';
+    }).join("");
+  }
+
+  if (adminUsersList) {
+    adminUsersList.addEventListener("click", function (e) {
+      var row = e.target.closest("[data-toggle]");
+      if (!row) return;
+      var idx = row.getAttribute("data-toggle");
+      var details = document.getElementById("auDetails" + idx);
+      var chevron = row.querySelector(".au-chevron");
+      if (!details) return;
+      var open = details.style.display === "block";
+      details.style.display = open ? "none" : "block";
+      if (chevron) chevron.style.transform = open ? "rotate(0deg)" : "rotate(180deg)";
+    });
+  }
+
+  if (adminReportsList) {
+    adminReportsList.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (!btn || !adminSessionPassword) return;
+      var reportId = btn.getAttribute("data-id");
+      var action = btn.getAttribute("data-action");
+      btn.disabled = true;
+      socket.emit("admin-report-action", { password: adminSessionPassword, reportId: reportId, action: action }, function (res) {
+        if (res && res.success) {
+          socket.emit("admin-login", { password: adminSessionPassword }, function (r2) {
+            if (r2 && r2.success) renderAdminReports(r2.reports || []);
+          });
+        } else {
+          btn.disabled = false;
+          showCustomAlert("Error", "অ্যাকশনটি সম্পন্ন করা যায়নি।");
+        }
+      });
+    });
+  }
+
+  // নতুন রিপোর্ট এলে রিয়েল-টাইমে ব্যাজ বাড়বে, প্যানেল খোলা থাকলে লিস্টেও যোগ হবে
+  socket.on("admin-new-report", function (report) {
+    bumpBadge();
+    if (adminPanelOverlay.style.display === "flex" && adminDashboardView.style.display === "block" && adminSessionPassword) {
+      socket.emit("admin-login", { password: adminSessionPassword }, function (res) {
+        if (res && res.success) renderAdminReports(res.reports || []);
+      });
+    }
+  });
+
+  // যে ইউজার রিপোর্ট করেছিল, তার রিপোর্ট রিভিউ হলে একটা মিনি টোস্ট দেখানো হয়
+  socket.on("report-status-update", function (data) {
+    if (typeof showMiniToast === "function") {
+      showMiniToast(data.status === "resolved" ? "আপনার রিপোর্টটি সমাধান করা হয়েছে ✅" : "আপনার রিপোর্টটি পর্যালোচনা করা হয়েছে");
+    }
+  });
+})();
+
 // স্প্ল্যাশ স্ক্রিন — অ্যাপ প্রস্তুত হলে সরিয়ে দেওয়া (index.html-এর টাইমারের ব্যাকআপ)
 window.addEventListener("load", () => {
   setTimeout(() => {
