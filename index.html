@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>EKT CHATING APP</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='0.55' stop-color='%237c5cff'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3Cfilter id='s' x='-40%25' y='-40%25' width='180%25' height='180%25'%3E%3CfeDropShadow dx='0' dy='1.5' stdDeviation='1.6' flood-color='%232a1a55' flood-opacity='0.45'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cg filter='url(%23s)'%3E%3Cpath d='M14 25c0-7.2 6.3-13 15.5-13S45 17.8 45 25s-6.3 13-15.5 13c-2 0-3.9-.3-5.6-.8L15 40l1.9-7.4C15.1 30.6 14 27.9 14 25z' fill='white'/%3E%3C/g%3E%3Ctext x='29' y='31' font-family='Arial,Helvetica,sans-serif' font-weight='800' font-size='19' text-anchor='middle' fill='url(%23g)'%3EE%3C/text%3E%3Ccircle cx='47' cy='15' r='4.5' fill='%23ffd166'/%3E%3C/svg%3E">
+  <title>EKT CHATTER</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f8cff'/%3E%3Cstop offset='0.55' stop-color='%237c5cff'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Crect x='4' y='4' width='56' height='56' rx='13' fill='none' stroke='white' stroke-opacity='0.22' stroke-width='2'/%3E%3Ctext x='32' y='45' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='42' text-anchor='middle' fill='white'%3EE%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Pacifico&display=swap">
@@ -139,28 +139,45 @@
       40%    { transform:translateY(-8px); opacity:1; }
     }
 
-    /* ---- app name, letter by letter ---- */
+    /* ---- app name, নতুন রিভিল: ঝাপসা থেকে ফোকাসে আসা + একবারের আলোর ঝলক, এরপর স্থির থাকবে ---- */
     .splash-title{
-      margin:0; font-size:32px; font-weight:800; letter-spacing:4px;
+      position:relative;
+      margin:0; font-size:34px; font-weight:800; letter-spacing:5px;
       font-family:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
       display:flex; justify-content:center; flex-wrap:wrap;
-      text-shadow:0 6px 30px rgba(13,110,253,.35);
+      text-shadow:0 6px 34px rgba(124,92,255,.4);
     }
     .splash-title span{
       display:inline-block; white-space:pre;
       background:linear-gradient(120deg,#7fc4ff,#ffffff 38%,#d3b6ff 70%,#ff9ecb);
       background-size:220% 100%;
+      background-position:0% 0;
       -webkit-background-clip:text; background-clip:text; color:transparent;
-      opacity:0; transform:translateY(24px) scale(.85);
-      animation:splashLetter .7s cubic-bezier(.2,1.2,.3,1) forwards,
-                splashShift 5s ease-in-out infinite;
+      opacity:0; transform:translateY(16px) scale(1.4);
+      filter:blur(9px);
+      animation:splashFocusIn .85s cubic-bezier(.19,1,.22,1) forwards;
     }
-    @keyframes splashLetter{
-      to{ opacity:1; transform:translateY(0) scale(1); }
+    .splash-title::after{
+      content:"";
+      position:absolute; inset:-6px -14px;
+      background:linear-gradient(100deg, transparent 42%, rgba(255,255,255,.85) 50%, transparent 58%);
+      background-size:220% 100%;
+      background-position:150% 0;
+      mix-blend-mode:overlay;
+      pointer-events:none;
+      opacity:0;
+      animation:splashFlashSweep 1s ease-out 1.5s forwards;
     }
-    @keyframes splashShift{
-      0%,100%{ background-position:0% 0; }
-      50%    { background-position:100% 0; }
+    @keyframes splashFocusIn{
+      0%{ opacity:0; transform:translateY(16px) scale(1.4); filter:blur(9px); }
+      60%{ opacity:1; filter:blur(0); }
+      100%{ opacity:1; transform:translateY(0) scale(1); filter:blur(0); background-position:0% 0; }
+    }
+    @keyframes splashFlashSweep{
+      0%{ opacity:0; background-position:150% 0; }
+      15%{ opacity:1; }
+      55%{ opacity:0; background-position:-60% 0; }
+      100%{ opacity:0; background-position:-60% 0; }
     }
 
     .splash-divider{
@@ -256,11 +273,11 @@
       // Build the app name letter-by-letter so each one can animate in sequence.
       var el = document.getElementById("splashTitle");
       if (el) {
-        var name = "EKT CHATING APP";
+        var name = "EKT CHATTER";
         for (var i = 0; i < name.length; i++) {
           var s = document.createElement("span");
           s.textContent = name[i];
-          s.style.animationDelay = (0.75 + i * 0.075) + "s, " + (1.9 + i * 0.05) + "s";
+          s.style.animationDelay = (0.7 + i * 0.09) + "s, " + (2.1 + i * 0.05) + "s";
           el.appendChild(s);
         }
       }
@@ -296,8 +313,9 @@
   </script>
 
   <header class="navbar">
-    <div class="logo" aria-label="EKT CHATING APP">
-      <span class="logo-shine" id="logoShineText" aria-hidden="true">EKT CHATING APP</span>
+    <div class="logo" aria-label="EKT CHATTER">
+      <span class="logo-sizer" aria-hidden="true">EKT CHATTER</span>
+      <span class="logo-type"><span class="logo-loop-text" id="logoLoopText"></span><span class="logo-loop-cursor"></span></span>
     </div>
     <div class="nav-controls">
       <button id="themeToggleBtn" class="icon-btn" aria-label="Switch theme"><i class="fa-solid fa-moon"></i></button>
@@ -521,29 +539,38 @@
 
   <script src="app.js"></script>
   <script>
-    // "Developed by Eyamin" — যেখানেই দেখা যায় (স্প্ল্যাশ ও প্রতিটা কার্ড স্ক্রিন), একই টাইপ →
-    // কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ চলবে, প্রতিটার নিজস্ব টাইমার আলাদা।
-    (function () {
-      var FULL = "Developed by Eyamin";
+    // পুনর্ব্যবহারযোগ্য টাইপ → কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ।
+    // হেডারের "EKT CHATTER" ও "Developed by Eyamin" — দুটো জায়গাতেই এই একই ফাংশন চলে।
+    function startTypeEraseLoop(el, text, opts) {
+      var o = opts || {};
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      var TYPE_MS = 90, ERASE_MS = 45, HOLD_MS = 2000, GAP_MS = 650;
-      document.querySelectorAll(".dev-credit-text").forEach(function (el, order) {
-        if (reduce) { el.textContent = FULL; return; }
-        var i = 0, erasing = false;
-        function tick() {
-          if (!erasing) {
-            i++;
-            el.textContent = FULL.slice(0, i);
-            if (i >= FULL.length) { erasing = true; setTimeout(tick, HOLD_MS); return; }
-            setTimeout(tick, TYPE_MS);
-          } else {
-            i--;
-            el.textContent = FULL.slice(0, i);
-            if (i <= 0) { erasing = false; setTimeout(tick, GAP_MS); return; }
-            setTimeout(tick, ERASE_MS);
-          }
+      if (reduce) { el.textContent = text; return; }
+      var TYPE_MS = o.typeMs || 90, ERASE_MS = o.eraseMs || 45,
+          HOLD_MS = o.holdMs || 2000, GAP_MS = o.gapMs || 650,
+          START_DELAY = o.startDelay || 300;
+      var i = 0, erasing = false;
+      function tick() {
+        if (!erasing) {
+          i++;
+          el.textContent = text.slice(0, i);
+          if (i >= text.length) { erasing = true; setTimeout(tick, HOLD_MS); return; }
+          setTimeout(tick, TYPE_MS);
+        } else {
+          i--;
+          el.textContent = text.slice(0, i);
+          if (i <= 0) { erasing = false; setTimeout(tick, GAP_MS); return; }
+          setTimeout(tick, ERASE_MS);
         }
-        setTimeout(tick, 250 + order * 120);
+      }
+      setTimeout(tick, START_DELAY);
+    }
+
+    (function () {
+      var logoEl = document.getElementById("logoLoopText");
+      if (logoEl) startTypeEraseLoop(logoEl, "EKT CHATTER", { typeMs: 130, eraseMs: 65, holdMs: 2600, gapMs: 600, startDelay: 500 });
+
+      document.querySelectorAll(".dev-credit-text").forEach(function (el, order) {
+        startTypeEraseLoop(el, "Developed by Eyamin", { startDelay: 250 + order * 120 });
       });
     })();
   </script>
