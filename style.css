@@ -2290,3 +2290,16 @@ textarea.profile-edit-field { resize: vertical; min-height: 64px; font-family: i
 @media (prefers-reduced-motion: reduce) {
   .dev-credit-cursor { animation: none; opacity: 0; }
 }
+
+
+/* About tab: Edit / Save / Close row */
+.profile-about-actions{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+.profile-about-actions .btn{
+  flex:1;
+  min-width:120px;
+}
