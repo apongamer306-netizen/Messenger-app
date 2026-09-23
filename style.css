@@ -1900,7 +1900,7 @@ textarea.profile-edit-field { resize: vertical; min-height: 64px; font-family: i
   z-index: 9999;
 }
 #callModal { z-index: 200001 !important; }
-#customModalOverlay { z-index: 200002 !important; }
+#customModalOverlay { z-index: 400000 !important; }
 #mediaPreviewModal, #themeModal { z-index: 200000 !important; }
 
 #customModalOverlay .card-screen { max-width: 360px; margin: auto; padding: 28px 22px 22px; }
