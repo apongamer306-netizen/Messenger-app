@@ -1605,6 +1605,16 @@ img { -webkit-user-drag: none; }
 .pm-cover-pos-bar input[type="range"] {
   flex: 1; height: 4px; accent-color: #7c5cff; cursor: pointer;
 }
+.pm-cover-pos-btn {
+  width: 24px; height: 24px; border-radius: 50%; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 11px; flex-shrink: 0; padding: 0;
+}
+.pm-cover-save-btn { background: #22c55e; color: #fff; }
+.pm-cover-save-btn:hover { background: #16a34a; }
+.pm-cover-save-btn:disabled { opacity: .55; cursor: not-allowed; }
+.pm-cover-cancel-btn { background: rgba(255,255,255,0.18); color: #fff; }
+.pm-cover-cancel-btn:hover { background: rgba(255,255,255,0.32); }
 
 .pm-avatar-wrap {
   position: absolute;
