@@ -39,7 +39,15 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
     if (name) body.set("name", String(name).slice(0, 80));
     const res = await doFetch("https://api.imgbb.com/1/upload", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        // imgbb-র bot-protection cloud/hosting IP থেকে আসা request প্রায়ই ব্লক করে দেয়;
+        // সাধারণ browser-এর মতো User-Agent/Accept/Referer পাঠালে সেটা এড়ানো যায়।
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://imgbb.com/",
+        "Origin": "https://imgbb.com",
+      },
       body: body.toString(),
     });
     const json = await res.json();
