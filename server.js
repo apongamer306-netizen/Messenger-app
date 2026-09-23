@@ -9,6 +9,19 @@ const path = require("path");
 // ---------- Image host (optional CDN; set IMGBB_API_KEY on Render) ----------
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
 const MAX_FALLBACK_DATA_URL = 900000;
+// পুরোনো Node version-এ গ্লোবাল fetch না থাকলে node-fetch দিয়ে fallback করবে
+let _fetchImpl = (typeof fetch === "function") ? fetch : null;
+async function getFetch() {
+  if (_fetchImpl) return _fetchImpl;
+  try {
+    const mod = await import("node-fetch");
+    _fetchImpl = mod.default;
+    return _fetchImpl;
+  } catch (e) {
+    console.warn("⚠️ No global fetch and node-fetch not installed — imgbb upload will fail. Run: npm i node-fetch");
+    return null;
+  }
+}
 async function uploadToImgbb(dataUrlOrBase64, name) {
   if (!IMGBB_API_KEY) return null;
   try {
@@ -18,20 +31,23 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
       if (i >= 0) b64 = b64.slice(i + 1);
     }
     if (!b64 || b64.length < 32) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
     const body = new URLSearchParams();
     body.set("key", IMGBB_API_KEY);
     body.set("image", b64);
     if (name) body.set("name", String(name).slice(0, 80));
-    const res = await fetch("https://api.imgbb.com/1/upload", {
+    const res = await doFetch("https://api.imgbb.com/1/upload", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
     });
     const json = await res.json();
     if (json && json.success && json.data) {
+      console.log("imgbb upload OK:", json.data.display_url || json.data.url);
       return json.data.display_url || json.data.url || null;
     }
-    console.warn("Remote image upload failed:", json && (json.error || json.status_txt || json));
+    console.warn("Remote image upload failed:", JSON.stringify(json && (json.error || json.status_txt || json)));
     return null;
   } catch (e) {
     console.warn("Remote image upload error:", e.message);
