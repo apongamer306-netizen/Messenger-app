@@ -282,6 +282,8 @@ io.on("connection", (socket) => {
       const userList = Object.values(users).map((u) => {
         const p = profiles[u.phone] || {};
         const ban = bannedUsers[u.phone] || null;
+        const friendPhones = Array.from(ensureSet(friendships, u.phone));
+        const friends = friendPhones.map((fp) => publicUser(fp));
         return {
           name: u.name,
           phone: u.phone,
@@ -291,7 +293,9 @@ io.on("connection", (socket) => {
           work: p.work || "",
           education: p.education || "",
           relationship: p.relationship || "",
-          friendCount: ensureSet(friendships, u.phone).size,
+          about: p.about || "",
+          friendCount: friendPhones.length,
+          friends: friends,
           banned: !!ban,
           banReason: ban ? (ban.reason || "") : "",
           banTime: ban ? ban.time : null,
@@ -388,7 +392,7 @@ io.on("connection", (socket) => {
   // ---------- FRIEND RESTORE / SYNC ----------
   // ক্লায়েন্ট তার ব্রাউজারে সেভ থাকা ফ্রেন্ড লিস্ট পাঠায়। সার্ভারের ডেটা কোনো
   // কারণে মুছে গেলে এখান থেকেই আবার তৈরি হয়ে যায় — তাই ফ্রেন্ড হারায় না।
-  socket.on("sync-user-data", ({ user, friends }, callback) => {
+  socket.on("sync-user-data", ({ user, friends, profile }, callback) => {
     if (!user || !user.phone) {
       if (typeof callback === "function") callback({ requests: [], friends: [] });
       return;
@@ -398,10 +402,26 @@ io.on("connection", (socket) => {
     socketToPhone[socket.id] = user.phone;
     phoneToSocket[user.phone] = socket.id;
 
+    // ক্লায়েন্টের ব্যাকআপ প্রোফাইল (bio/location + ছোট গ্যালারি) সার্ভারে ফেরত আনা —
+    // Render রিস্টার্টে ephemeral ডিস্ক মুছে গেলেও ইউজার লগইন করলেই ডেটা ফিরে আসে (ফ্রি)
+    if (profile && typeof profile === "object") {
+      const existing = profiles[user.phone] || {};
+      const merged = { ...existing };
+      ["bio", "location", "work", "education", "relationship", "about"].forEach((k) => {
+        if (profile[k] && !merged[k]) merged[k] = String(profile[k]).slice(0, 2000);
+      });
+      // গ্যালারি আইটেম: সর্বোচ্চ ৬টা, প্রতিটা ছোট রাখা (base64 খুব বড় হলে স্কিপ)
+      if (Array.isArray(profile.items) && (!merged.items || !merged.items.length)) {
+        merged.items = profile.items
+          .filter((it) => it && it.src && String(it.src).length < 400000)
+          .slice(0, 6);
+      }
+      profiles[user.phone] = merged;
+    }
+
     if (Array.isArray(friends)) {
       friends.forEach((f) => {
         if (!f || !f.phone || f.phone === user.phone) return;
-        // বন্ধুর বেসিক তথ্য রাখা (নাম/ছবি) যদি সার্ভারে না থাকে
         if (!users[f.phone]) {
           users[f.phone] = { name: f.name, phone: f.phone, pic: f.pic };
         }
@@ -445,6 +465,19 @@ io.on("connection", (socket) => {
     ensureSet(friendRequests, currentUser.phone).delete(fromPhone);
     saveData();
     sendFriendData(currentUser.phone);
+  });
+
+  socket.on("remove-friend", ({ currentPhone, friendPhone }, callback) => {
+    if (!currentPhone || !friendPhone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    ensureSet(friendships, currentPhone).delete(friendPhone);
+    ensureSet(friendships, friendPhone).delete(currentPhone);
+    saveData();
+    sendFriendData(currentPhone);
+    sendFriendData(friendPhone);
+    if (typeof callback === "function") callback({ success: true });
   });
 
   // নাম বা ফোন দিয়ে ইউজার সার্চ (ফ্রেন্ড রিকোয়েস্ট পাঠানোর জন্য)
@@ -618,10 +651,18 @@ io.on("connection", (socket) => {
   });
 
   // ---------- USER PROFILE (তথ্য + ছবি/ভিডিও/অডিও) ----------
-  socket.on("get-profile", ({ phone }, callback) => {
+  socket.on("get-profile", ({ phone, viewerPhone }, callback) => {
     if (typeof callback !== "function") return;
     const base = publicUser(phone);
-    callback({ ...base, ...(profiles[phone] || {}) });
+    const p = profiles[phone] || {};
+    let relation = "none"; // none | friends | outgoing | incoming | self
+    if (viewerPhone && viewerPhone === phone) relation = "self";
+    else if (viewerPhone && phone) {
+      if (ensureSet(friendships, viewerPhone).has(phone)) relation = "friends";
+      else if (ensureSet(friendRequests, phone).has(viewerPhone)) relation = "outgoing";
+      else if (ensureSet(friendRequests, viewerPhone).has(phone)) relation = "incoming";
+    }
+    callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
   });
 
   socket.on("save-profile", ({ phone, profile }, callback) => {
@@ -937,4 +978,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-Loading Bar Animation Fix - Grok
