@@ -189,7 +189,6 @@ const dashboardAvatar = document.getElementById("dashboardAvatar");
 const dashboardUserName = document.getElementById("dashboardUserName");
 const avatarUpload = document.getElementById("avatarUpload");
 
-// Dashboard: no name-edit button (edit only inside profile)
 let editNameBtn = document.getElementById("editNameBtn");
 if (editNameBtn && editNameBtn.parentNode) { try { editNameBtn.remove(); } catch (e) {} editNameBtn = null; }
 
@@ -737,10 +736,8 @@ function showCustomAlert(title, subtitle) {
     confBtn.onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
   });
 }
-
 function showUploadLockout(kind) {
-  const label = (kind === "picture" || kind === "avatar" || kind === "photo" || kind === "cover")
-    ? "your picture" : (kind === "post" ? "your post" : "your data");
+  const label = (kind === "picture" || kind === "avatar" || kind === "photo" || kind === "cover") ? "your picture" : (kind === "post" ? "your post" : "your data");
   modalTitle.textContent = "Uploading…";
   modalSubtitle.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;justify-content:center;"><i class="fa-solid fa-spinner fa-spin" style="font-style:normal;"></i>Uploading ' + label + ', please wait</span>';
   modalInputGroup.style.display = "none";
@@ -748,13 +745,10 @@ function showUploadLockout(kind) {
   customModalOverlay.style.zIndex = "400000";
   customModalOverlay.style.display = "flex";
 }
-
 function showUploadResult(success, kind) {
   if (success) {
     modalTitle.textContent = "Uploaded";
-    modalSubtitle.textContent = kind === "post" ? "Your post has been uploaded successfully."
-      : kind === "cover" ? "Your cover photo has been uploaded successfully."
-      : "Your picture has been uploaded successfully.";
+    modalSubtitle.textContent = kind === "post" ? "Your post has been uploaded successfully." : kind === "cover" ? "Your cover photo has been uploaded successfully." : "Your picture has been uploaded successfully.";
   } else {
     modalTitle.textContent = "Upload failed";
     modalSubtitle.textContent = "Could not upload. Please try again.";
@@ -767,34 +761,50 @@ function showUploadResult(success, kind) {
     document.getElementById("modalConfirmBtn").onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
   });
 }
-
 function runUploadWithLockout(kind, emitFn) {
   showUploadLockout(kind);
   return new Promise((resolve) => {
     let settled = false;
     const finish = async (ok, payload) => {
-      if (settled) return;
-      settled = true;
+      if (settled) return; settled = true;
       await showUploadResult(!!ok, kind);
       resolve({ ok: !!ok, payload });
     };
-    try { emitFn((res) => finish(res && res.success, res)); }
-    catch (e) { finish(false, null); }
+    try { emitFn((res) => finish(res && res.success, res)); } catch (e) { finish(false, null); }
     setTimeout(() => { if (!settled) finish(false, null); }, 45000);
   });
 }
-
-function applyPmCover(coverUrl) {
+function applyPmCover(coverUrl, coverY, showPosBar) {
   const coverEl = document.getElementById("pmCover");
   const img = document.getElementById("pmCoverImg");
+  const posBar = document.getElementById("pmCoverPosBar");
+  const range = document.getElementById("pmCoverPosRange");
   if (!coverEl) return;
+  const y = (typeof coverY === "number" && !isNaN(coverY)) ? Math.max(0, Math.min(100, coverY)) : 30;
   if (coverUrl) {
-    if (img) { img.src = coverUrl; img.style.display = "block"; }
+    if (img) {
+      img.src = coverUrl;
+      img.style.display = "block";
+      img.style.objectPosition = "center " + y + "%";
+    }
     coverEl.classList.add("has-cover");
+    if (range) range.value = String(y);
+    if (posBar) posBar.classList.toggle("show", !!showPosBar);
   } else {
     if (img) { img.removeAttribute("src"); img.style.display = "none"; }
     coverEl.classList.remove("has-cover");
+    if (posBar) posBar.classList.remove("show");
   }
+}
+
+function saveCoverPosition(y) {
+  if (!currentUser || !profileViewState.isMe) return;
+  const val = Math.max(0, Math.min(100, Number(y) || 30));
+  if (profileViewState.data) profileViewState.data.coverY = val;
+  socket.emit("save-profile", {
+    phone: currentUser.phone,
+    profile: { coverY: val }
+  }, () => {});
 }
 
 document.addEventListener("DOMContentLoaded", () => { checkActiveSession(); });
@@ -1407,23 +1417,23 @@ profileModalOverlay.className = "profile-modal-overlay";
 profileModalOverlay.innerHTML = `
   <div class="profile-modal">
     <div class="profile-modal-cover" id="pmCover">
-      <img id="pmCoverImg" class="profile-cover-img" alt="" style="display:none;">
-      <button type="button" id="pmEditCoverBtn" class="pm-cover-edit-btn" style="display:none;" title="Change cover">
-        <i class="fa-solid fa-camera"></i>
-      </button>
+      <div class="profile-cover-clip">
+        <img id="pmCoverImg" class="profile-cover-img" alt="" style="display:none;">
+      </div>
+      <button type="button" id="pmEditCoverBtn" class="pm-cover-edit-btn" style="display:none;" title="Change cover"><i class="fa-solid fa-camera"></i></button>
+      <div id="pmCoverPosBar" class="pm-cover-pos-bar">
+        <i class="fa-solid fa-up-down" style="font-style:normal;opacity:.85;"></i>
+        <input type="range" id="pmCoverPosRange" min="0" max="100" value="30" title="Move cover up/down">
+      </div>
       <div class="pm-avatar-wrap">
         <img id="pmAvatar" class="profile-modal-avatar" src="https://via.placeholder.com/100" alt="">
-        <button type="button" id="pmEditAvatarBtn" class="pm-avatar-edit-btn" style="display:none;" title="Change photo">
-          <i class="fa-solid fa-camera"></i>
-        </button>
+        <button type="button" id="pmEditAvatarBtn" class="pm-avatar-edit-btn" style="display:none;" title="Change photo"><i class="fa-solid fa-camera"></i></button>
       </div>
     </div>
     <div class="profile-modal-body">
       <div class="pm-name-row">
         <div id="pmName" class="profile-modal-name">Friend</div>
-        <button type="button" id="pmEditNameBtn" class="pm-edit-name-btn" style="display:none;" title="Change name">
-          <i class="fa-solid fa-pen"></i>
-        </button>
+        <button type="button" id="pmEditNameBtn" class="pm-edit-name-btn" style="display:none;" title="Change name"><i class="fa-solid fa-pen"></i></button>
       </div>
       <div id="pmSub" class="profile-modal-sub pm-bio-box">Friend on EKT Chatter</div>
 
@@ -1471,13 +1481,11 @@ const profileFileInput = document.createElement("input");
 profileFileInput.type = "file";
 profileFileInput.style.display = "none";
 document.body.appendChild(profileFileInput);
-
 const pmAvatarFileInput = document.createElement("input");
 pmAvatarFileInput.type = "file";
 pmAvatarFileInput.accept = "image/*";
 pmAvatarFileInput.style.display = "none";
 document.body.appendChild(pmAvatarFileInput);
-
 const pmCoverFileInput = document.createElement("input");
 pmCoverFileInput.type = "file";
 pmCoverFileInput.accept = "image/*";
@@ -1739,11 +1747,8 @@ document.getElementById("pmSubmitPostBtn").onclick = async () => {
   if (ok && res && res.post) {
     profileViewState.data.posts = profileViewState.data.posts || [];
     profileViewState.data.posts.unshift(res.post);
-    pmComposerText.value = "";
-    pmComposerText.style.height = "auto";
-    pendingPostMedia = null;
-    pmComposerPreview.style.display = "none";
-    pmComposerPreview.innerHTML = "";
+    pmComposerText.value = ""; pmComposerText.style.height = "auto";
+    pendingPostMedia = null; pmComposerPreview.style.display = "none"; pmComposerPreview.innerHTML = "";
     renderPostsFeed();
   }
 };
@@ -1990,9 +1995,7 @@ profileFileInput.onchange = async () => {
   if (ok && res) {
     profileViewState.data.items = res.items;
     try {
-      const slim = (res.items || [])
-        .filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:"))
-        .slice(0, 40)
+      const slim = (res.items || []).filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:")).slice(0, 40)
         .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, timestamp: it.timestamp }));
       localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
     } catch (e) {}
@@ -2090,31 +2093,26 @@ function updateProfileFriendButton(relation) {
 function openProfile(phone, fallback) {
   if (!phone || !currentUser) return;
   const isMe = phone === currentUser.phone;
-
   document.getElementById("pmAvatar").src = (fallback && fallback.pic) || "https://via.placeholder.com/100";
   document.getElementById("pmName").textContent = (fallback && fallback.name) || "Profile";
   document.getElementById("pmSub").textContent = "লোড হচ্ছে...";
   document.getElementById("pmMessageBtn").style.display = isMe ? "none" : "inline-flex";
   updateProfileFriendButton(isMe ? "self" : "none");
-
   const editCover = document.getElementById("pmEditCoverBtn");
   const editAv = document.getElementById("pmEditAvatarBtn");
   const editName = document.getElementById("pmEditNameBtn");
   if (editCover) editCover.style.display = isMe ? "flex" : "none";
   if (editAv) editAv.style.display = isMe ? "flex" : "none";
   if (editName) editName.style.display = isMe ? "inline-flex" : "none";
-  applyPmCover((fallback && fallback.cover) || null);
-
+  applyPmCover((fallback && fallback.cover) || null, fallback && fallback.coverY, isMe);
   pendingPostMedia = null;
   pmComposerText.value = "";
   pmComposerText.style.height = "auto";
   pmComposerPreview.style.display = "none";
   pmComposerPreview.innerHTML = "";
-
   profileViewState = { phone, isMe, data: fallback || {}, tab: "posts" };
   profileModalOverlay.classList.add("active");
   switchProfileTab("posts");
-
   socket.emit("get-profile", { phone, viewerPhone: currentUser.phone }, (data) => {
     if (!data) return;
     profileViewState.data = data;
@@ -2122,14 +2120,9 @@ function openProfile(phone, fallback) {
     document.getElementById("pmName").textContent = data.name || "Profile";
     const subEl = document.getElementById("pmSub");
     const bioText = (data.bio || "").trim();
-    if (bioText) {
-      subEl.textContent = bioText;
-      subEl.classList.add("has-bio");
-    } else {
-      subEl.textContent = isMe ? "About ট্যাব থেকে bio যোগ করুন" : "EKT Chatter";
-      subEl.classList.remove("has-bio");
-    }
-    applyPmCover(data.cover || null);
+    if (bioText) { subEl.textContent = bioText; subEl.classList.add("has-bio"); }
+    else { subEl.textContent = isMe ? "About ট্যাব থেকে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
+    applyPmCover(data.cover || null, data.coverY, isMe);
     updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
     switchProfileTab(profileViewState.tab);
   });
@@ -2204,21 +2197,14 @@ if (openFriendProfileBtn) {
   openFriendProfileBtn.onclick = () => openFriendProfile(activeDirectChatFriend);
 }
 
-// ড্যাশবোর্ড: শুধু প্রোফাইল খোলা (এডিট নয়)
 if (dashboardAvatar) {
   dashboardAvatar.style.cursor = "pointer";
-  dashboardAvatar.addEventListener("click", () => {
-    if (currentUser) openProfile(currentUser.phone, currentUser);
-  });
+  dashboardAvatar.addEventListener("click", () => { if (currentUser) openProfile(currentUser.phone, currentUser); });
 }
 if (dashboardUserName) {
   dashboardUserName.style.cursor = "pointer";
-  dashboardUserName.addEventListener("click", () => {
-    if (currentUser) openProfile(currentUser.phone, currentUser);
-  });
+  dashboardUserName.addEventListener("click", () => { if (currentUser) openProfile(currentUser.phone, currentUser); });
 }
-
-// প্রোফাইল মোডাল: ছবি / কভার / নাম
 (function wireProfileEdits() {
   const avBtn = document.getElementById("pmEditAvatarBtn");
   const coverBtn = document.getElementById("pmEditCoverBtn");
@@ -2236,54 +2222,57 @@ if (dashboardUserName) {
         currentUser.name = res.name || clean;
         try { localStorage.setItem("appUser", JSON.stringify(currentUser)); saveUserToStorage(currentUser); } catch (err) {}
         if (dashboardUserName) dashboardUserName.textContent = currentUser.name;
-        const nm = document.getElementById("pmName");
-        if (nm) nm.textContent = currentUser.name;
+        const nm = document.getElementById("pmName"); if (nm) nm.textContent = currentUser.name;
         if (profileViewState.data) profileViewState.data.name = currentUser.name;
         if (typeof showMiniToast === "function") showMiniToast("Name updated");
       } else showCustomAlert("Error", "নাম পরিবর্তন করা যায়নি।");
     });
   };
-
   pmAvatarFileInput.onchange = async () => {
-    const file = pmAvatarFileInput.files[0];
-    pmAvatarFileInput.value = "";
+    const file = pmAvatarFileInput.files[0]; pmAvatarFileInput.value = "";
     if (!file || !currentUser || !profileViewState.isMe) return;
     if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
     let dataUrl;
-    try {
-      const compressed = await compressImageFile(file);
-      dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-    } catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
+    try { const c = await compressImageFile(file); dataUrl = c ? c.dataUrl : await readFileAsDataUrl(file); }
+    catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
     const { ok, payload: res } = await runUploadWithLockout("picture", (done) => {
       socket.emit("update-avatar", { phone: currentUser.phone, dataUrl, name: file.name }, done);
     });
     if (ok && res && res.pic) {
       currentUser.pic = res.pic;
       if (dashboardAvatar) dashboardAvatar.src = res.pic;
-      const pmAv = document.getElementById("pmAvatar");
-      if (pmAv) pmAv.src = res.pic;
-      const compAv = document.getElementById("pmComposerAvatar");
-      if (compAv) compAv.src = res.pic;
+      const pmAv = document.getElementById("pmAvatar"); if (pmAv) pmAv.src = res.pic;
+      const compAv = document.getElementById("pmComposerAvatar"); if (compAv) compAv.src = res.pic;
       try { localStorage.setItem("appUser", JSON.stringify(currentUser)); saveUserToStorage(currentUser); } catch (e) {}
       if (profileViewState.data) profileViewState.data.pic = res.pic;
     }
   };
-
+  const coverRange = document.getElementById("pmCoverPosRange");
+  if (coverRange && !coverRange._wired) {
+    coverRange._wired = true;
+    let posTimer = null;
+    coverRange.addEventListener("input", () => {
+      const img = document.getElementById("pmCoverImg");
+      const y = Number(coverRange.value) || 30;
+      if (img) img.style.objectPosition = "center " + y + "%";
+    });
+    coverRange.addEventListener("change", () => {
+      clearTimeout(posTimer);
+      posTimer = setTimeout(() => saveCoverPosition(coverRange.value), 200);
+    });
+  }
   pmCoverFileInput.onchange = async () => {
-    const file = pmCoverFileInput.files[0];
-    pmCoverFileInput.value = "";
+    const file = pmCoverFileInput.files[0]; pmCoverFileInput.value = "";
     if (!file || !currentUser || !profileViewState.isMe) return;
     if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
     let dataUrl;
-    try {
-      const compressed = await compressImageFile(file);
-      dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-    } catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
+    try { const c = await compressImageFile(file); dataUrl = c ? c.dataUrl : await readFileAsDataUrl(file); }
+    catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
     const { ok, payload: res } = await runUploadWithLockout("cover", (done) => {
       socket.emit("update-cover", { phone: currentUser.phone, dataUrl, name: file.name }, done);
     });
     if (ok && res && res.cover) {
-      applyPmCover(res.cover);
+      applyPmCover(res.cover, (profileViewState.data && profileViewState.data.coverY) || 30, true);
       if (profileViewState.data) profileViewState.data.cover = res.cover;
     }
   };
@@ -2889,7 +2878,7 @@ socket.on("room-members-update", (members) => {
   }
 });
 
-// Dashboard no longer edits name/photo — only inside profile modal
+// dashboard edit removed — use profile modal
 
 
 createRoomBtn.addEventListener("click", () => {
