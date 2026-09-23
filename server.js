@@ -55,6 +55,7 @@ let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has block
 let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
 let roomMessages = {};       // roomCode -> [ messages ]
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
+let bannedUsers = {};        // phone -> { reason, time }
 
 // ================= অ্যাডমিন প্যানেল =================
 // অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
@@ -101,6 +102,7 @@ function loadData() {
     profiles = raw.profiles || {};
     directThemes = raw.directThemes || {};
     reports = raw.reports || [];
+    bannedUsers = raw.bannedUsers || {};
     console.log("Saved data loaded successfully.");
   } catch (e) {
     console.error("Could not load saved data:", e.message);
@@ -124,6 +126,7 @@ function saveData() {
         profiles,
         directThemes,
         reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
+        bannedUsers,
       };
       fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
     } catch (e) {
@@ -163,6 +166,7 @@ loadData();
           profiles,
           directThemes,
           reports: reports.slice(-300),
+          bannedUsers,
         })
       );
     } catch (e) {}
@@ -220,18 +224,31 @@ io.on("connection", (socket) => {
 
   socket.on("register-user", (newUser, callback) => {
     if (newUser && newUser.phone) {
+      if (bannedUsers[newUser.phone]) {
+        if (typeof callback === "function") callback({ success: false, banned: true });
+        return;
+      }
       users[newUser.phone] = { ...(users[newUser.phone] || {}), ...newUser };
       saveData();
     }
-    if (typeof callback === "function") callback();
+    if (typeof callback === "function") callback({ success: true });
   });
 
   socket.on("login-user", ({ phone, password }, callback) => {
+    if (typeof callback !== "function") return;
+    if (bannedUsers[phone]) {
+      callback({
+        success: false,
+        banned: true,
+        reason: (bannedUsers[phone] && bannedUsers[phone].reason) || "আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।",
+      });
+      return;
+    }
     const user = users[phone];
     if (user && user.password === password) {
-      if (typeof callback === "function") callback({ success: true, user });
+      callback({ success: true, user });
     } else {
-      if (typeof callback === "function") callback({ success: false });
+      callback({ success: false });
     }
   });
 
@@ -264,6 +281,7 @@ io.on("connection", (socket) => {
     if (password === ADMIN_PASSWORD) {
       const userList = Object.values(users).map((u) => {
         const p = profiles[u.phone] || {};
+        const ban = bannedUsers[u.phone] || null;
         return {
           name: u.name,
           phone: u.phone,
@@ -274,12 +292,75 @@ io.on("connection", (socket) => {
           education: p.education || "",
           relationship: p.relationship || "",
           friendCount: ensureSet(friendships, u.phone).size,
+          banned: !!ban,
+          banReason: ban ? (ban.reason || "") : "",
+          banTime: ban ? ban.time : null,
         };
       });
+      // banned users who were deleted from users map still show? only active users
       callback({ success: true, users: userList, reports: reports.slice().reverse() });
     } else {
       callback({ success: false });
     }
+  });
+
+  // ---------- অ্যাডমিন: ব্যান / আনব্যান / ডিলিট ----------
+  socket.on("admin-ban-user", ({ password, phone, reason }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    bannedUsers[phone] = { reason: (reason || "").toString().slice(0, 200), time: Date.now() };
+    saveData();
+    const sid = phoneToSocket[phone];
+    if (sid) {
+      io.to(sid).emit("account-banned", { reason: bannedUsers[phone].reason });
+    }
+    if (typeof callback === "function") callback({ success: true, banned: true });
+  });
+
+  socket.on("admin-unban-user", ({ password, phone }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    delete bannedUsers[phone];
+    saveData();
+    if (typeof callback === "function") callback({ success: true, banned: false });
+  });
+
+  socket.on("admin-delete-user", ({ password, phone }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    delete users[phone];
+    delete profiles[phone];
+    delete friendships[phone];
+    delete friendRequests[phone];
+    delete blockedUsers[phone];
+    delete bannedUsers[phone];
+    // remove from others' friend lists / requests
+    Object.keys(friendships).forEach((p) => {
+      if (friendships[p] && friendships[p].has) friendships[p].delete(phone);
+    });
+    Object.keys(friendRequests).forEach((p) => {
+      if (friendRequests[p] && friendRequests[p].has) friendRequests[p].delete(phone);
+    });
+    // wipe direct message keys involving this phone
+    Object.keys(directMessages).forEach((key) => {
+      if (key.split("|").includes(phone)) delete directMessages[key];
+    });
+    Object.keys(directThemes).forEach((key) => {
+      if (key.split("|").includes(phone)) delete directThemes[key];
+    });
+    saveData();
+    const sid = phoneToSocket[phone];
+    if (sid) {
+      io.to(sid).emit("account-deleted");
+      try { io.sockets.sockets.get(sid)?.disconnect(true); } catch (e) {}
+    }
+    if (typeof callback === "function") callback({ success: true });
   });
 
   socket.on("admin-report-action", ({ password, reportId, action }, callback) => {
@@ -359,6 +440,40 @@ io.on("connection", (socket) => {
     sendFriendData(friendUser.phone);
   });
 
+  socket.on("reject-friend-request", ({ currentUser, fromPhone }) => {
+    if (!currentUser || !fromPhone) return;
+    ensureSet(friendRequests, currentUser.phone).delete(fromPhone);
+    saveData();
+    sendFriendData(currentUser.phone);
+  });
+
+  // নাম বা ফোন দিয়ে ইউজার সার্চ (ফ্রেন্ড রিকোয়েস্ট পাঠানোর জন্য)
+  socket.on("search-users", ({ query, myPhone }, callback) => {
+    if (typeof callback !== "function") return;
+    const q = (query || "").toString().trim().toLowerCase();
+    if (!q || q.length < 1) {
+      callback([]);
+      return;
+    }
+    const myFriends = ensureSet(friendships, myPhone);
+    const myOutgoing = []; // optional: track pending outbound — skip for now
+    const results = Object.values(users)
+      .filter((u) => {
+        if (!u || !u.phone || u.phone === myPhone) return false;
+        if (bannedUsers[u.phone]) return false;
+        const name = (u.name || "").toLowerCase();
+        const phone = (u.phone || "").toLowerCase();
+        return name.includes(q) || phone.includes(q);
+      })
+      .slice(0, 25)
+      .map((u) => ({
+        ...publicUser(u.phone),
+        isFriend: myFriends.has(u.phone),
+        requestPending: ensureSet(friendRequests, u.phone).has(myPhone),
+      }));
+    callback(results);
+  });
+
   // ---------- DIRECT MESSAGES ----------
   socket.on("get-direct-history", ({ senderPhone, receiverPhone }, callback) => {
     const key = directKey(senderPhone, receiverPhone);
@@ -368,6 +483,10 @@ io.on("connection", (socket) => {
   socket.on("send-direct-message", (msgData, callback) => {
     const { senderPhone, receiverPhone } = msgData;
 
+    if (bannedUsers[senderPhone]) {
+      if (typeof callback === "function") callback({ success: false, error: "banned" });
+      return;
+    }
     if (ensureSet(blockedUsers, senderPhone).has(receiverPhone)) {
       if (typeof callback === "function") callback({ success: false, error: "blocked_by_you" });
       return;
@@ -818,3 +937,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+Loading Bar Animation Fix - Grok
