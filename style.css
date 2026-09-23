@@ -498,6 +498,30 @@ img { -webkit-user-drag: none; }
 .admin-user-row .au-phone { font-size: 11.5px; color: var(--text-3); }
 .au-chevron { font-size: 12px; color: var(--text-3); transition: transform .2s ease; }
 .admin-user-details { padding: 4px 12px 12px 56px; border-top: 1px solid var(--line); }
+.admin-user-row-wrap.is-banned { border-color: rgba(239, 68, 68, 0.35); }
+.admin-user-row-wrap.is-banned .admin-user-row { opacity: 0.85; }
+.au-ban-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; background: rgba(239, 68, 68, 0.2); color: #f87171;
+  vertical-align: middle;
+}
+.au-admin-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+}
+.au-act-btn {
+  flex: 1; min-width: 90px; padding: 9px 10px; border-radius: 11px; border: none;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.au-view { background: var(--brand-grad); color: #fff; }
+.au-ban { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35) !important; }
+.au-unban { background: rgba(34, 197, 94, 0.16); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3) !important; }
+.au-delete { background: rgba(239, 68, 68, 0.16); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3) !important; }
+.au-act-btn:hover { filter: brightness(1.08); }
+.au-act-btn:disabled { opacity: 0.5; cursor: wait; }
+.admin-panel-card { max-width: 440px !important; }
+.admin-users-list { max-height: 52vh !important; }
+
 .au-detail-row { font-size: 12px; color: var(--text-2); padding: 4px 0; line-height: 1.5; }
 .au-detail-row i { width: 16px; color: var(--brand); margin-right: 6px; }
 .au-detail-label { font-weight: 700; color: var(--text); }
@@ -1254,6 +1278,56 @@ img { -webkit-user-drag: none; }
 .friend-requests-section { display: none; margin-bottom: 22px; }
 .friend-requests-section.has-requests { display: block; }
 .friend-requests-list, .friends-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Friend search */
+.friend-search-box {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; margin-bottom: 14px;
+  border-radius: 16px; border: 1px solid var(--line-2);
+  background: var(--input-bg);
+}
+.friend-search-box i { color: var(--text-3); font-size: 14px; }
+.friend-search-box input {
+  flex: 1; border: none; background: transparent; outline: none;
+  color: var(--text); font-size: 14px; font-family: inherit;
+}
+.friend-search-box input::placeholder { color: var(--text-3); }
+.friend-search-results {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 16px; max-height: 220px; overflow-y: auto;
+}
+.friend-search-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.friend-search-row img {
+  width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+}
+.fs-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fs-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.fs-phone { font-size: 11.5px; color: var(--text-3); }
+.fs-btn {
+  border: none; border-radius: 12px; padding: 8px 12px; cursor: pointer;
+  font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+}
+.fs-add { background: var(--brand-grad); color: #fff; }
+.fs-msg { background: var(--surface-3); color: var(--text); border: 1px solid var(--line); }
+.fs-pending { background: var(--input-bg); color: var(--text-3); cursor: default; }
+
+.fr-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.fr-reject-btn {
+  width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer;
+  background: rgba(239, 68, 68, 0.15); color: #f87171;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fr-reject-btn:hover { background: rgba(239, 68, 68, 0.28); }
+.fr-accept-btn {
+  width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer;
+  background: rgba(34, 197, 94, 0.18); color: #4ade80;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fr-accept-btn:hover { background: rgba(34, 197, 94, 0.3); }
 
 .friend-request-card, .friend-card {
   display: flex;
