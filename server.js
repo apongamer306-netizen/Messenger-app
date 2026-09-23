@@ -6,8 +6,10 @@ const { Server } = require("socket.io");
 const path = require("path");
 
 
-// ---------- ImgBB: free image host (set IMGBB_API_KEY env on Render) ----------
-const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "f6d6bad865ef561536b22bc71e1c2c50";
+// ---------- Image host (optional CDN; set IMGBB_API_KEY on Render) ----------
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
+const MAX_FALLBACK_DATA_URL = 900000;
+
 async function uploadToImgbb(dataUrlOrBase64, name) {
   if (!IMGBB_API_KEY) return null;
   try {
@@ -30,15 +32,29 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
     if (json && json.success && json.data) {
       return json.data.display_url || json.data.url || null;
     }
-    console.warn("ImgBB upload failed:", json && json.error);
+    console.warn("Remote image upload failed:", json && (json.error || json.status_txt || json));
     return null;
   } catch (e) {
-    console.warn("ImgBB error:", e.message);
+    console.warn("Remote image upload error:", e.message);
     return null;
   }
 }
-if (IMGBB_API_KEY) console.log("ImgBB API key loaded — photos will upload to imgbb.com");
-else console.warn("⚠️ IMGBB_API_KEY not set — photos stay as base64 (fills disk). Get free key: https://api.imgbb.com/");
+
+async function resolveImageSrc(dataUrlOrHttp, name) {
+  const raw = String(dataUrlOrHttp || "");
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return { src: raw, host: "url" };
+  if (!raw.startsWith("data:")) return null;
+  const remote = await uploadToImgbb(raw, name);
+  if (remote) return { src: remote, host: "cdn" };
+  if (raw.length <= MAX_FALLBACK_DATA_URL) {
+    console.warn("Using local data-URL fallback for image.");
+    return { src: raw, host: "local" };
+  }
+  return null;
+}
+
+if (IMGBB_API_KEY) console.log("Image CDN API key loaded.");
+else console.warn("⚠️ No image CDN key — using local data-URL fallback.");
 
 
 const app = express();
@@ -701,32 +717,49 @@ io.on("connection", (socket) => {
     callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
   });
 
-  // প্রোফাইল পিকচার → ImgBB URL (সব ডিভাইসে একই)
+  // প্রোফাইল পিকচার
   socket.on("update-avatar", async ({ phone, dataUrl, name }, callback) => {
     if (!phone || !dataUrl) {
-      if (typeof callback === "function") callback({ success: false, error: "missing" });
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
       return;
     }
-    let url = null;
-    if (String(dataUrl).startsWith("data:")) {
-      url = await uploadToImgbb(dataUrl, name || "avatar");
-    } else if (String(dataUrl).startsWith("http")) {
-      url = dataUrl;
-    }
-    if (!url) {
-      if (typeof callback === "function") {
-        callback({
-          success: false,
-          error: IMGBB_API_KEY ? "imgbb_failed" : "imgbb_key_missing",
-          message: IMGBB_API_KEY ? "ImgBB আপলোড ব্যর্থ" : "IMGBB_API_KEY সেট করা নেই",
-        });
-      }
+    const resolved = await resolveImageSrc(dataUrl, name || "avatar");
+    if (!resolved || !resolved.src) {
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
       return;
     }
     if (!users[phone]) users[phone] = { phone };
-    users[phone].pic = url;
+    users[phone].pic = resolved.src;
     saveData();
-    if (typeof callback === "function") callback({ success: true, pic: url });
+    if (typeof callback === "function") callback({ success: true, pic: resolved.src });
+  });
+
+  socket.on("update-cover", async ({ phone, dataUrl, name }, callback) => {
+    if (!phone || !dataUrl) {
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
+      return;
+    }
+    const resolved = await resolveImageSrc(dataUrl, name || "cover");
+    if (!resolved || !resolved.src) {
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
+      return;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    profiles[phone].cover = resolved.src;
+    saveData();
+    if (typeof callback === "function") callback({ success: true, cover: resolved.src });
+  });
+
+  socket.on("update-display-name", ({ phone, name }, callback) => {
+    const clean = (name || "").toString().trim().slice(0, 40);
+    if (!phone || !clean) {
+      if (typeof callback === "function") callback({ success: false, error: "invalid" });
+      return;
+    }
+    if (!users[phone]) users[phone] = { phone };
+    users[phone].name = clean;
+    saveData();
+    if (typeof callback === "function") callback({ success: true, name: clean });
   });
 
   socket.on("save-profile", ({ phone, profile }, callback) => {
@@ -740,35 +773,25 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback({ success: true, profile: profiles[phone] });
   });
 
-  // প্রোফাইলে শুধু ছবি (ImgBB → URL, সার্ভারে base64 রাখা হয় না)
+  // প্রোফাইলে শুধু ছবি
   socket.on("add-profile-item", async ({ phone, item }, callback) => {
     if (!phone || !item) {
-      if (typeof callback === "function") callback({ success: false, error: "missing" });
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
       return;
     }
-    // শুধু photo
     if (item.kind && item.kind !== "photo") {
-      if (typeof callback === "function") callback({ success: false, error: "photos_only" });
+      if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি আপলোড করা যায়।" });
       return;
     }
     item.kind = "photo";
-    // data URL হলে ImgBB-তে তুলে URL রাখা
     if (item.src && String(item.src).startsWith("data:")) {
-      const url = await uploadToImgbb(item.src, item.name || "photo");
-      if (url) {
-        item.src = url;
-        item.host = "imgbb";
-      } else if (!IMGBB_API_KEY) {
-        if (typeof callback === "function") {
-          callback({ success: false, error: "imgbb_key_missing", message: "IMGBB_API_KEY সেট করা নেই" });
-        }
-        return;
-      } else {
-        if (typeof callback === "function") {
-          callback({ success: false, error: "imgbb_failed", message: "ImgBB আপলোড ব্যর্থ" });
-        }
+      const resolved = await resolveImageSrc(item.src, item.name || "photo");
+      if (!resolved || !resolved.src) {
+        if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
         return;
       }
+      item.src = resolved.src;
+      item.host = resolved.host;
     }
     if (!profiles[phone]) profiles[phone] = {};
     if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
@@ -811,23 +834,19 @@ io.on("connection", (socket) => {
     if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
 
     let mediaOut = media || null;
-    // শুধু ইমেজ — ভিডিও পোস্ট বন্ধ; ImgBB URL
     if (mediaOut) {
       if (mediaOut.type === "video") {
-        if (typeof callback === "function") callback({ success: false, error: "photos_only" });
+        if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি পোস্ট করা যায়।" });
         return;
       }
       mediaOut.type = "image";
       if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
-        const url = await uploadToImgbb(mediaOut.src, "post");
-        if (url) {
-          mediaOut = { type: "image", src: url, host: "imgbb" };
-        } else {
-          if (typeof callback === "function") {
-            callback({ success: false, error: "imgbb_failed", message: "ছবি আপলোড ব্যর্থ (ImgBB)" });
-          }
+        const resolved = await resolveImageSrc(mediaOut.src, "post");
+        if (!resolved || !resolved.src) {
+          if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
           return;
         }
+        mediaOut = { type: "image", src: resolved.src, host: resolved.host };
       }
     }
 
