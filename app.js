@@ -244,6 +244,11 @@ friendsPanelOverlay.innerHTML = `
       <button id="closeFriendsPanelBtn" class="friends-panel-close"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="friends-panel-body">
+      <div class="friend-search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="friendSearchInput" placeholder="নাম বা নম্বর দিয়ে সার্চ করুন..." autocomplete="off">
+      </div>
+      <div id="friendSearchResults" class="friend-search-results" style="display:none;"></div>
       <div id="friendRequestsSection" class="friend-requests-section">
         <h4><i class="fa-solid fa-user-plus"></i> Friend Requests</h4>
         <div id="friendRequestsList" class="friend-requests-list"></div>
@@ -960,28 +965,49 @@ authSubmitBtn.addEventListener("click", async () => {
       showDashboard();
     });
   } else {
-    const localUser = localUsers[phone];
-    if (localUser && localUser.password === password) {
-      currentUser = localUser;
-      localStorage.setItem("appUser", JSON.stringify(currentUser));
-      socket.emit("set-user-socket", { phone: currentUser.phone });
-      fetchFriendData();
-      showDashboard();
-    } else {
-      socket.emit("login-user", { phone, password }, async (res) => {
-        if (res.success) {
-          currentUser = res.user;
-          saveUserToStorage(currentUser);
-          localStorage.setItem("appUser", JSON.stringify(currentUser));
-          socket.emit("set-user-socket", { phone: currentUser.phone });
-          fetchFriendData();
-          showDashboard();
-        } else {
-          await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
-        }
-      });
-    }
+    // সবসময় সার্ভারে চেক — ব্যান থাকলে লোকাল ক্যাশ দিয়েও লগইন হবে না
+    socket.emit("login-user", { phone, password }, async (res) => {
+      if (res && res.banned) {
+        await showCustomAlert("Account Banned", res.reason || "আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।");
+        return;
+      }
+      if (res && res.success) {
+        currentUser = res.user;
+        saveUserToStorage(currentUser);
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        socket.emit("set-user-socket", { phone: currentUser.phone });
+        fetchFriendData();
+        showDashboard();
+        return;
+      }
+      // সার্ভারে নেই — লোকাল ক্যাশ দিয়ে চেষ্টা
+      const localUser = localUsers[phone];
+      if (localUser && localUser.password === password) {
+        currentUser = localUser;
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        socket.emit("set-user-socket", { phone: currentUser.phone });
+        socket.emit("register-user", currentUser, () => {});
+        fetchFriendData();
+        showDashboard();
+      } else {
+        await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
+      }
+    });
   }
+});
+
+// সার্ভার থেকে অ্যাকাউন্ট ব্যান/ডিলিট হলে সেশন শেষ
+socket.on("account-banned", async (data) => {
+  await showCustomAlert("Account Banned", (data && data.reason) || "আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।");
+  try { localStorage.removeItem("appUser"); } catch (e) {}
+  currentUser = null;
+  location.reload();
+});
+socket.on("account-deleted", async () => {
+  await showCustomAlert("Account Deleted", "আপনার অ্যাকাউন্ট অ্যাডমিন মুছে দিয়েছেন।");
+  try { localStorage.removeItem("appUser"); } catch (e) {}
+  currentUser = null;
+  location.reload();
 });
 
 function showDashboard() {
@@ -1140,11 +1166,21 @@ function renderFriendData(data) {
           <span class="friend-request-name">${reqUser.name}</span>
           <span class="friend-request-sub">Sent you a friend request</span>
         </div>
-        <button class="fr-accept-btn" title="Accept"><i class="fa-solid fa-check"></i></button>
+        <div class="fr-actions">
+          <button class="fr-accept-btn" title="Accept"><i class="fa-solid fa-check"></i></button>
+          <button class="fr-reject-btn" title="Reject"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       `;
-      item.querySelector(".fr-accept-btn").onclick = () => {
+      item.querySelector(".fr-accept-btn").onclick = (e) => {
+        e.stopPropagation();
         socket.emit("accept-friend-request", { currentUser, friendUser: reqUser });
       };
+      item.querySelector(".fr-reject-btn").onclick = (e) => {
+        e.stopPropagation();
+        socket.emit("reject-friend-request", { currentUser, fromPhone: reqUser.phone });
+      };
+      item.querySelector("img").onclick = () => openProfile(reqUser.phone, reqUser);
+      item.querySelector(".friend-request-name").onclick = () => openProfile(reqUser.phone, reqUser);
       reqList.appendChild(item);
     });
   } else {
@@ -1180,6 +1216,80 @@ function renderFriendData(data) {
     });
   }
 }
+
+
+// ---------- নাম/নম্বর সার্চ করে ফ্রেন্ড রিকোয়েস্ট ----------
+(function setupFriendSearch() {
+  const input = document.getElementById("friendSearchInput");
+  const resultsEl = document.getElementById("friendSearchResults");
+  if (!input || !resultsEl) return;
+  let timer = null;
+
+  function renderSearchResults(list) {
+    if (!list || !list.length) {
+      resultsEl.style.display = "block";
+      resultsEl.innerHTML = `<div class="friends-empty-state" style="padding:14px;"><p>কোনো ইউজার পাওয়া যায়নি</p></div>`;
+      return;
+    }
+    resultsEl.style.display = "block";
+    resultsEl.innerHTML = "";
+    list.forEach((u) => {
+      const row = document.createElement("div");
+      row.className = "friend-search-row";
+      let actionHtml;
+      if (u.isFriend) {
+        actionHtml = `<button class="fs-btn fs-msg" type="button"><i class="fa-solid fa-message"></i></button>`;
+      } else if (u.requestPending) {
+        actionHtml = `<button class="fs-btn fs-pending" type="button" disabled>Sent</button>`;
+      } else {
+        actionHtml = `<button class="fs-btn fs-add" type="button"><i class="fa-solid fa-user-plus"></i></button>`;
+      }
+      row.innerHTML = `
+        <img src="${u.pic || "https://via.placeholder.com/40"}" alt="">
+        <div class="fs-info">
+          <span class="fs-name">${u.name || "User"}</span>
+          <span class="fs-phone">${u.phone || ""}</span>
+        </div>
+        ${actionHtml}
+      `;
+      row.querySelector("img").onclick = () => openProfile(u.phone, u);
+      const addBtn = row.querySelector(".fs-add");
+      if (addBtn) {
+        addBtn.onclick = () => {
+          if (!currentUser) return;
+          socket.emit("send-friend-request", { fromUser: currentUser, toUserPhone: u.phone });
+          addBtn.outerHTML = `<button class="fs-btn fs-pending" type="button" disabled>Sent</button>`;
+          if (typeof showMiniToast === "function") showMiniToast("ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে");
+        };
+      }
+      const msgBtn = row.querySelector(".fs-msg");
+      if (msgBtn) {
+        msgBtn.onclick = () => {
+          friendsPanelOverlay.classList.remove("open");
+          openDirectChat(u);
+        };
+      }
+      resultsEl.appendChild(row);
+    });
+  }
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (!q) {
+      resultsEl.style.display = "none";
+      resultsEl.innerHTML = "";
+      return;
+    }
+    timer = setTimeout(() => {
+      if (!currentUser) return;
+      socket.emit("search-users", { query: q, myPhone: currentUser.phone }, (list) => {
+        renderSearchResults(list || []);
+      });
+    }, 280);
+  });
+})();
+
 
 socket.on("friend-list-updated", (data) => { renderFriendData(data); });
 socket.on("receive-friend-request", () => { fetchFriendData(); });
@@ -3391,29 +3501,50 @@ socket.on("direct-call-ended", endCallCleanup);
     return '<div class="au-detail-row"><i class="fa-solid ' + icon + '"></i><span class="au-detail-label">' + label + ':</span> <span>' + esc(value) + '</span></div>';
   }
 
+  var _adminUsersCache = [];
+
   function renderAdminUsers(list) {
     if (!adminUsersList) return;
+    _adminUsersCache = list || [];
     if (!list.length) {
       adminUsersList.innerHTML = '<div class="admin-empty-note">এখনো কোনো ইউজার ডাটা নেই।</div>';
       return;
     }
     adminUsersList.innerHTML = list.map(function (u, idx) {
+      var banBadge = u.banned
+        ? '<span class="au-ban-badge">Banned</span>'
+        : '';
       var details = fieldRow("fa-quote-left", "Bio", u.bio) +
         fieldRow("fa-location-dot", "Location", u.location) +
         fieldRow("fa-briefcase", "Work", u.work) +
         fieldRow("fa-graduation-cap", "Education", u.education) +
         fieldRow("fa-heart", "Relationship", u.relationship) +
-        '<div class="au-detail-row"><i class="fa-solid fa-user-group"></i><span class="au-detail-label">Friends:</span> <span>' + (u.friendCount || 0) + '</span></div>';
-      return '<div class="admin-user-row-wrap">' +
+        '<div class="au-detail-row"><i class="fa-solid fa-user-group"></i><span class="au-detail-label">Friends:</span> <span>' + (u.friendCount || 0) + '</span></div>' +
+        (u.banned ? fieldRow("fa-ban", "Ban reason", u.banReason || "—") : "") +
+        '<div class="au-admin-actions">' +
+          '<button type="button" class="au-act-btn au-view" data-admin-act="view" data-phone="' + esc(u.phone) + '" data-idx="' + idx + '"><i class="fa-solid fa-id-card"></i> Profile</button>' +
+          (u.banned
+            ? '<button type="button" class="au-act-btn au-unban" data-admin-act="unban" data-phone="' + esc(u.phone) + '"><i class="fa-solid fa-unlock"></i> Unban</button>'
+            : '<button type="button" class="au-act-btn au-ban" data-admin-act="ban" data-phone="' + esc(u.phone) + '"><i class="fa-solid fa-ban"></i> Ban</button>') +
+          '<button type="button" class="au-act-btn au-delete" data-admin-act="delete" data-phone="' + esc(u.phone) + '"><i class="fa-solid fa-trash"></i> Delete</button>' +
+        '</div>';
+      return '<div class="admin-user-row-wrap' + (u.banned ? ' is-banned' : '') + '">' +
         '<div class="admin-user-row" data-toggle="' + idx + '">' +
         '<img src="' + esc(u.pic) + '" alt="">' +
-        '<div class="au-info"><div class="au-name">' + esc(u.name) + '</div>' +
-        '<div class="au-phone">' + esc(u.phone) + '</div></div>' +
+        '<div class="au-info"><div class="au-name">' + esc(u.name) + ' ' + banBadge + '</div>' +
+        '<div class="au-phone">' + esc(u.phone) + ' · ' + (u.friendCount || 0) + ' friends</div></div>' +
         '<i class="fa-solid fa-chevron-down au-chevron"></i>' +
         '</div>' +
-        '<div class="admin-user-details" id="auDetails' + idx + '" style="display:none;">' + (details || '<div class="admin-empty-note">এই ইউজার এখনো প্রোফাইল তথ্য দেননি।</div>') + '</div>' +
+        '<div class="admin-user-details" id="auDetails' + idx + '" style="display:none;">' + details + '</div>' +
         '</div>';
     }).join("");
+  }
+
+  function refreshAdminUsers() {
+    if (!adminSessionPassword) return;
+    socket.emit("admin-login", { password: adminSessionPassword }, function (res) {
+      if (res && res.success) renderAdminUsers(res.users || []);
+    });
   }
 
   function timeAgoLabel(ts) {
@@ -3453,6 +3584,68 @@ socket.on("direct-call-ended", endCallCleanup);
 
   if (adminUsersList) {
     adminUsersList.addEventListener("click", function (e) {
+      var actBtn = e.target.closest("[data-admin-act]");
+      if (actBtn) {
+        e.stopPropagation();
+        var act = actBtn.getAttribute("data-admin-act");
+        var phone = actBtn.getAttribute("data-phone");
+        if (!adminSessionPassword || !phone) return;
+
+        if (act === "view") {
+          var idx = parseInt(actBtn.getAttribute("data-idx"), 10);
+          var u = _adminUsersCache[idx] || { phone: phone, name: phone, pic: "https://via.placeholder.com/100" };
+          // close admin panel briefly so profile is visible on top
+          if (typeof openProfile === "function" && currentUser) {
+            openProfile(phone, u);
+          } else if (typeof openProfile === "function") {
+            // admin may view even without being "friends"
+            openProfile(phone, u);
+          }
+          return;
+        }
+
+        if (act === "ban") {
+          actBtn.disabled = true;
+          socket.emit("admin-ban-user", { password: adminSessionPassword, phone: phone, reason: "Admin ban" }, function (res) {
+            actBtn.disabled = false;
+            if (res && res.success) {
+              if (typeof showMiniToast === "function") showMiniToast("User banned");
+              refreshAdminUsers();
+            } else {
+              showCustomAlert("Error", "Ban করা যায়নি।");
+            }
+          });
+          return;
+        }
+
+        if (act === "unban") {
+          actBtn.disabled = true;
+          socket.emit("admin-unban-user", { password: adminSessionPassword, phone: phone }, function (res) {
+            actBtn.disabled = false;
+            if (res && res.success) {
+              if (typeof showMiniToast === "function") showMiniToast("User unbanned");
+              refreshAdminUsers();
+            }
+          });
+          return;
+        }
+
+        if (act === "delete") {
+          if (!confirm("এই ইউজারের অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলবেন? (" + phone + ")")) return;
+          actBtn.disabled = true;
+          socket.emit("admin-delete-user", { password: adminSessionPassword, phone: phone }, function (res) {
+            actBtn.disabled = false;
+            if (res && res.success) {
+              if (typeof showMiniToast === "function") showMiniToast("Account deleted");
+              refreshAdminUsers();
+            } else {
+              showCustomAlert("Error", "ডিলিট করা যায়নি।");
+            }
+          });
+          return;
+        }
+      }
+
       var row = e.target.closest("[data-toggle]");
       if (!row) return;
       var idx = row.getAttribute("data-toggle");
