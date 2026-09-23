@@ -719,6 +719,7 @@ function showCustomModal(options) {
   const confBtn = document.getElementById("modalConfirmBtn");
   const cancBtn = document.getElementById("modalCancelBtn");
   if (options.hideCancel) cancBtn.style.display = "none";
+  customModalOverlay.style.zIndex = "400000";
   customModalOverlay.style.display = "flex";
 
   return new Promise((resolve) => {
@@ -734,6 +735,8 @@ function showCustomAlert(title, subtitle) {
   modalInputGroup.style.display = "none";
   modalActionContainer.innerHTML = `<button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%;">Confirm</button>`;
   const confBtn = document.getElementById("modalConfirmBtn");
+  // প্রোফাইল মডালের উপরে দেখানোর জন্য
+  customModalOverlay.style.zIndex = "400000";
   customModalOverlay.style.display = "flex";
   return new Promise((resolve) => {
     confBtn.onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
@@ -1883,10 +1886,12 @@ function saveMyProfile() {
     if (res && res.success) {
       profileViewState.data = { ...profileViewState.data, ...res.profile };
       document.getElementById("pmSub").textContent = profile.bio || "EKT Chatter";
-      // এই ডিভাইসেও একটা কপি রাখা হয় — সার্ভার কোনো কারণে ডেটা হারালেও
-      // এই ডিভাইস থেকে পরের বার কানেক্ট হলেই আবার নিজে থেকে ফিরে আসবে
       try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
-      showCustomAlert("Saved", "আপনার প্রোফাইল সেভ হয়েছে।");
+      // পপআপ প্রোফাইলের উপরে দেখাবে
+      showCustomAlert("Saved ✓", "আপনার প্রোফাইল সফলভাবে সেভ হয়েছে।");
+      if (typeof showMiniToast === "function") showMiniToast("Profile saved");
+    } else {
+      showCustomAlert("Error", "সেভ করা যায়নি, আবার চেষ্টা করুন।");
     }
   });
 }
