@@ -22,16 +22,16 @@
       display:flex; align-items:center; justify-content:center; flex-direction:column;
       background:#02040a;
       opacity:1; transition:opacity .85s ease, visibility .85s ease;
-      padding:env(safe-area-inset-top,0px) 20px env(safe-area-inset-bottom,0px);
+      padding:env(safe-area-inset-top,0px) max(16px, 4vw) env(safe-area-inset-bottom,0px);
       overflow:hidden;
     }
     #splashScreen.splash-hide{ opacity:0; visibility:hidden; pointer-events:none; }
     #splashScreen::before{
       content:""; position:absolute; inset:-20%;
       background:
-        radial-gradient(ellipse 50% 40% at 50% 35%, rgba(79,70,229,.2), transparent 60%),
-        radial-gradient(ellipse 40% 30% at 30% 70%, rgba(168,85,247,.1), transparent 55%),
-        radial-gradient(ellipse 35% 25% at 75% 60%, rgba(34,211,238,.08), transparent 50%);
+        radial-gradient(ellipse 50% 40% at 50% 35%, rgba(79,70,229,.22), transparent 60%),
+        radial-gradient(ellipse 40% 30% at 30% 70%, rgba(168,85,247,.12), transparent 55%),
+        radial-gradient(ellipse 35% 25% at 75% 60%, rgba(34,211,238,.1), transparent 50%);
       animation:splashBgDrift 10s ease-in-out infinite alternate;
       pointer-events:none;
     }
@@ -43,14 +43,28 @@
     .sp-inner{
       position:relative; z-index:2;
       display:flex; flex-direction:column; align-items:center;
-      width:100%; max-width:360px;
+      width:100%;
+      max-width:min(420px, 92vw);
+      transform:scale(1);
+    }
+    /* phone: slightly larger feel; desktop: scale up so not tiny in center */
+    @media (min-width: 600px){
+      .sp-inner{ transform:scale(1.15); }
+    }
+    @media (min-width: 900px){
+      .sp-inner{ transform:scale(1.28); }
+    }
+    @media (min-width: 1200px){
+      .sp-inner{ transform:scale(1.35); }
     }
 
-    /* ---- Multi-ring energy atom (game-like) ---- */
+    /* ---- Multi-ring energy atom ---- */
     .sp-energy{
-      position:relative; width:168px; height:168px;
+      position:relative;
+      width:clamp(140px, 38vw, 180px);
+      height:clamp(140px, 38vw, 180px);
       transform-style:preserve-3d;
-      margin-bottom:30px;
+      margin-bottom:clamp(18px, 4vw, 28px);
       animation:spEnergyIn .9s cubic-bezier(.16,1.2,.3,1) both;
     }
     @keyframes spEnergyIn{
@@ -59,7 +73,8 @@
     }
     .sp-core{
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:52px; height:52px; border-radius:50%;
+      width:clamp(48px, 13vw, 58px); height:clamp(48px, 13vw, 58px);
+      border-radius:50%;
       background:radial-gradient(circle at 32% 28%, #ddd6fe, #6366f1 45%, #1e1b4b);
       box-shadow:
         0 0 26px #6366f1,
@@ -70,7 +85,7 @@
       animation:spCorePulse 2.2s ease-in-out infinite;
       z-index:5;
     }
-    .sp-core i{ font-size:20px; color:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+    .sp-core i{ font-size:clamp(18px, 5vw, 22px); color:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
     @keyframes spCorePulse{
       0%,100%{ box-shadow:0 0 26px #6366f1,0 0 52px rgba(99,102,241,.45),inset 0 -8px 14px rgba(0,0,0,.35); }
       50%{ box-shadow:0 0 38px #818cf8,0 0 72px rgba(129,140,248,.55),inset 0 -8px 14px rgba(0,0,0,.35); }
@@ -88,74 +103,62 @@
       top:-3.5px; left:50%; margin-left:-3.5px;
       box-shadow:0 0 10px currentColor, 0 0 3px #fff;
     }
-    /* 6 rings — different size, tilt, speed, color */
     .sp-ring.r1{
-      width:70px; height:70px; margin:-35px 0 0 -35px;
+      width:42%; height:42%; margin:0; transform:translate(-50%,-50%) rotateX(72deg);
       border-top-color:#22d3ee; border-right-color:rgba(34,211,238,.3);
-      transform:rotateX(72deg);
       animation:spR1 2.8s linear infinite;
     }
     .sp-ring.r1 .sp-ball{ background:#22d3ee; color:#22d3ee; width:6px; height:6px; }
     .sp-ring.r2{
-      width:92px; height:92px; margin:-46px 0 0 -46px;
+      width:55%; height:55%; transform:translate(-50%,-50%) rotateX(68deg) rotateZ(40deg);
       border-bottom-color:#e879f9; border-left-color:rgba(232,121,249,.3);
-      transform:rotateX(68deg) rotateZ(40deg);
       animation:spR2 3.6s linear infinite;
     }
     .sp-ring.r2 .sp-ball{ background:#e879f9; color:#e879f9; }
     .sp-ring.r3{
-      width:114px; height:114px; margin:-57px 0 0 -57px;
+      width:68%; height:68%; transform:translate(-50%,-50%) rotateX(65deg) rotateZ(-55deg);
       border-top-color:#60a5fa; border-right-color:rgba(96,165,250,.25);
-      transform:rotateX(65deg) rotateZ(-55deg);
       animation:spR3 4.4s linear infinite;
     }
     .sp-ring.r3 .sp-ball{ background:#60a5fa; color:#60a5fa; }
     .sp-ring.r4{
-      width:134px; height:134px; margin:-67px 0 0 -67px;
+      width:80%; height:80%; transform:translate(-50%,-50%) rotateX(70deg) rotateZ(90deg);
       border-bottom-color:#a78bfa; border-left-color:rgba(167,139,250,.25);
-      transform:rotateX(70deg) rotateZ(90deg);
-      animation:spR4 5.2s linear infinite;
-      opacity:.9;
+      animation:spR4 5.2s linear infinite; opacity:.9;
     }
     .sp-ring.r4 .sp-ball{ background:#a78bfa; color:#a78bfa; width:6px; height:6px; }
     .sp-ring.r5{
-      width:150px; height:150px; margin:-75px 0 0 -75px;
+      width:90%; height:90%; transform:translate(-50%,-50%) rotateX(62deg) rotateZ(20deg);
       border-top-color:#34d399; border-right-color:rgba(52,211,153,.2);
-      transform:rotateX(62deg) rotateZ(20deg);
-      animation:spR5 6.2s linear infinite;
-      opacity:.75;
+      animation:spR5 6.2s linear infinite; opacity:.75;
     }
     .sp-ring.r5 .sp-ball{ background:#34d399; color:#34d399; width:5px; height:5px; }
     .sp-ring.r6{
-      width:164px; height:164px; margin:-82px 0 0 -82px;
+      width:98%; height:98%; transform:translate(-50%,-50%) rotateX(75deg) rotateZ(-30deg);
       border-bottom-color:#f472b6; border-left-color:rgba(244,114,182,.2);
-      transform:rotateX(75deg) rotateZ(-30deg);
-      animation:spR6 7.4s linear infinite;
-      opacity:.65;
+      animation:spR6 7.4s linear infinite; opacity:.65;
     }
     .sp-ring.r6 .sp-ball{ background:#f472b6; color:#f472b6; width:5px; height:5px; }
 
-    @keyframes spR1{ to{ transform:rotateX(72deg) rotate(360deg); } }
-    @keyframes spR2{ to{ transform:rotateX(68deg) rotateZ(40deg) rotate(-360deg); } }
-    @keyframes spR3{ to{ transform:rotateX(65deg) rotateZ(-55deg) rotate(360deg); } }
-    @keyframes spR4{ to{ transform:rotateX(70deg) rotateZ(90deg) rotate(-360deg); } }
-    @keyframes spR5{ to{ transform:rotateX(62deg) rotateZ(20deg) rotate(360deg); } }
-    @keyframes spR6{ to{ transform:rotateX(75deg) rotateZ(-30deg) rotate(-360deg); } }
+    @keyframes spR1{ to{ transform:translate(-50%,-50%) rotateX(72deg) rotate(360deg); } }
+    @keyframes spR2{ to{ transform:translate(-50%,-50%) rotateX(68deg) rotateZ(40deg) rotate(-360deg); } }
+    @keyframes spR3{ to{ transform:translate(-50%,-50%) rotateX(65deg) rotateZ(-55deg) rotate(360deg); } }
+    @keyframes spR4{ to{ transform:translate(-50%,-50%) rotateX(70deg) rotateZ(90deg) rotate(-360deg); } }
+    @keyframes spR5{ to{ transform:translate(-50%,-50%) rotateX(62deg) rotateZ(20deg) rotate(360deg); } }
+    @keyframes spR6{ to{ transform:translate(-50%,-50%) rotateX(75deg) rotateZ(-30deg) rotate(-360deg); } }
 
-    /* ---- Title ---- */
+    /* ---- Title: one line, responsive ---- */
     .sp-title{
       font-family:"Inter",system-ui,sans-serif;
-      font-size:clamp(15px,4.2vw,18px);
+      font-size:clamp(16px, 4.5vw, 22px);
       font-weight:800;
-      letter-spacing:0.14em;
+      letter-spacing:0.12em;
       text-indent:0;
       text-align:center;
-      margin:0 0 8px;
-      padding:0 12px;
+      margin:0 0 6px;
+      padding:0 8px;
       width:100%;
-      max-width:280px;
       white-space:nowrap;
-      overflow:hidden;
       color:#f1f5ff;
       text-shadow:
         0 0 14px rgba(129,140,248,.65),
@@ -179,12 +182,15 @@
 
     .sp-tagline{
       font-family:"Inter",system-ui,sans-serif;
-      font-size:10px; font-weight:600;
-      letter-spacing:0.22em; text-indent:0;
+      font-size:clamp(9px, 2.4vw, 11px);
+      font-weight:600;
+      letter-spacing:0.2em;
+      text-indent:0;
       text-transform:uppercase;
-      color:rgba(165,180,252,.5);
-      margin:0 0 26px;
+      color:rgba(165,180,252,.55);
+      margin:0 0 clamp(18px, 4vw, 26px);
       opacity:0;
+      white-space:nowrap;
     }
     .sp-tagline.show{ animation:spFadeUp .65s ease .1s forwards; }
     @keyframes spFadeUp{
@@ -192,10 +198,12 @@
       to{ opacity:1; transform:none; }
     }
 
-    /* ---- Circular progress (bottle/water fill feel) ---- */
+    /* ---- Circular progress ---- */
     .sp-circle{
       --p:0;
-      width:86px; height:86px; border-radius:50%;
+      width:clamp(72px, 20vw, 96px);
+      height:clamp(72px, 20vw, 96px);
+      border-radius:50%;
       background:conic-gradient(from -90deg,
         #22d3ee 0%,
         #6366f1 calc(var(--p) * 0.45%),
@@ -203,12 +211,9 @@
         #f472b6 calc(var(--p) * 1%),
         rgba(255,255,255,.08) 0);
       display:flex; align-items:center; justify-content:center;
-      box-shadow:
-        0 0 24px rgba(99,102,241,.3),
-        inset 0 0 0 1px rgba(255,255,255,.06);
+      box-shadow:0 0 24px rgba(99,102,241,.3), inset 0 0 0 1px rgba(255,255,255,.06);
       opacity:0;
       transform:scale(.85);
-      position:relative;
     }
     .sp-circle.show{
       animation:spCircleIn .55s cubic-bezier(.16,1.1,.3,1) forwards;
@@ -217,14 +222,16 @@
       to{ opacity:1; transform:scale(1); }
     }
     .sp-circle-inner{
-      width:68px; height:68px; border-radius:50%;
+      width:78%; height:78%;
+      border-radius:50%;
       background:#02040a;
       display:flex; align-items:center; justify-content:center;
       box-shadow:inset 0 0 12px rgba(0,0,0,.5);
     }
     .sp-circle-pct{
       font-family:"Inter",system-ui,sans-serif;
-      font-size:16px; font-weight:800;
+      font-size:clamp(13px, 3.8vw, 17px);
+      font-weight:800;
       letter-spacing:0.02em;
       background:linear-gradient(135deg,#67e8f9,#a5b4fc,#e879f9);
       -webkit-background-clip:text; background-clip:text;
@@ -235,13 +242,15 @@
 
     /* ---- Typewriter credit ---- */
     .sp-credit{
-      position:absolute; bottom:max(28px, env(safe-area-inset-bottom,0px) + 16px);
+      position:absolute;
+      bottom:max(24px, env(safe-area-inset-bottom,0px) + 14px);
       left:0; right:0; text-align:center;
       z-index:3;
       font-family:"Pacifico","Poppins",cursive;
-      font-size:15px;
+      font-size:clamp(13px, 3.5vw, 17px);
       letter-spacing:0.04em;
       min-height:1.4em;
+      padding:0 12px;
     }
     .sp-credit-text{
       background:linear-gradient(90deg,#94a3b8,#c4b5fd,#67e8f9,#c4b5fd,#94a3b8);
