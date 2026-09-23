@@ -9,7 +9,6 @@ const path = require("path");
 // ---------- Image host (optional CDN; set IMGBB_API_KEY on Render) ----------
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
 const MAX_FALLBACK_DATA_URL = 900000;
-
 async function uploadToImgbb(dataUrlOrBase64, name) {
   if (!IMGBB_API_KEY) return null;
   try {
@@ -39,22 +38,17 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
     return null;
   }
 }
-
 async function resolveImageSrc(dataUrlOrHttp, name) {
   const raw = String(dataUrlOrHttp || "");
   if (raw.startsWith("http://") || raw.startsWith("https://")) return { src: raw, host: "url" };
   if (!raw.startsWith("data:")) return null;
   const remote = await uploadToImgbb(raw, name);
   if (remote) return { src: remote, host: "cdn" };
-  if (raw.length <= MAX_FALLBACK_DATA_URL) {
-    console.warn("Using local data-URL fallback for image.");
-    return { src: raw, host: "local" };
-  }
+  if (raw.length <= MAX_FALLBACK_DATA_URL) return { src: raw, host: "local" };
   return null;
 }
-
 if (IMGBB_API_KEY) console.log("Image CDN API key loaded.");
-else console.warn("⚠️ No image CDN key — using local data-URL fallback.");
+else console.warn("⚠️ No image CDN key — local data-URL fallback.");
 
 
 const app = express();
@@ -717,7 +711,6 @@ io.on("connection", (socket) => {
     callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
   });
 
-  // প্রোফাইল পিকচার
   socket.on("update-avatar", async ({ phone, dataUrl, name }, callback) => {
     if (!phone || !dataUrl) {
       if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
@@ -725,7 +718,7 @@ io.on("connection", (socket) => {
     }
     const resolved = await resolveImageSrc(dataUrl, name || "avatar");
     if (!resolved || !resolved.src) {
-      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
       return;
     }
     if (!users[phone]) users[phone] = { phone };
@@ -741,7 +734,7 @@ io.on("connection", (socket) => {
     }
     const resolved = await resolveImageSrc(dataUrl, name || "cover");
     if (!resolved || !resolved.src) {
-      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
       return;
     }
     if (!profiles[phone]) profiles[phone] = {};
@@ -773,21 +766,20 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback({ success: true, profile: profiles[phone] });
   });
 
-  // প্রোফাইলে শুধু ছবি
   socket.on("add-profile-item", async ({ phone, item }, callback) => {
     if (!phone || !item) {
       if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
       return;
     }
     if (item.kind && item.kind !== "photo") {
-      if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি আপলোড করা যায়।" });
+      if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি।" });
       return;
     }
     item.kind = "photo";
     if (item.src && String(item.src).startsWith("data:")) {
       const resolved = await resolveImageSrc(item.src, item.name || "photo");
       if (!resolved || !resolved.src) {
-        if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
+        if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
         return;
       }
       item.src = resolved.src;
@@ -836,14 +828,14 @@ io.on("connection", (socket) => {
     let mediaOut = media || null;
     if (mediaOut) {
       if (mediaOut.type === "video") {
-        if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি পোস্ট করা যায়।" });
+        if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি।" });
         return;
       }
       mediaOut.type = "image";
       if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
         const resolved = await resolveImageSrc(mediaOut.src, "post");
         if (!resolved || !resolved.src) {
-          if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।" });
+          if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
           return;
         }
         mediaOut = { type: "image", src: resolved.src, host: resolved.host };
