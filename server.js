@@ -4,12 +4,20 @@ const cors = require("cors");
 const fs = require("fs");
 const { Server } = require("socket.io");
 const path = require("path");
+const crypto = require("crypto");
 
 
-// ---------- Image host (optional CDN; set IMGBB_API_KEY on Render) ----------
+// ---------- Media host: Cloudinary (primary) → Catbox → imgbb → local ----------
+// Render Env (সব ফ্রি, কার্ড লাগে না):
+//   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+//   (ঐচ্ছিক) IMGBB_API_KEY
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || "";
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
 const MAX_FALLBACK_DATA_URL = 900000;
-// পুরোনো Node version-এ গ্লোবাল fetch না থাকলে node-fetch দিয়ে fallback করবে
+const CATBOX_MAX_BYTES = 200 * 1024 * 1024;
+
 let _fetchImpl = (typeof fetch === "function") ? fetch : null;
 async function getFetch() {
   if (_fetchImpl) return _fetchImpl;
@@ -18,10 +26,136 @@ async function getFetch() {
     _fetchImpl = mod.default;
     return _fetchImpl;
   } catch (e) {
-    console.warn("⚠️ No global fetch and node-fetch not installed — imgbb upload will fail. Run: npm i node-fetch");
+    console.warn("⚠️ No global fetch / node-fetch — remote upload will fail.");
     return null;
   }
 }
+
+function dataUrlToBuffer(dataUrlOrBase64) {
+  let raw = String(dataUrlOrBase64 || "");
+  let mime = "application/octet-stream";
+  let b64 = raw;
+  if (raw.startsWith("data:")) {
+    const comma = raw.indexOf(",");
+    if (comma < 0) return null;
+    const header = raw.slice(5, comma);
+    const semi = header.indexOf(";");
+    mime = (semi >= 0 ? header.slice(0, semi) : header) || mime;
+    b64 = raw.slice(comma + 1);
+  }
+  if (!b64 || b64.length < 16) return null;
+  try {
+    const buf = Buffer.from(b64, "base64");
+    if (!buf.length) return null;
+    return { buffer: buf, mime };
+  } catch (e) {
+    return null;
+  }
+}
+
+function guessExt(mime, name) {
+  if (name && /\.[a-z0-9]{2,5}$/i.test(name)) return name.slice(name.lastIndexOf("."));
+  const map = {
+    "image/jpeg": ".jpg", "image/jpg": ".jpg", "image/png": ".png", "image/gif": ".gif",
+    "image/webp": ".webp", "image/svg+xml": ".svg",
+    "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov", "video/x-msvideo": ".avi",
+    "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/ogg": ".ogg", "audio/webm": ".webm", "audio/wav": ".wav",
+  };
+  return map[mime] || ".bin";
+}
+
+function isVideoMime(mime) {
+  return /^video\//i.test(mime || "");
+}
+
+async function uploadToCloudinary(dataUrlOrBase64, name) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) return null;
+  try {
+    const parsed = dataUrlToBuffer(dataUrlOrBase64);
+    if (!parsed) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+
+    const resourceType = isVideoMime(parsed.mime) ? "video" : "image";
+    const timestamp = Math.floor(Date.now() / 1000);
+    const toSign = `timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
+    const signature = crypto.createHash("sha1").update(toSign).digest("hex");
+
+    const FormDataCtor = globalThis.FormData;
+    const BlobCtor = globalThis.Blob;
+    if (!FormDataCtor || !BlobCtor) {
+      console.warn("Cloudinary: need Node 18+ (FormData/Blob)");
+      return null;
+    }
+
+    const ext = guessExt(parsed.mime, name);
+    const filename =
+      (String(name || "file").replace(/[^\w.\-]+/g, "_").slice(0, 60) || "file") +
+      (String(name || "").endsWith(ext) ? "" : ext);
+
+    const form = new FormDataCtor();
+    form.append("file", new BlobCtor([parsed.buffer], { type: parsed.mime }), filename);
+    form.append("api_key", CLOUDINARY_API_KEY);
+    form.append("timestamp", String(timestamp));
+    form.append("signature", signature);
+
+    const res = await doFetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
+      { method: "POST", body: form }
+    );
+    const json = await res.json();
+    if (json && json.secure_url) {
+      console.log("Cloudinary upload OK:", json.secure_url);
+      return json.secure_url;
+    }
+    console.warn("Cloudinary upload failed:", JSON.stringify(json && (json.error || json)));
+    return null;
+  } catch (e) {
+    console.warn("Cloudinary upload error:", e && e.message);
+    return null;
+  }
+}
+
+async function uploadToCatbox(dataUrlOrBase64, name) {
+  try {
+    const parsed = dataUrlToBuffer(dataUrlOrBase64);
+    if (!parsed || parsed.buffer.length > CATBOX_MAX_BYTES) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+    const FormDataCtor = globalThis.FormData;
+    const BlobCtor = globalThis.Blob;
+    if (!FormDataCtor || !BlobCtor) return null;
+
+    const ext = guessExt(parsed.mime, name);
+    const filename =
+      (String(name || "file").replace(/[^\w.\-]+/g, "_").slice(0, 60) || "file") +
+      (String(name || "").endsWith(ext) ? "" : ext);
+
+    const form = new FormDataCtor();
+    form.append("reqtype", "fileupload");
+    form.append("fileToUpload", new BlobCtor([parsed.buffer], { type: parsed.mime }), filename);
+
+    const res = await doFetch("https://catbox.moe/user/api.php", {
+      method: "POST",
+      body: form,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
+    });
+    const text = (await res.text()).trim();
+    if (res.ok && text && /^https?:\/\/(files\.)?catbox\.moe\//i.test(text)) {
+      console.log("Catbox upload OK:", text);
+      return text;
+    }
+    console.warn("Catbox upload failed:", res.status, text.slice(0, 180));
+    return null;
+  } catch (e) {
+    console.warn("Catbox upload error:", e && e.message);
+    return null;
+  }
+}
+
 async function uploadToImgbb(dataUrlOrBase64, name) {
   if (!IMGBB_API_KEY) return null;
   try {
@@ -41,12 +175,11 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        // imgbb-র bot-protection cloud/hosting IP থেকে আসা request প্রায়ই ব্লক করে দেয়;
-        // সাধারণ browser-এর মতো User-Agent/Accept/Referer পাঠালে সেটা এড়ানো যায়।
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://imgbb.com/",
-        "Origin": "https://imgbb.com",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "application/json, text/plain, */*",
+        Referer: "https://imgbb.com/",
+        Origin: "https://imgbb.com",
       },
       body: body.toString(),
     });
@@ -55,24 +188,42 @@ async function uploadToImgbb(dataUrlOrBase64, name) {
       console.log("imgbb upload OK:", json.data.display_url || json.data.url);
       return json.data.display_url || json.data.url || null;
     }
-    console.warn("Remote image upload failed:", JSON.stringify(json && (json.error || json.status_txt || json)));
     return null;
   } catch (e) {
-    console.warn("Remote image upload error:", e.message);
+    console.warn("imgbb upload error:", e.message);
     return null;
   }
 }
+
 async function resolveImageSrc(dataUrlOrHttp, name) {
   const raw = String(dataUrlOrHttp || "");
   if (raw.startsWith("http://") || raw.startsWith("https://")) return { src: raw, host: "url" };
   if (!raw.startsWith("data:")) return null;
-  const remote = await uploadToImgbb(raw, name);
-  if (remote) return { src: remote, host: "cdn" };
+
+  const cloudUrl = await uploadToCloudinary(raw, name);
+  if (cloudUrl) return { src: cloudUrl, host: "cloudinary" };
+
+  const catboxUrl = await uploadToCatbox(raw, name);
+  if (catboxUrl) return { src: catboxUrl, host: "catbox" };
+
+  if (!/^data:video\//i.test(raw)) {
+    const imgbbUrl = await uploadToImgbb(raw, name);
+    if (imgbbUrl) return { src: imgbbUrl, host: "cdn" };
+  }
+
   if (raw.length <= MAX_FALLBACK_DATA_URL) return { src: raw, host: "local" };
   return null;
 }
-if (IMGBB_API_KEY) console.log("Image CDN API key loaded.");
-else console.warn("⚠️ No image CDN key — local data-URL fallback.");
+
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_API_KEY && CLOUDINARY_API_SECRET) {
+  console.log("Cloudinary enabled (primary). Cloud:", CLOUDINARY_CLOUD_NAME);
+} else {
+  console.warn(
+    "⚠️ Cloudinary env not set — Catbox/imgbb/local fallback. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET."
+  );
+}
+console.log("Catbox backup enabled (photo+video, no key).");
+if (IMGBB_API_KEY) console.log("imgbb backup key loaded.");
 
 
 const app = express();
@@ -1084,6 +1235,9 @@ app.get("/api/ice-servers", async (req, res) => {
     const results = await Promise.allSettled(jobs.map((j) => j[1]));
     let list = [];
     const providers = [];
+    results.results?.forEach((r, i) => {
+      // safe fallback traversal
+    });
     results.forEach((r, i) => {
       if (r.status === "fulfilled" && Array.isArray(r.value) && r.value.length) {
         list = list.concat(r.value);
