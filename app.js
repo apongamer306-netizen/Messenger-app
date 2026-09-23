@@ -1076,9 +1076,19 @@ function fetchFriendData() {
   if (cached) renderFriendData(cached);
 
   // ২) এরপর সার্ভারে নিজের প্রোফাইল + ফ্রেন্ড লিস্ট পাঠিয়ে সিঙ্ক করা হয়
+  let profileBackup = null;
+  try { profileBackup = JSON.parse(localStorage.getItem("myProfileAbout_" + currentUser.phone) || "null"); } catch (e) {}
+  // গ্যালারি ব্যাকআপ (ছোট লিস্ট) — রিস্টার্টের পর ফ্রি তে ফেরত আনার জন্য
+  try {
+    const itemsBackup = JSON.parse(localStorage.getItem("myProfileItems_" + currentUser.phone) || "null");
+    if (itemsBackup && Array.isArray(itemsBackup)) {
+      profileBackup = profileBackup || {};
+      profileBackup.items = itemsBackup;
+    }
+  } catch (e) {}
   socket.emit(
     "sync-user-data",
-    { user: currentUser, friends: (cached && cached.friends) || [] },
+    { user: currentUser, friends: (cached && cached.friends) || [], profile: profileBackup },
     (data) => {
       if (data && Array.isArray(data.friends)) renderFriendData(data);
     }
@@ -1379,6 +1389,7 @@ profileModalOverlay.innerHTML = `
       </div>
 
       <div class="profile-modal-actions">
+        <button id="pmFriendBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-user-plus"></i> Add Friend</button>
         <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
         <button id="pmCloseBtn" class="btn btn-secondary">Close</button>
       </div>
@@ -1845,6 +1856,13 @@ profileFileInput.onchange = async () => {
   socket.emit("add-profile-item", { phone: currentUser.phone, item }, (res) => {
     if (res && res.success) {
       profileViewState.data.items = res.items;
+      try {
+        // ফ্রি পারসিস্টেন্স: এই ডিভাইসে গ্যালারির ছোট কপি রাখা (রিস্টার্টের পর সিঙ্ক হবে)
+        const slim = (res.items || []).slice(0, 6).map((it) => ({
+          id: it.id, type: it.type, src: it.src, name: it.name, timestamp: it.timestamp
+        })).filter((it) => it.src && String(it.src).length < 350000);
+        localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
+      } catch (e) {}
       renderProfileGallery(kind);
     } else {
       showCustomAlert("Error", "আপলোড করা যায়নি, আবার চেষ্টা করুন।");
@@ -1879,18 +1897,54 @@ function healMyProfileIfNeeded() {
   if (!currentUser) return;
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem("myProfileAbout_" + currentUser.phone) || "null"); } catch (e) {}
-  if (!cached) return;
+  let itemsBackup = null;
+  try { itemsBackup = JSON.parse(localStorage.getItem("myProfileItems_" + currentUser.phone) || "null"); } catch (e) {}
 
-  socket.emit("get-profile", { phone: currentUser.phone }, (data) => {
+  socket.emit("get-profile", { phone: currentUser.phone, viewerPhone: currentUser.phone }, (data) => {
     const hasAnyAboutField = data && (data.bio || data.location || data.work || data.education || data.about);
-    if (!hasAnyAboutField) {
-      // সার্ভারে কিছুই নেই কিন্তু এই ডিভাইসে ব্যাকআপ আছে — পুনরুদ্ধার করা হচ্ছে
-      socket.emit("save-profile", { phone: currentUser.phone, profile: cached }, () => {});
+    const payload = { ...(cached || {}) };
+    if ((!data || !data.items || !data.items.length) && Array.isArray(itemsBackup) && itemsBackup.length) {
+      payload.items = itemsBackup.slice(0, 6);
+    }
+    if (!hasAnyAboutField && cached) {
+      socket.emit("save-profile", { phone: currentUser.phone, profile: payload }, () => {});
+    } else if (payload.items && payload.items.length) {
+      // শুধু গ্যালারি ফেরত
+      socket.emit("save-profile", { phone: currentUser.phone, profile: { items: payload.items } }, () => {});
     }
   });
 }
 
 // ---------- প্রোফাইল খোলা ----------
+function updateProfileFriendButton(relation) {
+  const btn = document.getElementById("pmFriendBtn");
+  if (!btn) return;
+  if (!relation || relation === "self") {
+    btn.style.display = "none";
+    return;
+  }
+  btn.style.display = "inline-flex";
+  btn.disabled = false;
+  if (relation === "friends") {
+    btn.innerHTML = '<i class="fa-solid fa-user-minus"></i> Unfriend';
+    btn.dataset.mode = "unfriend";
+    btn.className = "btn btn-secondary";
+  } else if (relation === "outgoing") {
+    btn.innerHTML = '<i class="fa-solid fa-clock"></i> Request Sent';
+    btn.dataset.mode = "pending";
+    btn.disabled = true;
+    btn.className = "btn btn-secondary";
+  } else if (relation === "incoming") {
+    btn.innerHTML = '<i class="fa-solid fa-user-check"></i> Accept Request';
+    btn.dataset.mode = "accept";
+    btn.className = "btn btn-primary";
+  } else {
+    btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Add Friend';
+    btn.dataset.mode = "add";
+    btn.className = "btn btn-primary";
+  }
+}
+
 function openProfile(phone, fallback) {
   if (!phone || !currentUser) return;
   const isMe = phone === currentUser.phone;
@@ -1899,6 +1953,7 @@ function openProfile(phone, fallback) {
   document.getElementById("pmName").textContent = (fallback && fallback.name) || "Profile";
   document.getElementById("pmSub").textContent = "লোড হচ্ছে...";
   document.getElementById("pmMessageBtn").style.display = isMe ? "none" : "inline-flex";
+  updateProfileFriendButton(isMe ? "self" : "none");
 
   // কম্পোজার রিসেট
   pendingPostMedia = null;
@@ -1911,12 +1966,13 @@ function openProfile(phone, fallback) {
   profileModalOverlay.classList.add("active");
   switchProfileTab("posts");
 
-  socket.emit("get-profile", { phone }, (data) => {
+  socket.emit("get-profile", { phone, viewerPhone: currentUser.phone }, (data) => {
     if (!data) return;
     profileViewState.data = data;
     document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
     document.getElementById("pmName").textContent = data.name || "Profile";
     document.getElementById("pmSub").textContent = data.bio || (isMe ? "আপনার প্রোফাইল" : "EKT Chatter");
+    updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
     switchProfileTab(profileViewState.tab);
   });
 }
@@ -1946,6 +2002,38 @@ document.getElementById("pmMessageBtn").onclick = () => {
       phone: profileViewState.phone,
       name: profileViewState.data.name,
       pic: profileViewState.data.pic
+    });
+  }
+};
+document.getElementById("pmFriendBtn").onclick = async () => {
+  if (!currentUser || !profileViewState.phone || profileViewState.isMe) return;
+  const btn = document.getElementById("pmFriendBtn");
+  const mode = btn.dataset.mode;
+  const target = {
+    phone: profileViewState.phone,
+    name: profileViewState.data.name,
+    pic: profileViewState.data.pic
+  };
+  if (mode === "add") {
+    socket.emit("send-friend-request", { fromUser: currentUser, toUserPhone: target.phone });
+    updateProfileFriendButton("outgoing");
+    if (typeof showMiniToast === "function") showMiniToast("ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে");
+  } else if (mode === "accept") {
+    socket.emit("accept-friend-request", { currentUser, friendUser: target });
+    updateProfileFriendButton("friends");
+    if (typeof showMiniToast === "function") showMiniToast("ফ্রেন্ড রিকোয়েস্ট একসেপ্ট হয়েছে");
+  } else if (mode === "unfriend") {
+    const ok = await showCustomModal({
+      title: "Unfriend",
+      subtitle: (target.name || "এই ইউজার") + " কে আনফ্রেন্ড করবেন?",
+      hasInput: false
+    });
+    if (!ok) return;
+    socket.emit("remove-friend", { currentPhone: currentUser.phone, friendPhone: target.phone }, (res) => {
+      if (res && res.success) {
+        updateProfileFriendButton("none");
+        if (typeof showMiniToast === "function") showMiniToast("আনফ্রেন্ড করা হয়েছে");
+      }
     });
   }
 };
@@ -3511,16 +3599,29 @@ socket.on("direct-call-ended", endCallCleanup);
       return;
     }
     adminUsersList.innerHTML = list.map(function (u, idx) {
-      var banBadge = u.banned
-        ? '<span class="au-ban-badge">Banned</span>'
-        : '';
-      var details = fieldRow("fa-quote-left", "Bio", u.bio) +
-        fieldRow("fa-location-dot", "Location", u.location) +
-        fieldRow("fa-briefcase", "Work", u.work) +
-        fieldRow("fa-graduation-cap", "Education", u.education) +
-        fieldRow("fa-heart", "Relationship", u.relationship) +
-        '<div class="au-detail-row"><i class="fa-solid fa-user-group"></i><span class="au-detail-label">Friends:</span> <span>' + (u.friendCount || 0) + '</span></div>' +
-        (u.banned ? fieldRow("fa-ban", "Ban reason", u.banReason || "—") : "") +
+      var banBadge = u.banned ? '<span class="au-ban-badge">Banned</span>' : '';
+      var friendChips = '';
+      if (u.friends && u.friends.length) {
+        friendChips = '<div class="au-friends-list">' +
+          u.friends.map(function (f) {
+            return '<div class="au-friend-chip" data-admin-act="view" data-phone="' + esc(f.phone) + '" data-idx="-1" title="' + esc(f.phone) + '">' +
+              '<img src="' + esc(f.pic || 'https://via.placeholder.com/28') + '" alt="">' +
+              '<span>' + esc(f.name || f.phone) + '</span></div>';
+          }).join('') + '</div>';
+      } else {
+        friendChips = '<div class="admin-empty-note" style="padding:8px 0;text-align:left;">এখনো কোনো ফ্রেন্ড নেই</div>';
+      }
+      var details =
+        '<div class="au-detail-block">' +
+          fieldRow("fa-quote-left", "Bio", u.bio) +
+          fieldRow("fa-location-dot", "Location", u.location) +
+          fieldRow("fa-briefcase", "Work", u.work) +
+          fieldRow("fa-graduation-cap", "Education", u.education) +
+          fieldRow("fa-heart", "Relationship", u.relationship) +
+          (u.banned ? fieldRow("fa-ban", "Ban reason", u.banReason || "—") : "") +
+        '</div>' +
+        '<div class="au-friends-section"><div class="au-friends-title"><i class="fa-solid fa-user-group"></i> Friends (' + (u.friendCount || 0) + ')</div>' +
+        friendChips + '</div>' +
         '<div class="au-admin-actions">' +
           '<button type="button" class="au-act-btn au-view" data-admin-act="view" data-phone="' + esc(u.phone) + '" data-idx="' + idx + '"><i class="fa-solid fa-id-card"></i> Profile</button>' +
           (u.banned
@@ -3593,14 +3694,8 @@ socket.on("direct-call-ended", endCallCleanup);
 
         if (act === "view") {
           var idx = parseInt(actBtn.getAttribute("data-idx"), 10);
-          var u = _adminUsersCache[idx] || { phone: phone, name: phone, pic: "https://via.placeholder.com/100" };
-          // close admin panel briefly so profile is visible on top
-          if (typeof openProfile === "function" && currentUser) {
-            openProfile(phone, u);
-          } else if (typeof openProfile === "function") {
-            // admin may view even without being "friends"
-            openProfile(phone, u);
-          }
+          var u = (idx >= 0 && _adminUsersCache[idx]) ? _adminUsersCache[idx] : { phone: phone, name: actBtn.textContent.trim() || phone, pic: "https://via.placeholder.com/100" };
+          if (typeof openProfile === "function") openProfile(phone, u);
           return;
         }
 
