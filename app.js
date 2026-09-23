@@ -1424,6 +1424,8 @@ profileModalOverlay.innerHTML = `
       <div id="pmCoverPosBar" class="pm-cover-pos-bar">
         <i class="fa-solid fa-up-down" style="font-style:normal;opacity:.85;"></i>
         <input type="range" id="pmCoverPosRange" min="0" max="100" value="30" title="Move cover up/down">
+        <button type="button" id="pmCoverSaveBtn" class="pm-cover-pos-btn pm-cover-save-btn" title="Save"><i class="fa-solid fa-check"></i></button>
+        <button type="button" id="pmCoverCancelBtn" class="pm-cover-pos-btn pm-cover-cancel-btn" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="pm-avatar-wrap">
         <img id="pmAvatar" class="profile-modal-avatar" src="https://via.placeholder.com/100" alt="">
@@ -2104,7 +2106,7 @@ function openProfile(phone, fallback) {
   if (editCover) editCover.style.display = isMe ? "flex" : "none";
   if (editAv) editAv.style.display = isMe ? "flex" : "none";
   if (editName) editName.style.display = isMe ? "inline-flex" : "none";
-  applyPmCover((fallback && fallback.cover) || null, fallback && fallback.coverY, isMe);
+  applyPmCover((fallback && fallback.cover) || null, fallback && fallback.coverY, false);
   pendingPostMedia = null;
   pmComposerText.value = "";
   pmComposerText.style.height = "auto";
@@ -2122,7 +2124,7 @@ function openProfile(phone, fallback) {
     const bioText = (data.bio || "").trim();
     if (bioText) { subEl.textContent = bioText; subEl.classList.add("has-bio"); }
     else { subEl.textContent = isMe ? "About ট্যাব থেকে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
-    applyPmCover(data.cover || null, data.coverY, isMe);
+    applyPmCover(data.cover || null, data.coverY, false);
     updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
     switchProfileTab(profileViewState.tab);
   });
@@ -2261,6 +2263,15 @@ if (dashboardUserName) {
       posTimer = setTimeout(() => saveCoverPosition(coverRange.value), 200);
     });
   }
+  // কভার ছবি বেছে নেওয়ার পর আগে position ঠিক করার সুযোগ দেয়, তারপর Save করলেই আপলোড হয়।
+  let pendingCoverDataUrl = null;
+  let pendingCoverFileName = null;
+  function revertCoverPreview() {
+    pendingCoverDataUrl = null;
+    pendingCoverFileName = null;
+    const d = profileViewState.data || {};
+    applyPmCover(d.cover || null, d.coverY, false);
+  }
   pmCoverFileInput.onchange = async () => {
     const file = pmCoverFileInput.files[0]; pmCoverFileInput.value = "";
     if (!file || !currentUser || !profileViewState.isMe) return;
@@ -2268,14 +2279,42 @@ if (dashboardUserName) {
     let dataUrl;
     try { const c = await compressImageFile(file); dataUrl = c ? c.dataUrl : await readFileAsDataUrl(file); }
     catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
-    const { ok, payload: res } = await runUploadWithLockout("cover", (done) => {
-      socket.emit("update-cover", { phone: currentUser.phone, dataUrl, name: file.name }, done);
-    });
-    if (ok && res && res.cover) {
-      applyPmCover(res.cover, (profileViewState.data && profileViewState.data.coverY) || 30, true);
-      if (profileViewState.data) profileViewState.data.cover = res.cover;
-    }
+    // এখনই সার্ভারে পাঠানো হচ্ছে না — আগে লোকাল প্রিভিউ দেখিয়ে position ঠিক করার সুযোগ দেওয়া হচ্ছে
+    pendingCoverDataUrl = dataUrl;
+    pendingCoverFileName = file.name;
+    const currentY = (profileViewState.data && profileViewState.data.coverY) || 30;
+    applyPmCover(dataUrl, currentY, true);
   };
+  const coverSaveBtn = document.getElementById("pmCoverSaveBtn");
+  const coverCancelBtn = document.getElementById("pmCoverCancelBtn");
+  if (coverSaveBtn && !coverSaveBtn._wired) {
+    coverSaveBtn._wired = true;
+    coverSaveBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!pendingCoverDataUrl || !currentUser || !profileViewState.isMe) return;
+      const dataUrl = pendingCoverDataUrl;
+      const name = pendingCoverFileName;
+      const y = Number((document.getElementById("pmCoverPosRange") || {}).value) || 30;
+      coverSaveBtn.disabled = true;
+      const { ok, payload: res } = await runUploadWithLockout("cover", (done) => {
+        socket.emit("update-cover", { phone: currentUser.phone, dataUrl, name }, done);
+      });
+      coverSaveBtn.disabled = false;
+      if (ok && res && res.cover) {
+        pendingCoverDataUrl = null;
+        pendingCoverFileName = null;
+        if (profileViewState.data) { profileViewState.data.cover = res.cover; profileViewState.data.coverY = y; }
+        saveCoverPosition(y);
+        applyPmCover(res.cover, y, false);
+      } else {
+        await showCustomAlert("Error", "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।");
+      }
+    };
+  }
+  if (coverCancelBtn && !coverCancelBtn._wired) {
+    coverCancelBtn._wired = true;
+    coverCancelBtn.onclick = (e) => { e.stopPropagation(); revertCoverPreview(); };
+  }
 })();
 // থ্রি-ডট মেনু টগল ও অ্যাকশন
 const directMenuToggle = document.getElementById("directMenuToggle");
