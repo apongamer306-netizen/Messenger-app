@@ -1363,8 +1363,6 @@ profileModalOverlay.innerHTML = `
         <button class="profile-tab active" data-tab="posts">Posts</button>
         <button class="profile-tab" data-tab="about">About</button>
         <button class="profile-tab" data-tab="photos">Photos</button>
-        <button class="profile-tab" data-tab="videos">Videos</button>
-        <button class="profile-tab" data-tab="audio">Audio</button>
       </div>
 
       <div id="pmTabPosts" class="profile-tab-panel">
@@ -1376,7 +1374,6 @@ profileModalOverlay.innerHTML = `
           <div id="pmComposerPreview" class="post-composer-preview" style="display:none;"></div>
           <div class="post-composer-actions">
             <button class="post-composer-btn" id="pmAddPhotoBtn"><i class="fa-solid fa-image" style="color:#45bd62;"></i> Photo</button>
-            <button class="post-composer-btn" id="pmAddVideoBtn"><i class="fa-solid fa-video" style="color:#f3425f;"></i> Video</button>
             <button class="btn btn-primary post-submit-btn" id="pmSubmitPostBtn">Post</button>
           </div>
         </div>
@@ -1413,7 +1410,7 @@ postMediaInput.type = "file";
 postMediaInput.style.display = "none";
 document.body.appendChild(postMediaInput);
 
-let profileViewState = { phone: null, isMe: false, data: {}, tab: "posts" };
+let profileViewState = { phone: null, isMe: false, data: {}, tab: "posts", aboutEditing: false, aboutDirty: false };
 let pendingPostMedia = null; // { type, src, name } — পোস্ট করার আগে সিলেক্ট করা ছবি/ভিডিও
 
 function detailRow(icon, label, value) {
@@ -1624,40 +1621,26 @@ document.getElementById("pmAddPhotoBtn").onclick = () => {
   postMediaInput.dataset.kind = "image";
   postMediaInput.click();
 };
-document.getElementById("pmAddVideoBtn").onclick = () => {
-  postMediaInput.accept = "video/*";
-  postMediaInput.dataset.kind = "video";
-  postMediaInput.click();
-};
-
 postMediaInput.onchange = async () => {
   const file = postMediaInput.files[0];
-  const kind = postMediaInput.dataset.kind;
   postMediaInput.value = "";
   if (!file || !currentUser) return;
-
+  if (!file.type || !file.type.startsWith("image/")) {
+    await showCustomAlert("Photos only", "পোস্টে শুধু ছবি যোগ করা যাবে।");
+    return;
+  }
   let src;
   try {
-    if (kind === "image") {
-      const compressed = await compressImageFile(file);
-      src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-    } else {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        await showCustomAlert("File Too Large", "ভিডিওটি অনেক বড় (১৮MB এর বেশি)।");
-        return;
-      }
-      src = await readFileAsDataUrl(file);
-    }
+    const compressed = await compressImageFile(file);
+    src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
   } catch (e) {
     await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
     return;
   }
-
-  pendingPostMedia = { type: kind === "video" ? "video" : "image", src, name: file.name };
+  pendingPostMedia = { type: "image", src, name: file.name };
   pmComposerPreview.style.display = "block";
-  pmComposerPreview.innerHTML = kind === "video"
-    ? `<video src="${src}#t=0.1" muted></video><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`
-    : `<img src="${src}" alt=""><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`;
+  pmComposerPreview.innerHTML =
+    `<img src="${src}" alt=""><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`;
   document.getElementById("pmRemoveMedia").onclick = () => {
     pendingPostMedia = null;
     pmComposerPreview.style.display = "none";
@@ -1685,7 +1668,7 @@ document.getElementById("pmSubmitPostBtn").onclick = () => {
       pmComposerPreview.innerHTML = "";
       renderPostsFeed();
     } else {
-      showCustomAlert("Error", "পোস্ট করা যায়নি, আবার চেষ্টা করুন।");
+      showCustomAlert("Error", (res && res.message) || "পোস্ট করা যায়নি, আবার চেষ্টা করুন।");
     }
   });
 };
@@ -1706,18 +1689,90 @@ socket.on("post-updated", ({ phone, postId, likes, comments }) => {
 function renderProfileAbout() {
   const d = profileViewState.data || {};
   const box = document.getElementById("pmTabAbout");
+  if (!box) return;
 
   if (profileViewState.isMe) {
-    // নিজের প্রোফাইল — সরাসরি এডিট করা যাবে
-    box.innerHTML = `
-      <input class="profile-edit-field" id="pfBio" placeholder="Bio / স্ট্যাটাস" value="${escapeHtml(d.bio || "")}">
-      <input class="profile-edit-field" id="pfLocation" placeholder="কোথায় থাকেন" value="${escapeHtml(d.location || "")}">
-      <input class="profile-edit-field" id="pfWork" placeholder="কাজ / পেশা" value="${escapeHtml(d.work || "")}">
-      <input class="profile-edit-field" id="pfEducation" placeholder="পড়াশোনা" value="${escapeHtml(d.education || "")}">
-      <textarea class="profile-edit-field" id="pfAbout" placeholder="নিজের সম্পর্কে কিছু লিখুন...">${escapeHtml(d.about || "")}</textarea>
-      <button id="pfSaveBtn" class="btn btn-primary" style="margin-top:4px;"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
-    `;
-    document.getElementById("pfSaveBtn").onclick = saveMyProfile;
+    const editing = !!profileViewState.aboutEditing;
+    if (!editing) {
+      // View mode — only details + Edit (no Save / Close)
+      const html =
+        detailRow("fa-solid fa-quote-left", "Bio", d.bio) +
+        detailRow("fa-solid fa-location-dot", "Lives in", d.location) +
+        detailRow("fa-solid fa-briefcase", "Work", d.work) +
+        detailRow("fa-solid fa-graduation-cap", "Education", d.education) +
+        detailRow("fa-solid fa-circle-info", "About", d.about);
+      box.innerHTML =
+        (html || `<div class="profile-empty">এখনো About খালি। Edit দিয়ে যোগ করুন।</div>`) +
+        `<div class="profile-about-actions">
+           <button type="button" id="pfEditBtn" class="btn btn-primary">
+             <i class="fa-solid fa-pen"></i> Edit
+           </button>
+         </div>`;
+      const editBtn = document.getElementById("pfEditBtn");
+      if (editBtn) {
+        editBtn.onclick = function () {
+          profileViewState.aboutEditing = true;
+          profileViewState.aboutDirty = false;
+          renderProfileAbout();
+        };
+      }
+    } else {
+      // Edit mode — fields; Save/Close only after a change
+      box.innerHTML = `
+        <input class="profile-edit-field" id="pfBio" placeholder="Bio / স্ট্যাটাস" value="${escapeHtml(d.bio || "")}">
+        <input class="profile-edit-field" id="pfLocation" placeholder="কোথায় থাকেন" value="${escapeHtml(d.location || "")}">
+        <input class="profile-edit-field" id="pfWork" placeholder="কাজ / পেশা" value="${escapeHtml(d.work || "")}">
+        <input class="profile-edit-field" id="pfEducation" placeholder="পড়াশোনা" value="${escapeHtml(d.education || "")}">
+        <textarea class="profile-edit-field" id="pfAbout" placeholder="নিজের সম্পর্কে কিছু লিখুন...">${escapeHtml(d.about || "")}</textarea>
+        <div class="profile-about-actions" id="pfEditActions" style="display:none;">
+          <button type="button" id="pfSaveBtn" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+          <button type="button" id="pfCancelBtn" class="btn btn-secondary">Close</button>
+        </div>`;
+      const snap = {
+        bio: d.bio || "",
+        location: d.location || "",
+        work: d.work || "",
+        education: d.education || "",
+        about: d.about || ""
+      };
+      function currentVals() {
+        return {
+          bio: (document.getElementById("pfBio") || {}).value || "",
+          location: (document.getElementById("pfLocation") || {}).value || "",
+          work: (document.getElementById("pfWork") || {}).value || "",
+          education: (document.getElementById("pfEducation") || {}).value || "",
+          about: (document.getElementById("pfAbout") || {}).value || ""
+        };
+      }
+      function isDirty() {
+        const v = currentVals();
+        return v.bio !== snap.bio || v.location !== snap.location || v.work !== snap.work ||
+          v.education !== snap.education || v.about !== snap.about;
+      }
+      function syncActions() {
+        const dirty = isDirty();
+        profileViewState.aboutDirty = dirty;
+        const actions = document.getElementById("pfEditActions");
+        if (actions) actions.style.display = dirty ? "flex" : "none";
+      }
+      ["pfBio", "pfLocation", "pfWork", "pfEducation", "pfAbout"].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", syncActions);
+        el.addEventListener("change", syncActions);
+      });
+      const saveBtn = document.getElementById("pfSaveBtn");
+      if (saveBtn) saveBtn.onclick = saveMyProfile;
+      const cancelBtn = document.getElementById("pfCancelBtn");
+      if (cancelBtn) {
+        cancelBtn.onclick = function () {
+          profileViewState.aboutEditing = false;
+          profileViewState.aboutDirty = false;
+          renderProfileAbout();
+        };
+      }
+      syncActions();
+    }
   } else {
     const html =
       detailRow("fa-solid fa-phone", "Phone", d.phone) +
@@ -1773,6 +1828,10 @@ function renderProfileGallery(kind) {
 }
 
 function switchProfileTab(tab) {
+  if (tab !== "about") {
+    profileViewState.aboutEditing = false;
+    profileViewState.aboutDirty = false;
+  }
   profileViewState.tab = tab;
   document.querySelectorAll(".profile-tab").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === tab);
@@ -1808,14 +1867,13 @@ function switchProfileTab(tab) {
   aboutBox.style.display = "none";
   mediaBox.style.display = "block";
 
-  const kind = tab === "photos" ? "photo" : tab === "videos" ? "video" : "audio";
+  // শুধু Photos
+  const kind = "photo";
   uploadRow.style.display = profileViewState.isMe ? "flex" : "none";
-  document.getElementById("pmUploadLabel").textContent =
-    kind === "photo" ? "Add Photo" : kind === "video" ? "Add Video" : "Add Audio";
-  profileFileInput.accept = kind === "photo" ? "image/*" : kind === "video" ? "video/*" : "audio/*";
-  profileFileInput.dataset.kind = kind;
-
-  renderProfileGallery(kind);
+  document.getElementById("pmUploadLabel").textContent = "Add Photo";
+  profileFileInput.accept = "image/*";
+  profileFileInput.dataset.kind = "photo";
+  renderProfileGallery("photo");
 }
 
 document.querySelectorAll(".profile-tab").forEach((btn) => {
@@ -1827,22 +1885,17 @@ document.getElementById("pmUploadBtn").onclick = () => profileFileInput.click();
 
 profileFileInput.onchange = async () => {
   const file = profileFileInput.files[0];
-  const kind = profileFileInput.dataset.kind;
   profileFileInput.value = "";
   if (!file || !currentUser) return;
+  if (!file.type || !file.type.startsWith("image/")) {
+    await showCustomAlert("Photos only", "শুধু ছবি আপলোড করা যাবে।");
+    return;
+  }
 
   let src = null;
   try {
-    if (kind === "photo") {
-      const compressed = await compressImageFile(file);
-      src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-    } else {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        await showCustomAlert("File Too Large", "ফাইলটি অনেক বড় (১৮MB এর বেশি)। ছোট ফাইল দিন।");
-        return;
-      }
-      src = await readFileAsDataUrl(file);
-    }
+    const compressed = await compressImageFile(file);
+    src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
   } catch (e) {
     await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
     return;
@@ -1850,45 +1903,61 @@ profileFileInput.onchange = async () => {
 
   const item = {
     id: "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-    kind: kind,
+    kind: "photo",
     src: src,
     name: file.name,
     timestamp: Date.now()
   };
 
+  if (typeof showMiniToast === "function") showMiniToast("Uploading…");
+
   socket.emit("add-profile-item", { phone: currentUser.phone, item }, (res) => {
     if (res && res.success) {
       profileViewState.data.items = res.items;
       try {
-        // ফ্রি পারসিস্টেন্স: এই ডিভাইসে গ্যালারির ছোট কপি রাখা (রিস্টার্টের পর সিঙ্ক হবে)
-        const slim = (res.items || []).slice(0, 6).map((it) => ({
-          id: it.id, type: it.type, src: it.src, name: it.name, timestamp: it.timestamp
-        })).filter((it) => it.src && String(it.src).length < 350000);
+        // ImgBB URL ছোট — অনেক লিংক রাখা যায়
+        const slim = (res.items || [])
+          .filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:"))
+          .slice(0, 40)
+          .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, timestamp: it.timestamp }));
         localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
       } catch (e) {}
-      renderProfileGallery(kind);
+      renderProfileGallery("photo");
+      if (typeof showMiniToast === "function") showMiniToast("Photo uploaded");
     } else {
-      showCustomAlert("Error", "আপলোড করা যায়নি, আবার চেষ্টা করুন।");
+      const msg =
+        res && res.error === "imgbb_key_missing"
+          ? "সার্ভারে IMGBB_API_KEY সেট করা নেই।"
+          : res && res.message
+            ? res.message
+            : "আপলোড ব্যর্থ, আবার চেষ্টা করুন।";
+      showCustomAlert("Upload failed", msg);
     }
   });
 };
 
 // ---------- সেভ ----------
 function saveMyProfile() {
+  if (!currentUser) return;
+  const bioEl = document.getElementById("pfBio");
+  if (!bioEl) return;
   const profile = {
-    bio: document.getElementById("pfBio").value.trim(),
+    bio: bioEl.value.trim(),
     location: document.getElementById("pfLocation").value.trim(),
     work: document.getElementById("pfWork").value.trim(),
     education: document.getElementById("pfEducation").value.trim(),
     about: document.getElementById("pfAbout").value.trim()
   };
-  socket.emit("save-profile", { phone: currentUser.phone, profile }, (res) => {
+  socket.emit("save-profile", { phone: currentUser.phone, profile }, async (res) => {
     if (res && res.success) {
       profileViewState.data = { ...profileViewState.data, ...res.profile };
-      document.getElementById("pmSub").textContent = profile.bio || "EKT Chatter";
+      const sub = document.getElementById("pmSub");
+      if (sub) sub.textContent = profile.bio || "EKT Chatter";
       try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
-      // পপআপ প্রোফাইলের উপরে দেখাবে
-      showCustomAlert("Saved ✓", "আপনার প্রোফাইল সফলভাবে সেভ হয়েছে।");
+      await showCustomAlert("Saved ✓", "আপনার প্রোফাইল সফলভাবে সেভ হয়েছে।");
+      profileViewState.aboutEditing = false;
+      profileViewState.aboutDirty = false;
+      if (profileViewState.tab === "about") renderProfileAbout();
       if (typeof showMiniToast === "function") showMiniToast("Profile saved");
     } else {
       showCustomAlert("Error", "সেভ করা যায়নি, আবার চেষ্টা করুন।");
@@ -2672,18 +2741,44 @@ if (editNameBtn) {
   });
 }
 
-avatarUpload.addEventListener("change", (e) => {
+avatarUpload.addEventListener("change", async (e) => {
   const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      currentUser.pic = evt.target.result;
-      dashboardAvatar.src = currentUser.pic;
-      localStorage.setItem("appUser", JSON.stringify(currentUser));
-      saveUserToStorage(currentUser);
-    };
-    reader.readAsDataURL(file);
+  e.target.value = "";
+  if (!file || !currentUser) return;
+  if (!file.type || !file.type.startsWith("image/")) {
+    await showCustomAlert("Photos only", "প্রোফাইল পিকচারে শুধু ছবি দিন।");
+    return;
   }
+  let dataUrl = null;
+  try {
+    const compressed = await compressImageFile(file);
+    dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+  } catch (err) {
+    await showCustomAlert("Error", "ছবি পড়া যায়নি।");
+    return;
+  }
+  // আগে লোকালে দেখাও
+  if (dashboardAvatar) dashboardAvatar.src = dataUrl;
+  if (typeof showMiniToast === "function") showMiniToast("Uploading avatar…");
+
+  socket.emit("update-avatar", { phone: currentUser.phone, dataUrl, name: file.name }, (res) => {
+    if (res && res.success && res.pic) {
+      currentUser.pic = res.pic;
+      if (dashboardAvatar) dashboardAvatar.src = res.pic;
+      try {
+        localStorage.setItem("appUser", JSON.stringify(currentUser));
+        saveUserToStorage(currentUser);
+      } catch (e) {}
+      const pmAv = document.getElementById("pmAvatar");
+      if (pmAv) pmAv.src = res.pic;
+      if (typeof showMiniToast === "function") showMiniToast("Profile photo updated");
+    } else {
+      showCustomAlert(
+        "Upload failed",
+        (res && res.message) || "প্রোফাইল পিকচার আপলোড হয়নি। IMGBB_API_KEY চেক করুন।"
+      );
+    }
+  });
 });
 
 createRoomBtn.addEventListener("click", () => {
