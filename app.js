@@ -189,13 +189,9 @@ const dashboardAvatar = document.getElementById("dashboardAvatar");
 const dashboardUserName = document.getElementById("dashboardUserName");
 const avatarUpload = document.getElementById("avatarUpload");
 
+// Dashboard: no name-edit button (edit only inside profile)
 let editNameBtn = document.getElementById("editNameBtn");
-if (!editNameBtn && dashboardUserName) {
-  editNameBtn = document.createElement("i");
-  editNameBtn.id = "editNameBtn";
-  editNameBtn.className = "fa-solid fa-pen-to-square edit-name-btn";
-  dashboardUserName.parentNode.appendChild(editNameBtn);
-}
+if (editNameBtn && editNameBtn.parentNode) { try { editNameBtn.remove(); } catch (e) {} editNameBtn = null; }
 
 const createRoomBtn = document.getElementById("createRoomBtn");
 const joinRoomBtn = document.getElementById("joinRoomBtn");
@@ -735,12 +731,70 @@ function showCustomAlert(title, subtitle) {
   modalInputGroup.style.display = "none";
   modalActionContainer.innerHTML = `<button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%;">Confirm</button>`;
   const confBtn = document.getElementById("modalConfirmBtn");
-  // প্রোফাইল মডালের উপরে দেখানোর জন্য
   customModalOverlay.style.zIndex = "400000";
   customModalOverlay.style.display = "flex";
   return new Promise((resolve) => {
     confBtn.onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
   });
+}
+
+function showUploadLockout(kind) {
+  const label = (kind === "picture" || kind === "avatar" || kind === "photo" || kind === "cover")
+    ? "your picture" : (kind === "post" ? "your post" : "your data");
+  modalTitle.textContent = "Uploading…";
+  modalSubtitle.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;justify-content:center;"><i class="fa-solid fa-spinner fa-spin" style="font-style:normal;"></i>Uploading ' + label + ', please wait</span>';
+  modalInputGroup.style.display = "none";
+  modalActionContainer.innerHTML = "";
+  customModalOverlay.style.zIndex = "400000";
+  customModalOverlay.style.display = "flex";
+}
+
+function showUploadResult(success, kind) {
+  if (success) {
+    modalTitle.textContent = "Uploaded";
+    modalSubtitle.textContent = kind === "post" ? "Your post has been uploaded successfully."
+      : kind === "cover" ? "Your cover photo has been uploaded successfully."
+      : "Your picture has been uploaded successfully.";
+  } else {
+    modalTitle.textContent = "Upload failed";
+    modalSubtitle.textContent = "Could not upload. Please try again.";
+  }
+  modalInputGroup.style.display = "none";
+  modalActionContainer.innerHTML = '<button id="modalConfirmBtn" class="btn btn-primary" style="width:100%;">Confirm</button>';
+  customModalOverlay.style.zIndex = "400000";
+  customModalOverlay.style.display = "flex";
+  return new Promise((resolve) => {
+    document.getElementById("modalConfirmBtn").onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
+  });
+}
+
+function runUploadWithLockout(kind, emitFn) {
+  showUploadLockout(kind);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = async (ok, payload) => {
+      if (settled) return;
+      settled = true;
+      await showUploadResult(!!ok, kind);
+      resolve({ ok: !!ok, payload });
+    };
+    try { emitFn((res) => finish(res && res.success, res)); }
+    catch (e) { finish(false, null); }
+    setTimeout(() => { if (!settled) finish(false, null); }, 45000);
+  });
+}
+
+function applyPmCover(coverUrl) {
+  const coverEl = document.getElementById("pmCover");
+  const img = document.getElementById("pmCoverImg");
+  if (!coverEl) return;
+  if (coverUrl) {
+    if (img) { img.src = coverUrl; img.style.display = "block"; }
+    coverEl.classList.add("has-cover");
+  } else {
+    if (img) { img.removeAttribute("src"); img.style.display = "none"; }
+    coverEl.classList.remove("has-cover");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => { checkActiveSession(); });
@@ -1352,12 +1406,26 @@ profileModalOverlay.id = "profileModalOverlay";
 profileModalOverlay.className = "profile-modal-overlay";
 profileModalOverlay.innerHTML = `
   <div class="profile-modal">
-    <div class="profile-modal-cover">
-      <img id="pmAvatar" class="profile-modal-avatar" src="https://via.placeholder.com/100" alt="">
+    <div class="profile-modal-cover" id="pmCover">
+      <img id="pmCoverImg" class="profile-cover-img" alt="" style="display:none;">
+      <button type="button" id="pmEditCoverBtn" class="pm-cover-edit-btn" style="display:none;" title="Change cover">
+        <i class="fa-solid fa-camera"></i>
+      </button>
+      <div class="pm-avatar-wrap">
+        <img id="pmAvatar" class="profile-modal-avatar" src="https://via.placeholder.com/100" alt="">
+        <button type="button" id="pmEditAvatarBtn" class="pm-avatar-edit-btn" style="display:none;" title="Change photo">
+          <i class="fa-solid fa-camera"></i>
+        </button>
+      </div>
     </div>
     <div class="profile-modal-body">
-      <div id="pmName" class="profile-modal-name">Friend</div>
-      <div id="pmSub" class="profile-modal-sub">Friend on EKT Chatter</div>
+      <div class="pm-name-row">
+        <div id="pmName" class="profile-modal-name">Friend</div>
+        <button type="button" id="pmEditNameBtn" class="pm-edit-name-btn" style="display:none;" title="Change name">
+          <i class="fa-solid fa-pen"></i>
+        </button>
+      </div>
+      <div id="pmSub" class="profile-modal-sub pm-bio-box">Friend on EKT Chatter</div>
 
       <div class="profile-tabs">
         <button class="profile-tab active" data-tab="posts">Posts</button>
@@ -1403,6 +1471,18 @@ const profileFileInput = document.createElement("input");
 profileFileInput.type = "file";
 profileFileInput.style.display = "none";
 document.body.appendChild(profileFileInput);
+
+const pmAvatarFileInput = document.createElement("input");
+pmAvatarFileInput.type = "file";
+pmAvatarFileInput.accept = "image/*";
+pmAvatarFileInput.style.display = "none";
+document.body.appendChild(pmAvatarFileInput);
+
+const pmCoverFileInput = document.createElement("input");
+pmCoverFileInput.type = "file";
+pmCoverFileInput.accept = "image/*";
+pmCoverFileInput.style.display = "none";
+document.body.appendChild(pmCoverFileInput);
 
 // পোস্ট কম্পোজারের ছবি/ভিডিও ইনপুট
 const postMediaInput = document.createElement("input");
@@ -1648,29 +1728,24 @@ postMediaInput.onchange = async () => {
   };
 };
 
-document.getElementById("pmSubmitPostBtn").onclick = () => {
+document.getElementById("pmSubmitPostBtn").onclick = async () => {
   const text = pmComposerText.value.trim();
   if (!text && !pendingPostMedia) return;
   if (!currentUser) return;
-
-  socket.emit("create-post", {
-    phone: currentUser.phone,
-    text,
-    media: pendingPostMedia
-  }, (res) => {
-    if (res && res.success) {
-      profileViewState.data.posts = profileViewState.data.posts || [];
-      profileViewState.data.posts.unshift(res.post);
-      pmComposerText.value = "";
-      pmComposerText.style.height = "auto";
-      pendingPostMedia = null;
-      pmComposerPreview.style.display = "none";
-      pmComposerPreview.innerHTML = "";
-      renderPostsFeed();
-    } else {
-      showCustomAlert("Error", (res && res.message) || "পোস্ট করা যায়নি, আবার চেষ্টা করুন।");
-    }
+  const mediaSnapshot = pendingPostMedia;
+  const { ok, payload: res } = await runUploadWithLockout("post", (done) => {
+    socket.emit("create-post", { phone: currentUser.phone, text, media: mediaSnapshot }, done);
   });
+  if (ok && res && res.post) {
+    profileViewState.data.posts = profileViewState.data.posts || [];
+    profileViewState.data.posts.unshift(res.post);
+    pmComposerText.value = "";
+    pmComposerText.style.height = "auto";
+    pendingPostMedia = null;
+    pmComposerPreview.style.display = "none";
+    pmComposerPreview.innerHTML = "";
+    renderPostsFeed();
+  }
 };
 
 // অন্য কেউ লাইক/কমেন্ট করলে প্রোফাইল খোলা থাকলে সাথে সাথে আপডেট হবে
@@ -1909,31 +1984,20 @@ profileFileInput.onchange = async () => {
     timestamp: Date.now()
   };
 
-  if (typeof showMiniToast === "function") showMiniToast("Uploading…");
-
-  socket.emit("add-profile-item", { phone: currentUser.phone, item }, (res) => {
-    if (res && res.success) {
-      profileViewState.data.items = res.items;
-      try {
-        // ImgBB URL ছোট — অনেক লিংক রাখা যায়
-        const slim = (res.items || [])
-          .filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:"))
-          .slice(0, 40)
-          .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, timestamp: it.timestamp }));
-        localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
-      } catch (e) {}
-      renderProfileGallery("photo");
-      if (typeof showMiniToast === "function") showMiniToast("Photo uploaded");
-    } else {
-      const msg =
-        res && res.error === "imgbb_key_missing"
-          ? "সার্ভারে IMGBB_API_KEY সেট করা নেই।"
-          : res && res.message
-            ? res.message
-            : "আপলোড ব্যর্থ, আবার চেষ্টা করুন।";
-      showCustomAlert("Upload failed", msg);
-    }
+  const { ok, payload: res } = await runUploadWithLockout("picture", (done) => {
+    socket.emit("add-profile-item", { phone: currentUser.phone, item }, done);
   });
+  if (ok && res) {
+    profileViewState.data.items = res.items;
+    try {
+      const slim = (res.items || [])
+        .filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:"))
+        .slice(0, 40)
+        .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, timestamp: it.timestamp }));
+      localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
+    } catch (e) {}
+    renderProfileGallery("photo");
+  }
 };
 
 // ---------- সেভ ----------
@@ -1952,7 +2016,11 @@ function saveMyProfile() {
     if (res && res.success) {
       profileViewState.data = { ...profileViewState.data, ...res.profile };
       const sub = document.getElementById("pmSub");
-      if (sub) sub.textContent = profile.bio || "EKT Chatter";
+      if (sub) {
+        const bioText = (profile.bio || "").trim();
+        if (bioText) { sub.textContent = bioText; sub.classList.add("has-bio"); }
+        else { sub.textContent = "About ট্যাব থেকে bio যোগ করুন"; sub.classList.remove("has-bio"); }
+      }
       try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
       await showCustomAlert("Saved ✓", "আপনার প্রোফাইল সফলভাবে সেভ হয়েছে।");
       profileViewState.aboutEditing = false;
@@ -2029,7 +2097,14 @@ function openProfile(phone, fallback) {
   document.getElementById("pmMessageBtn").style.display = isMe ? "none" : "inline-flex";
   updateProfileFriendButton(isMe ? "self" : "none");
 
-  // কম্পোজার রিসেট
+  const editCover = document.getElementById("pmEditCoverBtn");
+  const editAv = document.getElementById("pmEditAvatarBtn");
+  const editName = document.getElementById("pmEditNameBtn");
+  if (editCover) editCover.style.display = isMe ? "flex" : "none";
+  if (editAv) editAv.style.display = isMe ? "flex" : "none";
+  if (editName) editName.style.display = isMe ? "inline-flex" : "none";
+  applyPmCover((fallback && fallback.cover) || null);
+
   pendingPostMedia = null;
   pmComposerText.value = "";
   pmComposerText.style.height = "auto";
@@ -2045,7 +2120,16 @@ function openProfile(phone, fallback) {
     profileViewState.data = data;
     document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
     document.getElementById("pmName").textContent = data.name || "Profile";
-    document.getElementById("pmSub").textContent = data.bio || (isMe ? "আপনার প্রোফাইল" : "EKT Chatter");
+    const subEl = document.getElementById("pmSub");
+    const bioText = (data.bio || "").trim();
+    if (bioText) {
+      subEl.textContent = bioText;
+      subEl.classList.add("has-bio");
+    } else {
+      subEl.textContent = isMe ? "About ট্যাব থেকে bio যোগ করুন" : "EKT Chatter";
+      subEl.classList.remove("has-bio");
+    }
+    applyPmCover(data.cover || null);
     updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
     switchProfileTab(profileViewState.tab);
   });
@@ -2120,13 +2204,90 @@ if (openFriendProfileBtn) {
   openFriendProfileBtn.onclick = () => openFriendProfile(activeDirectChatFriend);
 }
 
-// ড্যাশবোর্ডের নিজের ছবিতে ক্লিক করলে নিজের প্রোফাইল খুলবে
+// ড্যাশবোর্ড: শুধু প্রোফাইল খোলা (এডিট নয়)
 if (dashboardAvatar) {
   dashboardAvatar.style.cursor = "pointer";
   dashboardAvatar.addEventListener("click", () => {
     if (currentUser) openProfile(currentUser.phone, currentUser);
   });
 }
+if (dashboardUserName) {
+  dashboardUserName.style.cursor = "pointer";
+  dashboardUserName.addEventListener("click", () => {
+    if (currentUser) openProfile(currentUser.phone, currentUser);
+  });
+}
+
+// প্রোফাইল মোডাল: ছবি / কভার / নাম
+(function wireProfileEdits() {
+  const avBtn = document.getElementById("pmEditAvatarBtn");
+  const coverBtn = document.getElementById("pmEditCoverBtn");
+  const nameBtn = document.getElementById("pmEditNameBtn");
+  if (avBtn) avBtn.onclick = (e) => { e.stopPropagation(); if (profileViewState.isMe) pmAvatarFileInput.click(); };
+  if (coverBtn) coverBtn.onclick = (e) => { e.stopPropagation(); if (profileViewState.isMe) pmCoverFileInput.click(); };
+  if (nameBtn) nameBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (!profileViewState.isMe || !currentUser) return;
+    const newName = await showCustomModal({ title: "Change Name", subtitle: "নতুন নাম লিখুন:", hasInput: true, placeholder: currentUser.name || "" });
+    if (!newName || !newName.trim()) return;
+    const clean = newName.trim().slice(0, 40);
+    socket.emit("update-display-name", { phone: currentUser.phone, name: clean }, (res) => {
+      if (res && res.success) {
+        currentUser.name = res.name || clean;
+        try { localStorage.setItem("appUser", JSON.stringify(currentUser)); saveUserToStorage(currentUser); } catch (err) {}
+        if (dashboardUserName) dashboardUserName.textContent = currentUser.name;
+        const nm = document.getElementById("pmName");
+        if (nm) nm.textContent = currentUser.name;
+        if (profileViewState.data) profileViewState.data.name = currentUser.name;
+        if (typeof showMiniToast === "function") showMiniToast("Name updated");
+      } else showCustomAlert("Error", "নাম পরিবর্তন করা যায়নি।");
+    });
+  };
+
+  pmAvatarFileInput.onchange = async () => {
+    const file = pmAvatarFileInput.files[0];
+    pmAvatarFileInput.value = "";
+    if (!file || !currentUser || !profileViewState.isMe) return;
+    if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
+    let dataUrl;
+    try {
+      const compressed = await compressImageFile(file);
+      dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+    } catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
+    const { ok, payload: res } = await runUploadWithLockout("picture", (done) => {
+      socket.emit("update-avatar", { phone: currentUser.phone, dataUrl, name: file.name }, done);
+    });
+    if (ok && res && res.pic) {
+      currentUser.pic = res.pic;
+      if (dashboardAvatar) dashboardAvatar.src = res.pic;
+      const pmAv = document.getElementById("pmAvatar");
+      if (pmAv) pmAv.src = res.pic;
+      const compAv = document.getElementById("pmComposerAvatar");
+      if (compAv) compAv.src = res.pic;
+      try { localStorage.setItem("appUser", JSON.stringify(currentUser)); saveUserToStorage(currentUser); } catch (e) {}
+      if (profileViewState.data) profileViewState.data.pic = res.pic;
+    }
+  };
+
+  pmCoverFileInput.onchange = async () => {
+    const file = pmCoverFileInput.files[0];
+    pmCoverFileInput.value = "";
+    if (!file || !currentUser || !profileViewState.isMe) return;
+    if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
+    let dataUrl;
+    try {
+      const compressed = await compressImageFile(file);
+      dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+    } catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
+    const { ok, payload: res } = await runUploadWithLockout("cover", (done) => {
+      socket.emit("update-cover", { phone: currentUser.phone, dataUrl, name: file.name }, done);
+    });
+    if (ok && res && res.cover) {
+      applyPmCover(res.cover);
+      if (profileViewState.data) profileViewState.data.cover = res.cover;
+    }
+  };
+})();
 // থ্রি-ডট মেনু টগল ও অ্যাকশন
 const directMenuToggle = document.getElementById("directMenuToggle");
 const directDropdownMenu = document.getElementById("directDropdownMenu");
@@ -2728,58 +2889,8 @@ socket.on("room-members-update", (members) => {
   }
 });
 
-if (editNameBtn) {
-  editNameBtn.addEventListener("click", async () => {
-    const newName = await showCustomModal({ title: "Change Username", subtitle: "নতুন ইউজারনেম লিখুন:", hasInput: true, placeholder: currentUser.name });
-    if (newName && newName.trim() !== "") {
-      currentUser.name = newName.trim();
-      localStorage.setItem("appUser", JSON.stringify(currentUser));
-      saveUserToStorage(currentUser);
-      dashboardUserName.textContent = currentUser.name;
-      await showCustomAlert("Success", "ইউজারনেম পরিবর্তন করা হয়েছে!");
-    }
-  });
-}
+// Dashboard no longer edits name/photo — only inside profile modal
 
-avatarUpload.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  e.target.value = "";
-  if (!file || !currentUser) return;
-  if (!file.type || !file.type.startsWith("image/")) {
-    await showCustomAlert("Photos only", "প্রোফাইল পিকচারে শুধু ছবি দিন।");
-    return;
-  }
-  let dataUrl = null;
-  try {
-    const compressed = await compressImageFile(file);
-    dataUrl = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-  } catch (err) {
-    await showCustomAlert("Error", "ছবি পড়া যায়নি।");
-    return;
-  }
-  // আগে লোকালে দেখাও
-  if (dashboardAvatar) dashboardAvatar.src = dataUrl;
-  if (typeof showMiniToast === "function") showMiniToast("Uploading avatar…");
-
-  socket.emit("update-avatar", { phone: currentUser.phone, dataUrl, name: file.name }, (res) => {
-    if (res && res.success && res.pic) {
-      currentUser.pic = res.pic;
-      if (dashboardAvatar) dashboardAvatar.src = res.pic;
-      try {
-        localStorage.setItem("appUser", JSON.stringify(currentUser));
-        saveUserToStorage(currentUser);
-      } catch (e) {}
-      const pmAv = document.getElementById("pmAvatar");
-      if (pmAv) pmAv.src = res.pic;
-      if (typeof showMiniToast === "function") showMiniToast("Profile photo updated");
-    } else {
-      showCustomAlert(
-        "Upload failed",
-        (res && res.message) || "প্রোফাইল পিকচার আপলোড হয়নি। IMGBB_API_KEY চেক করুন।"
-      );
-    }
-  });
-});
 
 createRoomBtn.addEventListener("click", () => {
   const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
