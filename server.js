@@ -5,6 +5,42 @@ const fs = require("fs");
 const { Server } = require("socket.io");
 const path = require("path");
 
+
+// ---------- ImgBB: free image host (set IMGBB_API_KEY env on Render) ----------
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "f6d6bad865ef561536b22bc71e1c2c50";
+async function uploadToImgbb(dataUrlOrBase64, name) {
+  if (!IMGBB_API_KEY) return null;
+  try {
+    let b64 = String(dataUrlOrBase64 || "");
+    if (b64.startsWith("data:")) {
+      const i = b64.indexOf(",");
+      if (i >= 0) b64 = b64.slice(i + 1);
+    }
+    if (!b64 || b64.length < 32) return null;
+    const body = new URLSearchParams();
+    body.set("key", IMGBB_API_KEY);
+    body.set("image", b64);
+    if (name) body.set("name", String(name).slice(0, 80));
+    const res = await fetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    const json = await res.json();
+    if (json && json.success && json.data) {
+      return json.data.display_url || json.data.url || null;
+    }
+    console.warn("ImgBB upload failed:", json && json.error);
+    return null;
+  } catch (e) {
+    console.warn("ImgBB error:", e.message);
+    return null;
+  }
+}
+if (IMGBB_API_KEY) console.log("ImgBB API key loaded — photos will upload to imgbb.com");
+else console.warn("⚠️ IMGBB_API_KEY not set — photos stay as base64 (fills disk). Get free key: https://api.imgbb.com/");
+
+
 const app = express();
 const server = http.createServer(app);
 
@@ -665,6 +701,34 @@ io.on("connection", (socket) => {
     callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
   });
 
+  // প্রোফাইল পিকচার → ImgBB URL (সব ডিভাইসে একই)
+  socket.on("update-avatar", async ({ phone, dataUrl, name }, callback) => {
+    if (!phone || !dataUrl) {
+      if (typeof callback === "function") callback({ success: false, error: "missing" });
+      return;
+    }
+    let url = null;
+    if (String(dataUrl).startsWith("data:")) {
+      url = await uploadToImgbb(dataUrl, name || "avatar");
+    } else if (String(dataUrl).startsWith("http")) {
+      url = dataUrl;
+    }
+    if (!url) {
+      if (typeof callback === "function") {
+        callback({
+          success: false,
+          error: IMGBB_API_KEY ? "imgbb_failed" : "imgbb_key_missing",
+          message: IMGBB_API_KEY ? "ImgBB আপলোড ব্যর্থ" : "IMGBB_API_KEY সেট করা নেই",
+        });
+      }
+      return;
+    }
+    if (!users[phone]) users[phone] = { phone };
+    users[phone].pic = url;
+    saveData();
+    if (typeof callback === "function") callback({ success: true, pic: url });
+  });
+
   socket.on("save-profile", ({ phone, profile }, callback) => {
     if (!phone) {
       if (typeof callback === "function") callback({ success: false });
@@ -676,20 +740,44 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback({ success: true, profile: profiles[phone] });
   });
 
-  // প্রোফাইলে নতুন ছবি/ভিডিও/অডিও যোগ করা
-  socket.on("add-profile-item", ({ phone, item }, callback) => {
+  // প্রোফাইলে শুধু ছবি (ImgBB → URL, সার্ভারে base64 রাখা হয় না)
+  socket.on("add-profile-item", async ({ phone, item }, callback) => {
     if (!phone || !item) {
-      if (typeof callback === "function") callback({ success: false });
+      if (typeof callback === "function") callback({ success: false, error: "missing" });
       return;
+    }
+    // শুধু photo
+    if (item.kind && item.kind !== "photo") {
+      if (typeof callback === "function") callback({ success: false, error: "photos_only" });
+      return;
+    }
+    item.kind = "photo";
+    // data URL হলে ImgBB-তে তুলে URL রাখা
+    if (item.src && String(item.src).startsWith("data:")) {
+      const url = await uploadToImgbb(item.src, item.name || "photo");
+      if (url) {
+        item.src = url;
+        item.host = "imgbb";
+      } else if (!IMGBB_API_KEY) {
+        if (typeof callback === "function") {
+          callback({ success: false, error: "imgbb_key_missing", message: "IMGBB_API_KEY সেট করা নেই" });
+        }
+        return;
+      } else {
+        if (typeof callback === "function") {
+          callback({ success: false, error: "imgbb_failed", message: "ImgBB আপলোড ব্যর্থ" });
+        }
+        return;
+      }
     }
     if (!profiles[phone]) profiles[phone] = {};
     if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+    // শুধু photo আইটেম + URL (ছোট) — অনেক বেশি রাখা যায়
+    profiles[phone].items = profiles[phone].items.filter((it) => it && it.kind === "photo");
     profiles[phone].items.unshift(item);
-    // প্রোফাইলে সর্বোচ্চ ৪০টি আইটেম রাখা হয় (ফাইল যেন বেশি বড় না হয়)
-    profiles[phone].items = profiles[phone].items.slice(0, 40);
+    profiles[phone].items = profiles[phone].items.slice(0, 100);
     saveData();
 
-    // ফ্রেন্ডদের জানানো যে নতুন কিছু পোস্ট হয়েছে
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
       const sid = phoneToSocket[friendPhone];
       if (sid) io.to(sid).emit("friend-profile-updated", { phone });
@@ -714,7 +802,7 @@ io.on("connection", (socket) => {
     });
   }
 
-  socket.on("create-post", ({ phone, text, media }, callback) => {
+  socket.on("create-post", async ({ phone, text, media }, callback) => {
     if (!phone || (!text && !media)) {
       if (typeof callback === "function") callback({ success: false });
       return;
@@ -722,10 +810,31 @@ io.on("connection", (socket) => {
     if (!profiles[phone]) profiles[phone] = {};
     if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
 
+    let mediaOut = media || null;
+    // শুধু ইমেজ — ভিডিও পোস্ট বন্ধ; ImgBB URL
+    if (mediaOut) {
+      if (mediaOut.type === "video") {
+        if (typeof callback === "function") callback({ success: false, error: "photos_only" });
+        return;
+      }
+      mediaOut.type = "image";
+      if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
+        const url = await uploadToImgbb(mediaOut.src, "post");
+        if (url) {
+          mediaOut = { type: "image", src: url, host: "imgbb" };
+        } else {
+          if (typeof callback === "function") {
+            callback({ success: false, error: "imgbb_failed", message: "ছবি আপলোড ব্যর্থ (ImgBB)" });
+          }
+          return;
+        }
+      }
+    }
+
     const post = {
       id: "post_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       text: (text || "").slice(0, 2000),
-      media: media || null,   // { type: "image"|"video", src }
+      media: mediaOut,
       timestamp: Date.now(),
       likes: [],
       comments: []
