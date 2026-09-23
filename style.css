@@ -468,7 +468,7 @@ img { -webkit-user-drag: none; }
 @keyframes reportWaitPulse { 0%,100%{ transform: scale(1); opacity: 1; } 50%{ transform: scale(1.08); opacity: .85; } }
 
 /* ---------- অ্যাডমিন প্যানেল ---------- */
-.admin-panel-card { max-width: 420px; text-align: left; max-height: 82vh; overflow-y: auto; }
+.admin-panel-card { max-width: 440px; text-align: left; max-height: 85vh; overflow-y: auto; overflow-x: hidden; }
 .admin-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .admin-panel-header h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0; }
 .admin-close-btn {
@@ -487,7 +487,7 @@ img { -webkit-user-drag: none; }
 .admin-tab-btn.active { background: var(--brand-grad); color: #fff; }
 
 .admin-users-list, .admin-reports-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
-.admin-user-row-wrap { border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.admin-user-row-wrap { border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); overflow: visible; }
 .admin-user-row {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; cursor: pointer;
@@ -497,7 +497,43 @@ img { -webkit-user-drag: none; }
 .admin-user-row .au-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
 .admin-user-row .au-phone { font-size: 11.5px; color: var(--text-3); }
 .au-chevron { font-size: 12px; color: var(--text-3); transition: transform .2s ease; }
-.admin-user-details { padding: 4px 12px 12px 56px; border-top: 1px solid var(--line); }
+.admin-user-details {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.au-detail-block { display: flex; flex-direction: column; gap: 6px; }
+.au-friends-section {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.au-friends-title {
+  font-size: 12px; font-weight: 700; color: var(--text-2);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.au-friends-list {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.au-friend-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 999px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--text);
+  max-width: 100%;
+}
+.au-friend-chip:hover { border-color: var(--brand); background: var(--surface-3); }
+.au-friend-chip img {
+  width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+}
+.au-friend-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
 .admin-user-row-wrap.is-banned { border-color: rgba(239, 68, 68, 0.35); }
 .admin-user-row-wrap.is-banned .admin-user-row { opacity: 0.85; }
 .au-ban-badge {
@@ -1487,7 +1523,7 @@ img { -webkit-user-drag: none; }
   background: var(--overlay);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 200003;
+  z-index: 300000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1555,7 +1591,7 @@ img { -webkit-user-drag: none; }
 .profile-detail-row i { width: 20px; text-align: center; color: var(--brand); }
 .profile-detail-row .pd-label { color: var(--text-3); font-size: 11.5px; display: block; }
 .profile-detail-row .pd-value { font-weight: 600; }
-.profile-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+.profile-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .profile-modal-actions .btn { flex: 1; padding: 12px; font-size: 13.5px; }
 
 .profile-tabs {
