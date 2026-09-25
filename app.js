@@ -124,6 +124,37 @@ function unlockRemoteAudio() {
   } catch (e) {}
 }
 
+// ================= "Direct Open" / আনলক-এর সময় সব পারমিশন একসাথে চেয়ে নেয়া =================
+// ইউজার যখন Welcome স্ক্রিনে "Direct Open" বা PIN দিয়ে আনলক বাটনে ক্লিক করে, ওটাই একমাত্র
+// নিশ্চিত "ইউজার জেসচার" — ব্রাউজার এই মুহূর্তেই মাইক্রোফোন ও নোটিফিকেশনের পারমিশন পপ-আপ
+// দেখাতে রাজি হয়। এখানেই একসাথে চেয়ে নিলে, ব্রাউজার ধরে নেয় ইউজার আগে থেকেই "Allow" দিয়ে
+// রেখেছে — পরে আসল কল/রিং আসার সময় আর নতুন করে পারমিশন-পপ-আপে আটকে থেকে রিং মিস হবে না।
+function requestAppPermissions() {
+  // অডিও এলিমেন্ট/AudioContext আনলক করা, যাতে রিং/কল সাউন্ড অটোপ্লে ব্লকে আটকে না যায়
+  try { unlockRemoteAudio(); } catch (e) {}
+
+  // নোটিফিকেশন পারমিশন — নতুন মেসেজ/কল এলে সিস্টেম নোটিফিকেশন দেখানোর জন্য
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  } catch (e) {}
+
+  // মাইক্রোফোন পারমিশন আগেভাগেই নিয়ে রাখা হচ্ছে, যাতে আসল কল আসার সময় ব্রাউজার আর
+  // অনুমতি চেয়ে সময় নষ্ট না করে এবং রিংটোন সাথে সাথে বাজে। অনুমতি পাওয়ার সাথে সাথেই
+  // ট্র্যাক বন্ধ করে দেয়া হচ্ছে (আসল কল শুরু হলে নতুন করে getUserMedia কল হবে)।
+  try {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+        })
+        .catch(() => {});
+    }
+  } catch (e) {}
+}
+
 let soundHintEl = null;
 function showSoundHint() {
   if (!soundHintEl) {
@@ -1099,17 +1130,23 @@ unlockBtn.addEventListener("click", async () => {
   const savedPin = localStorage.getItem("appMasterPin");
   const enteredPin = masterKeyInput.value.trim();
   if (savedPin) {
-    if (enteredPin === savedPin) grantAccess();
-    else await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
+    if (enteredPin === savedPin) {
+      requestAppPermissions();
+      grantAccess();
+    } else await showCustomAlert("Access Denied", "ভুল Security PIN দিয়েছেন!");
   } else if (isCreatingPassword) {
     if (!enteredPin) return await showCustomAlert("Input Error", "অনুগ্রহ করে একটি পাসওয়ার্ড প্রদান করুন!");
     localStorage.setItem("appMasterPin", enteredPin);
     await showCustomAlert("Success", "পাসওয়ার্ড সফলভাবে সেভ করা হয়েছে!");
+    requestAppPermissions();
     grantAccess();
   }
 });
 
-directOpenBtn.addEventListener("click", () => { grantAccess(); });
+directOpenBtn.addEventListener("click", () => {
+  requestAppPermissions();
+  grantAccess();
+});
 
 function grantAccess() {
   sessionStorage.setItem("masterUnlocked", "true");
@@ -2551,8 +2588,14 @@ document.getElementById("menuDirectTheme").onclick = () => {
 document.getElementById("menuClearChat").onclick = async () => {
   const confirmClear = await showCustomModal({ title: "Clear Chat", subtitle: "সমস্ত চ্যাট হিস্ট্রি ডিলিট করতে চান?", hasInput: false });
   if (confirmClear && activeDirectChatFriend) {
-    socket.emit("clear-direct-history", { senderPhone: currentUser.phone, receiverPhone: activeDirectChatFriend.phone }, () => {
+    const friendPhone = activeDirectChatFriend.phone;
+    socket.emit("clear-direct-history", { senderPhone: currentUser.phone, receiverPhone: friendPhone }, () => {
       document.getElementById("directChatMessages").innerHTML = "";
+      // সার্ভার থেকে ডিলিট করলেও ব্রাউজারে ক্যাশ করা পুরনো মেসেজগুলো থেকে যেত —
+      // পরে চ্যাট আবার খুললে loadDirectChatHistory() সেই ক্যাশ সার্ভারে "sync-direct-messages"
+      // দিয়ে পাঠাতো এবং সার্ভার সেগুলো মার্জ করে আবার ফিরিয়ে দিত (ডিলিট করা মেসেজ
+      // "ফিরে আসতো")। তাই ক্লিয়ার করার সাথে সাথে লোকাল ক্যাশও মুছে ফেলা হচ্ছে।
+      try { localStorage.removeItem(directMsgCacheKey(friendPhone)); } catch (e) {}
     });
   }
 };
