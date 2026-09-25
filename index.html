@@ -327,19 +327,36 @@
       var creditDone = false;
       var chargeDone = false;
 
-      // সমস্যা ছিল: প্রতিবার রিলোড দিলেই (আগে থেকে লগইন করা থাকা সত্ত্বেও) পুরো
-      // কয়েক সেকেন্ডের ব্র্যান্ডিং অ্যানিমেশন (টাইটেল টাইপিং, % সার্কেল, ক্রেডিট
-      // টাইপরাইটার) আবার নতুন করে চলত — মনে হতো অ্যাপ পুরোপুরি নতুন করে চালু হচ্ছে।
-      // এখন: আগে থেকে সেশন/লগইন করা থাকলে (মানে এটা আসলে "রিলোড", প্রথমবার
-      // খোলা নয়) শুধু ঘোরানো রিং-স্পিনারটাই (sp-energy, যেটা এমনিতেই CSS দিয়ে
-      // অনন্তকাল ঘোরে) দেখানো হয় — টাইটেল/ট্যাগলাইন/% সার্কেল টেক্সট/ক্রেডিট
-      // টাইপিং স্কিপ করে দেওয়া হয়। app.js যখন আসল স্ক্রিন (ড্যাশবোর্ড/চ্যাট) বসিয়ে
-      // ফেলে, তখনই এই স্পিনারটা সরিয়ে দেয় — মানে স্পিনার ঠিক ওই জায়গাতেই ঘোরে,
-      // পুরো নতুন অ্যানিমেশন আর দেখায় না।
-      var isResumeSession = false;
+      // সমস্যা ছিল আগের ভার্সনে: "আগে থেকে লগইন করা আছে কিনা" দিয়ে অ্যানিমেশন
+      // দেখানো/না-দেখানো ঠিক করা হচ্ছিল — কিন্তু এতে লগইন করা অবস্থায় অ্যাপে নতুন
+      // করে ঢুকলেও (ব্রাউজার/অ্যাপ পুরোপুরি বন্ধ করে আবার খুললে) অ্যানিমেশন
+      // দেখাচ্ছিল না, যেটা ভুল ছিল — ফার্স্ট এন্ট্রিতে (লগইন থাকুক বা না থাকুক)
+      // অ্যানিমেশন সবসময় দেখানো উচিত।
+      //
+      // সঠিক নিয়ম: ব্রাউজারের Navigation Timing API দিয়ে বোঝা হচ্ছে এই পেজ-লোডটা
+      // আসলে কী ধরনের — "reload" (F5/পুল-টু-রিফ্রেশ/location.reload()) হলে ধরে
+      // নেওয়া হয় ইউজার আগে থেকেই অ্যাপের ভিতরে কোনো একটা স্ক্রিনে (ড্যাশবোর্ড/চ্যাট)
+      // ছিল আর এখন শুধু রিফ্রেশ করেছে — তখন পুরো অ্যানিমেশন বাদ দিয়ে শুধু স্পিনার
+      // দেখানো হয়। আর "navigate" (নতুন করে ট্যাব/অ্যাপ খোলা, লিংকে ঢোকা) হলে এটা
+      // আসল "প্রথমবার ঢোকা" — তখন লগইন থাকুক বা না থাকুক, সবসময় ফুল ব্র্যান্ডিং
+      // অ্যানিমেশন দেখানো হয়। (ব্যাক বাটন এখন আর পেজ রিলোড করায় না — সেটা আলাদাভাবে
+      // history API দিয়ে হ্যান্ডল হয় — তাই "back" চাপলে এই স্ক্রিপ্টটা আবার চলেই না।)
+      var navType = "navigate";
       try {
-        isResumeSession = sessionStorage.getItem("masterUnlocked") === "true" && !!localStorage.getItem("appUser");
+        var navEntries = performance && performance.getEntriesByType && performance.getEntriesByType("navigation");
+        if (navEntries && navEntries[0] && navEntries[0].type) {
+          navType = navEntries[0].type;
+        } else if (performance && performance.navigation) {
+          // পুরনো ব্রাউজারের জন্য fallback API
+          var legacyType = performance.navigation.type;
+          navType = legacyType === 1 ? "reload" : (legacyType === 2 ? "back_forward" : "navigate");
+        }
       } catch (e) {}
+      var isResumeSession = (navType === "reload" || navType === "back_forward");
+      // app.js এই ফ্ল্যাগটা দেখে বুঝবে যে স্প্ল্যাশ তাড়াতাড়ি সরানো ঠিক হবে কিনা —
+      // ফ্রেশ এন্ট্রির (navType "navigate") পুরো অ্যানিমেশন যেন কখনো মাঝপথে কেটে
+      // না যায়, সেটা নিশ্চিত করতেই এই গ্লোবাল ফ্ল্যাগ দরকার
+      window.__ektSplashIsResume = isResumeSession;
 
       var titleEl = document.getElementById("splashTitle");
       var tagEl = document.getElementById("splashTag");
