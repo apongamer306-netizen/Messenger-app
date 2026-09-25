@@ -197,11 +197,12 @@ function _startSynthRing() {
     setTimeout(() => { if (_ringCtx) _playClassicRingBurst(); }, 850);
   }, 1900);
 }
-// নিজস্ব ringtone-এর সোর্স — আগে Google Drive-এর ফাইল, না পেলে /ringtone.mp3 (রুট ফোল্ডারে রাখা হলে),
-// এটাও না পেলে ক্লাসিক synth রিং-এ ফিরে যাবে
+// নিজস্ব ringtone-এর সোর্স — নিজের হোস্ট করা ফাইল (/rington.mp3) আগে ট্রাই হয়,
+// না পেলে Google Drive লিংক (এটা অনির্ভরযোগ্য — মাঝে মাঝে প্রথমবার বাজলেও পরে
+// আর কাজ করে না), এটাও ব্যর্থ হলে ক্লাসিক synth রিং-এ ফিরে যাবে
 const RINGTONE_SOURCES = [
-  "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp",
-  "/ringtone.mp3"
+  "/rington.mp3",
+  "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp"
 ];
 function _tryRingSource(index) {
   if (index >= RINGTONE_SOURCES.length) { _startSynthRing(); return; }
@@ -618,10 +619,18 @@ const ektNavStack = [];
 let ektNavBaseReady = false;
 
 function ektNavInitBase() {
-  // ড্যাশবোর্ডকে "মূল" (root) state হিসেবে ধরে নেওয়া হয়, যাতে এখান থেকে ব্যাক
-  // চাপলে সরাসরি ব্রাউজারের ডিফল্ট আচরণ (ট্যাব থেকে বের হওয়া) কাজ করে
+  // ড্যাশবোর্ডকে "মূল" (root) state হিসেবে ধরে নেওয়া হয়। শুধু replaceState করলেই
+  // যথেষ্ট না — তাহলে root-এ প্রথমবার ব্যাক চাপলেই পেজের আগের (রিয়েল) হিস্ট্রি
+  // এন্ট্রিতে চলে যেতে পারে (ট্যাব বন্ধ/আগের পেজে চলে যাওয়া)। তাই সাথে সাথে
+  // একটা এক্সট্রা "ট্র্যাপ" state-ও পুশ করে রাখা হয়, যাতে root-এ ব্যাক চাপলে
+  // সবসময় popstate হ্যান্ডলারেই ধরা পড়ে (নিচের handler আবার নতুন trap পুশ করে) —
+  // ফলে root থেকে ব্যাক বাটন দিয়ে আর কখনোই বের হওয়া যায় না, ঠিক যেমন সাধারণ
+  // ফোন-অ্যাপে হয় (বের হতে হলে ট্যাব পাল্টাতে হয় বা হোম বাটনে চাপতে হয়)।
   ektNavStack.length = 0;
-  try { history.replaceState({ ektRoot: true }, "", location.href); } catch (e) {}
+  try {
+    history.replaceState({ ektRoot: true }, "", location.href);
+    history.pushState({ ektRoot: true, trap: true }, "", location.href);
+  } catch (e) {}
   ektNavBaseReady = true;
 }
 
@@ -661,9 +670,13 @@ window.addEventListener("popstate", () => {
   if (ektNavStack.length > 0) {
     const top = ektNavStack.pop();
     try { top.close(); } catch (e) {}
+    return;
   }
-  // স্ট্যাক খালি থাকলে কিছুই করার দরকার নেই — এখন আমরা "root" (ড্যাশবোর্ড)
-  // state-এ আছি, পরের ব্যাক চাপলে ব্রাউজার স্বাভাবিকভাবেই ট্যাব থেকে বের করে দেবে
+  // ড্যাশবোর্ড (root)-এ আর কোনো ব্যাক অপশন নেই — এখন ব্যাক বাটন চাপলে যেন
+  // ট্যাব/অ্যাপ বন্ধ না হয়ে যায়, তাই সাথে সাথে আবার একটা state পুশ করে
+  // ব্যাক-প্রেসটা "ট্র্যাপ" করে রাখা হয়। ঠিক ফোনের সাধারণ অ্যাপগুলোর মতো —
+  // এখান থেকে বের হতে হলে ট্যাব পাল্টাতে হবে বা হোম বাটনে চাপতে হবে।
+  try { history.pushState({ ektRoot: true }, "", location.href); } catch (e) {}
 });
 
 document.head.insertAdjacentHTML("beforeend", `
