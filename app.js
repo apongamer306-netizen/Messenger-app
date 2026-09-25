@@ -151,6 +151,94 @@ function playRemoteAudio() {
   }
 }
 
+// ================= শব্দ এফেক্ট (Web Audio API — কোনো বাইরের ফাইল লাগে না) =================
+function _getSoundCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  const c = window._ektAudioCtx || new AC();
+  if (c.state === "suspended") c.resume();
+  return c;
+}
+function _tone(ac, freq, start, dur, peakGain, type) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type || "sine";
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(peakGain, start + Math.min(0.02, dur * 0.25));
+  gain.gain.linearRampToValueAtTime(0, start + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+}
+
+// ---- ইনকামিং কলের রিং ----
+// প্রথমে নিজের কাস্টম "ringtone.mp3" ফাইল (রুট ফোল্ডারে রাখলেই কাজ করবে) দিয়ে চেষ্টা হয়;
+// ফাইলটা না থাকলে বা কোনো কারণে বাজাতে না পারলে ক্লাসিক টেলিফোন ওয়ারবল-এ ফিরে যায়।
+let _ringCtx = null;
+let _ringInterval = null;
+let _ringAudioEl = null;
+function _playClassicRingBurst() {
+  const ac = _ringCtx;
+  if (!ac) return;
+  const now = ac.currentTime;
+  for (let t = 0; t < 0.7; t += 0.02) {
+    _tone(ac, 950, now + t, 0.022, 0.22, "sine");
+    _tone(ac, 1400, now + t, 0.022, 0.10, "sine");
+  }
+}
+function _startSynthRing() {
+  _ringCtx = _getSoundCtx();
+  if (!_ringCtx) return;
+  _playClassicRingBurst();
+  setTimeout(() => { if (_ringCtx) _playClassicRingBurst(); }, 850);
+  _ringInterval = setInterval(() => {
+    _playClassicRingBurst();
+    setTimeout(() => { if (_ringCtx) _playClassicRingBurst(); }, 850);
+  }, 1900);
+}
+// নিজস্ব ringtone-এর সোর্স — আগে Google Drive-এর ফাইল, না পেলে /ringtone.mp3 (রুট ফোল্ডারে রাখা হলে),
+// এটাও না পেলে ক্লাসিক synth রিং-এ ফিরে যাবে
+const RINGTONE_SOURCES = [
+  "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp",
+  "/ringtone.mp3"
+];
+function _tryRingSource(index) {
+  if (index >= RINGTONE_SOURCES.length) { _startSynthRing(); return; }
+  try {
+    _ringAudioEl = new Audio(RINGTONE_SOURCES[index]);
+    _ringAudioEl.loop = true;
+    _ringAudioEl.volume = 1;
+    _ringAudioEl.onerror = () => { _ringAudioEl = null; _tryRingSource(index + 1); };
+    const p = _ringAudioEl.play();
+    if (p && typeof p.catch === "function") {
+      p.catch(() => { _ringAudioEl = null; _tryRingSource(index + 1); });
+    }
+  } catch (e) {
+    _tryRingSource(index + 1);
+  }
+}
+function startRingtone() {
+  stopRingtone();
+  _tryRingSource(0);
+}
+function stopRingtone() {
+  if (_ringInterval) { clearInterval(_ringInterval); _ringInterval = null; }
+  _ringCtx = null; // window._ektAudioCtx নিজে বন্ধ করা হয় না, অন্য জায়গায়ও ব্যবহার হয়
+  if (_ringAudioEl) { try { _ringAudioEl.pause(); } catch (e) {} _ringAudioEl = null; }
+}
+
+// ---- নতুন মেসেজ এলে হালকা "ডিং" নোটিফিকেশন সাউন্ড — সফট মারিম্বা স্টাইল ----
+function playMessageNotifySound() {
+  try {
+    const ac = _getSoundCtx();
+    if (!ac) return;
+    const now = ac.currentTime;
+    _tone(ac, 783.99, now, 0.16, 0.22, "triangle");       // G5
+    _tone(ac, 1046.5, now + 0.09, 0.22, 0.20, "triangle"); // C6
+  } catch (e) {}
+}
+
 myPeer.on("open", (id) => {
   myPeerId = id;
 });
@@ -1372,6 +1460,9 @@ socket.on("friend-list-updated", (data) => { renderFriendData(data); });
 socket.on("receive-friend-request", () => { fetchFriendData(); });
 
 function openDirectChat(friend) {
+  // চ্যাটে ঢোকার এই ক্লিকটাকেই ব্যবহার করে audio/ringtone "unlock" করে রাখা হচ্ছে,
+  // যাতে পরে হঠাৎ কল আসলে ব্রাউজার আলাদা করে পারমিশন না চেয়ে বসে আর ring ঠিকমতো বাজে।
+  unlockRemoteAudio();
   activeDirectChatFriend = friend;
   document.getElementById("directChatAvatar").src = friend.pic || "https://via.placeholder.com/40";
   document.getElementById("directChatName").textContent = friend.name;
@@ -2634,6 +2725,7 @@ socket.on("receive-direct-message", (msgData) => {
     unreadDirectCounts[msgData.senderPhone] = (unreadDirectCounts[msgData.senderPhone] || 0) + 1;
     updateFriendBadge();
     showMessageToast(msgData);
+    playMessageNotifySound();
     fetchFriendData();
   }
 });
@@ -2955,6 +3047,9 @@ joinRoomBtn.addEventListener("click", () => {
 });
 
 function joinRoom(code, isRefresh = false) {
+  // রুমে ঢোকার সময়ই audio unlock করে রাখা হচ্ছে, যাতে পরে ring/কল-সাউন্ডের জন্য
+  // আলাদা করে ব্রাউজার পারমিশন আটকে না দেয়
+  unlockRemoteAudio();
   currentRoom = code;
   sessionStorage.setItem("activeRoom", code);
   document.body.classList.remove("dashboard-active");
@@ -3089,6 +3184,7 @@ function sendChatMessage() {
 
 socket.on("receive-message", (msg) => {
   appendChatMessage(msg, false, "");
+  if (msg.sender !== currentUser.name) playMessageNotifySound();
   saveCurrentRoomHistoryToLocal();
 });
 
@@ -3182,6 +3278,7 @@ const callEndedActions = document.getElementById("callEndedActions");
 const muteCallBtn = document.getElementById("muteCallBtn");
 const videoToggleBtn = document.getElementById("videoToggleBtn");
 const speakerCallBtn = document.getElementById("speakerCallBtn");
+const switchCameraBtn = document.getElementById("switchCameraBtn");
 
 let callTimerInterval = null;
 let callStartedAt = null;
@@ -3189,6 +3286,11 @@ let isCallConnected = false;
 let isMicMuted = false;
 let isSpeakerOn = true;
 let lastCallInfo = null;   // { mode, phone, name, pic, type } — "Call again" এর জন্য
+// ডিফল্ট সামনের (selfie) ক্যামেরা — মেসেঞ্জার/হোয়াটসঅ্যাপের মতো ভিডিও কল শুরু হলে front camera-ই খুলবে
+let currentFacingMode = "user";
+function videoConstraintFor(wantVideo) {
+  return wantVideo ? { facingMode: currentFacingMode } : false;
+}
 
 function formatCallDuration(ms) {
   const total = Math.floor(ms / 1000);
@@ -3224,6 +3326,7 @@ function setCallStatus(text) {
 
 // কল কানেক্ট হলে — রিং থামবে, সময় গোনা শুরু হবে
 function markCallConnected() {
+  stopRingtone();
   if (isCallConnected) return;
   isCallConnected = true;
   callModal.classList.add("connected");
@@ -3242,6 +3345,7 @@ function setCallLayout(type) {
     videoToggleBtn.innerHTML = '<i class="fa-solid fa-video"></i>';
     videoToggleBtn.classList.add("active");
     videoToggleBtn.title = "Turn off camera";
+    if (switchCameraBtn) switchCameraBtn.style.display = "inline-flex";
   } else {
     callVideoGrid.style.display = "none";
     callProfileGrid.style.display = "flex";
@@ -3249,6 +3353,7 @@ function setCallLayout(type) {
     videoToggleBtn.innerHTML = '<i class="fa-solid fa-video-slash"></i>';
     videoToggleBtn.classList.remove("active");
     videoToggleBtn.title = "Switch to video";
+    if (switchCameraBtn) switchCameraBtn.style.display = "none";
   }
 }
 
@@ -3356,7 +3461,7 @@ if (videoToggleBtn) {
 
     // একদম নতুন করে ক্যামেরা চালু করে চলমান কলে যোগ করা
     try {
-      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraintFor(true) });
       const videoTrack = camStream.getVideoTracks()[0];
       localStream.addTrack(videoTrack);
       localVideo.srcObject = localStream;
@@ -3377,6 +3482,36 @@ if (videoToggleBtn) {
     } catch (err) {
       showCustomAlert("Camera Error", "ক্যামেরা চালু করা যায়নি। পারমিশন দেওয়া আছে কিনা দেখুন।");
     }
+  };
+}
+
+// ---- সামনের/পিছনের ক্যামেরা বদল (ভিডিও কলের মাঝপথেই) ----
+if (switchCameraBtn) {
+  switchCameraBtn.onclick = async () => {
+    if (!localStream) return;
+    const oldTrack = localStream.getVideoTracks()[0];
+    if (!oldTrack) return; // ক্যামেরা এখনো চালু না থাকলে কিছু হবে না
+    const nextFacingMode = currentFacingMode === "user" ? "environment" : "user";
+    switchCameraBtn.disabled = true;
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacingMode } });
+      const newTrack = newStream.getVideoTracks()[0];
+
+      localStream.removeTrack(oldTrack);
+      oldTrack.stop();
+      localStream.addTrack(newTrack);
+      localVideo.srcObject = localStream;
+
+      const pc = currentCall && currentCall.peerConnection;
+      if (pc) {
+        const sender = pc.getSenders().find((sn) => sn.track && sn.track.kind === "video");
+        if (sender) await sender.replaceTrack(newTrack);
+      }
+      currentFacingMode = nextFacingMode;
+    } catch (err) {
+      showCustomAlert("Camera Error", "ক্যামেরা পরিবর্তন করা যায়নি — এই ডিভাইসে হয়তো একাধিক ক্যামেরা নেই।");
+    }
+    switchCameraBtn.disabled = false;
   };
 }
 
@@ -3419,7 +3554,7 @@ async function initiateCall(type) {
   callContext = { mode: "room", phone: null };
   currentCallType = type;
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: type === "video" });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: videoConstraintFor(type === "video") });
     if (type === "video") localVideo.srcObject = localStream;
 
     openCallScreen({
@@ -3456,11 +3591,13 @@ socket.on("incoming-call", (data) => {
     incoming: true,
     status: "Incoming " + data.callType + " call"
   });
+  startRingtone();
 
   acceptCallBtn.onclick = async () => {
+    stopRingtone();
     unlockRemoteAudio();
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: currentCallType === "video" });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: videoConstraintFor(currentCallType === "video") });
       if (currentCallType === "video") localVideo.srcObject = localStream;
       setCallLayout(currentCallType === "video" ? "video" : "audio");
       const call = myPeer.call(data.callerPeerId, localStream);
@@ -3477,7 +3614,7 @@ myPeer.on("call", async (call) => {
   currentCallType = call.metadata ? call.metadata.type : currentCallType;
   try {
     if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: currentCallType === "video" });
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: videoConstraintFor(currentCallType === "video") });
     }
     if (currentCallType === "video") localVideo.srcObject = localStream;
     setCallLayout(currentCallType === "video" ? "video" : "audio");
@@ -3538,6 +3675,7 @@ function watchCallConnection(call) {
 socket.on("call-accepted-by-receiver", () => { markCallConnected(); });
 
 rejectCallBtn.onclick = () => {
+  stopRingtone();
   if (callContext.mode === "direct" && callContext.phone) {
     socket.emit("direct-call-end", { toPhone: callContext.phone });
   } else {
@@ -3550,6 +3688,7 @@ socket.on("call-ended", endCallCleanup);
 socket.on("call-directly-ended", endCallCleanup);
 
 function endCallCleanup() {
+  stopRingtone();
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
@@ -3592,7 +3731,7 @@ async function initiateDirectCall(type) {
   try {
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: AUDIO_CONSTRAINTS,
-      video: type === "video"
+      video: videoConstraintFor(type === "video")
     });
 
     if (type === "video") localVideo.srcObject = localStream;
@@ -3652,13 +3791,15 @@ socket.on("direct-incoming-call", (data) => {
     incoming: true,
     status: "Incoming " + data.callType + " call"
   });
+  startRingtone();
 
   acceptCallBtn.onclick = async () => {
+    stopRingtone();
     unlockRemoteAudio();
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: AUDIO_CONSTRAINTS,
-        video: currentCallType === "video"
+        video: videoConstraintFor(currentCallType === "video")
       });
 
       if (currentCallType === "video") localVideo.srcObject = localStream;
