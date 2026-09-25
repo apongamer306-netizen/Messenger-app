@@ -200,7 +200,6 @@ function _startSynthRing() {
 // নিজস্ব ringtone-এর সোর্স — আগে Google Drive-এর ফাইল, না পেলে /ringtone.mp3 (রুট ফোল্ডারে রাখা হলে),
 // এটাও না পেলে ক্লাসিক synth রিং-এ ফিরে যাবে
 const RINGTONE_SOURCES = [
-  "/rington.mpeg",  // GitHub repo-তে আপলোড করা আসল ফাইল (root ফোল্ডারে থাকায় সরাসরি সার্ভ হবে)
   "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp",
   "/ringtone.mp3"
 ];
@@ -604,6 +603,69 @@ topLoadingBar.style.cssText = "position:fixed; top:0; left:0; width:100%; height
 topLoadingBar.innerHTML = `<div style="width:100%; height:100%; background:#0d6efd; animation: indeterminate 1.2s infinite linear; transform-origin: left;"></div>`;
 document.body.appendChild(topLoadingBar);
 
+// ================= ব্যাক বাটন নেভিগেশন (মোবাইল ফোনের/ব্রাউজারের ব্যাক) =================
+// সমস্যা ছিল: চ্যাট বক্সে (ফ্রেন্ড চ্যাট/রুম/ফ্রেন্ড প্যানেল ইত্যাদি) থাকা অবস্থায়
+// ফোনের ব্যাক বাটনে চাপ দিলে সরাসরি পুরো ট্যাবটাই বন্ধ/ব্যাক হয়ে যেত, কারণ
+// ব্রাউজারের history-তে আলাদা কোনো state push করা হতো না।
+//
+// সমাধান: যখনই কোনো সাব-স্ক্রিন (ফ্রেন্ড চ্যাট বক্স, রুম চ্যাট, ফ্রেন্ড প্যানেল) খোলা
+// হয়, তখন history-তে একটা state পুশ করা হয়। ব্যাক চাপলে (popstate) সেই
+// state pop হয় আর আমরা শুধু সেই সাব-স্ক্রিনটা বন্ধ করে আগের জায়গায় (ড্যাশবোর্ড/
+// ফ্রেন্ড বক্স) ফিরিয়ে আনি — পুরো ট্যাব বন্ধ হয় না। একদম শুরুর (ড্যাশবোর্ড) অবস্থায়
+// আর কোনো পুশ করা state না থাকলে তখনই ব্যাক বাটনে স্বাভাবিক আচরণ (ট্যাব থেকে বের
+// হওয়া) হবে — ঠিক যেমনটা চাওয়া হয়েছিল।
+const ektNavStack = [];
+let ektNavBaseReady = false;
+
+function ektNavInitBase() {
+  // ড্যাশবোর্ডকে "মূল" (root) state হিসেবে ধরে নেওয়া হয়, যাতে এখান থেকে ব্যাক
+  // চাপলে সরাসরি ব্রাউজারের ডিফল্ট আচরণ (ট্যাব থেকে বের হওয়া) কাজ করে
+  ektNavStack.length = 0;
+  try { history.replaceState({ ektRoot: true }, "", location.href); } catch (e) {}
+  ektNavBaseReady = true;
+}
+
+// id: এই সাব-স্ক্রিনের নাম (একই id দুইবার পরপর পুশ করা এড়াতে ব্যবহার হয়)
+// closeFn: শুধু UI বন্ধ করার কাজ করবে (এটা নিজে history.back()/pushState নিয়ে
+// মাথা ঘামাবে না — সেটা এই সিস্টেমই সামলাবে)
+function ektNavPush(id, closeFn) {
+  if (!ektNavBaseReady) ektNavInitBase();
+  const top = ektNavStack[ektNavStack.length - 1];
+  if (top && top.id === id) return; // একই স্ক্রিন আবার পুশ করা এড়ানো
+  if (top) {
+    // আগে থেকেই একটা সাব-স্ক্রিন খোলা ছিল (যেমন ফ্রেন্ড প্যানেল), এখন সেটার বদলে
+    // আরেকটা খোলা হচ্ছে (যেমন ডিরেক্ট চ্যাট) — নতুন করে পুশ না করে প্রতিস্থাপন করা
+    // হয়, যাতে ব্যাক চাপলে একবারেই ড্যাশবোর্ডে ফিরে আসে
+    ektNavStack[ektNavStack.length - 1] = { id, close: closeFn };
+    try { history.replaceState({ ektNav: id, depth: ektNavStack.length }, "", location.href); } catch (e) {}
+    return;
+  }
+  ektNavStack.push({ id, close: closeFn });
+  try { history.pushState({ ektNav: id, depth: ektNavStack.length }, "", location.href); } catch (e) {}
+}
+
+// UI-র নিজস্ব "back/close" বাটনে চাপ দিলে এটা কল হবে — সরাসরি closeFn না চালিয়ে
+// history.back() কল করা হয়, যাতে ফোনের ব্যাক বাটন আর ইন-অ্যাপ ব্যাক বাটন সবসময়
+// সিঙ্কে থাকে (দুইবার চাপার সমস্যা যেন না হয়)
+function ektNavGoBack(id) {
+  const top = ektNavStack[ektNavStack.length - 1];
+  if (top && (!id || top.id === id)) {
+    try { history.back(); return; } catch (e) {}
+  }
+  // পুশ করা state না থাকলে সরাসরি close করাই একমাত্র উপায়
+  const closeFn = ektNavStack.length ? ektNavStack.pop().close : null;
+  if (closeFn) { try { closeFn(); } catch (e) {} }
+}
+
+window.addEventListener("popstate", () => {
+  if (ektNavStack.length > 0) {
+    const top = ektNavStack.pop();
+    try { top.close(); } catch (e) {}
+  }
+  // স্ট্যাক খালি থাকলে কিছুই করার দরকার নেই — এখন আমরা "root" (ড্যাশবোর্ড)
+  // state-এ আছি, পরের ব্যাক চাপলে ব্রাউজার স্বাভাবিকভাবেই ট্যাব থেকে বের করে দেবে
+});
+
 document.head.insertAdjacentHTML("beforeend", `
   <style>
     @keyframes indeterminate {
@@ -980,6 +1042,10 @@ function checkActiveSession() {
     }
   } finally {
     topLoadingBar.style.display = "none";
+    // সেশন থাকলে (রিলোড কেস) আসল স্ক্রিন এখন বসে গেছে — তাই এখনই স্প্ল্যাশ
+    // স্পিনারটা সরিয়ে দেওয়া হয় (index.html-এর isResumeSession পাথ এই কলের
+    // অপেক্ষায় থাকে, নাহলে পুরো ব্র্যান্ডিং অ্যানিমেশন আবার দেখাতো)
+    if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
   }
 }
 
@@ -1028,6 +1094,7 @@ function grantAccess() {
   } else {
     authScreen.style.display = "block";
   }
+  if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
 }
 
 function updateDashboardPinUI() {
@@ -1170,6 +1237,9 @@ function showDashboard() {
   authScreen.style.display = "none";
   chatScreen.style.display = "none";
   dashboardScreen.style.display = "block";
+  // ড্যাশবোর্ডে আসা মানেই এটা এখন আমাদের "root" স্ক্রিন — এখান থেকে যেকোনো
+  // সাব-স্ক্রিনে (ফ্রেন্ড চ্যাট/রুম/ফ্রেন্ড প্যানেল) ঢুকলে সেটা এই root-এর উপরে পুশ হবে
+  ektNavInitBase();
   document.body.classList.add("dashboard-active"); // ল্যাপটপে পেছনের আভা দেখানোর জন্য
   const latestUser = JSON.parse(localStorage.getItem("appUser"));
   if (latestUser) currentUser = latestUser;
@@ -1182,17 +1252,22 @@ function showDashboard() {
   updateDashboardPinUI();
 }
 // ================= FRIEND SYSTEM (premium panel + full-screen direct chat) =================
+function closeFriendsPanel() {
+  friendsPanelOverlay.classList.remove("active");
+}
+
 friendIconBtn.addEventListener("click", () => {
   friendsPanelOverlay.classList.add("active");
   fetchFriendData();
+  ektNavPush("friendsPanel", closeFriendsPanel);
 });
 
 document.getElementById("closeFriendsPanelBtn").addEventListener("click", () => {
-  friendsPanelOverlay.classList.remove("active");
+  ektNavGoBack("friendsPanel");
 });
 
 friendsPanelOverlay.addEventListener("click", (e) => {
-  if (e.target === friendsPanelOverlay) friendsPanelOverlay.classList.remove("active");
+  if (e.target === friendsPanelOverlay) ektNavGoBack("friendsPanel");
 });
 
 // ============ FRIEND PERSISTENCE ============
@@ -1473,6 +1548,9 @@ function openDirectChat(friend) {
   // রিলোড দিলে যেন এই একই চ্যাটেই ফিরে আসে, ড্যাশবোর্ডে ছুড়ে না দেয়
   try { sessionStorage.setItem("activeDirectChat", JSON.stringify(friend)); } catch (e) {}
 
+  // ফোনের ব্যাক বাটন চাপলে যেন সরাসরি ট্যাব বন্ধ না হয়ে এই চ্যাট বক্সটাই বন্ধ হয়
+  ektNavPush("directChat", closeDirectChatScreen);
+
   if (unreadDirectCounts[friend.phone]) {
     delete unreadDirectCounts[friend.phone];
     updateFriendBadge();
@@ -1493,10 +1571,16 @@ function openDirectChat(friend) {
   loadDirectChatHistory();
 }
 
-document.getElementById("backFromDirectChatBtn").addEventListener("click", () => {
+function closeDirectChatScreen() {
   directChatScreen.classList.remove("active");
   activeDirectChatFriend = null;
   try { sessionStorage.removeItem("activeDirectChat"); } catch (e) {}
+}
+
+document.getElementById("backFromDirectChatBtn").addEventListener("click", () => {
+  // সরাসরি বন্ধ না করে history.back() কল করা হয়, যাতে ফোনের ব্যাক বাটনের
+  // সাথে এই বাটনের আচরণ সবসময় এক থাকে
+  ektNavGoBack("directChat");
 });
 
 // ================= PROFILE PAGE (নিজের + বন্ধুর) =================
@@ -2518,20 +2602,81 @@ document.addEventListener("click", () => {
   document.querySelectorAll(".post-more-menu.open").forEach((m) => m.classList.remove("open"));
 });
 
+// ============ ডিরেক্ট (ফ্রেন্ড) মেসেজ পার্সিস্টেন্স ============
+// সমস্যা ছিল: সার্ভার (Render) কিছুক্ষণ পর "স্লিপ" মোডে চলে গিয়ে আবার চালু হলে,
+// অথবা রিডিপ্লয় হলে, ডিস্কের app-data.json মুছে যেত এবং ফ্রেন্ডের সাথে করা সব
+// মেসেজ যেন "ডিলিট" হয়ে যেত। রুমের চ্যাটের মতো এখানেও ব্রাউজারে মেসেজ ক্যাশ করা
+// হচ্ছে, আর সাথে সার্ভারকেও (ফ্রেন্ড-লিস্ট সিঙ্কের মতোই) ক্যাশ পাঠিয়ে হারানো ডেটা
+// ফিরিয়ে আনতে (restore) বলা হচ্ছে। এখন ইউজার নিজে ডিলিট না করা পর্যন্ত এবং
+// সার্ভার স্লিপে গেলেও মেসেজ হারাবে না।
+function directMsgCacheKey(friendPhone) {
+  return "direct_history_" + [currentUser.phone, friendPhone].sort().join("_");
+}
+
+function saveDirectMsgCache(friendPhone, messages) {
+  if (!currentUser) return;
+  try {
+    localStorage.setItem(directMsgCacheKey(friendPhone), JSON.stringify((messages || []).slice(-200)));
+  } catch (e) {}
+}
+
+function loadDirectMsgCache(friendPhone) {
+  if (!currentUser) return [];
+  try {
+    const raw = localStorage.getItem(directMsgCacheKey(friendPhone));
+    return raw ? (JSON.parse(raw) || []) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function mergeDirectMessages(a, b) {
+  const seen = new Set();
+  const out = [];
+  (a || []).concat(b || []).forEach((m) => {
+    if (!m) return;
+    const key = m.clientId || [m.senderPhone, m.timestamp, m.text || m.fileContent || ""].join("|");
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(m);
+  });
+  out.sort((x, y) => (x.timestamp || 0) - (y.timestamp || 0));
+  return out;
+}
+
 function loadDirectChatHistory() {
   if (!activeDirectChatFriend) return;
   const chatContainer = document.getElementById("directChatMessages");
-  socket.emit("get-direct-history", { senderPhone: currentUser.phone, receiverPhone: activeDirectChatFriend.phone }, (messages) => {
+  const friendPhone = activeDirectChatFriend.phone;
+
+  // ১) লোকাল ক্যাশ থাকলে সাথে সাথেই দেখানো হয় — নেট স্লো বা সার্ভার তখনও জাগছে
+  // (sleep থেকে ওঠার মাঝখানে) থাকলেও আগের মেসেজ কখনো "খালি/মুছে যাওয়া" দেখাবে না
+  const cachedMessages = loadDirectMsgCache(friendPhone);
+  if (cachedMessages.length) {
+    chatContainer.innerHTML = "";
+    cachedMessages.forEach(msg => appendDirectMessage(msg, { skipStatus: true, silentScroll: true }));
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  // ২) সার্ভারের সাথে সিঙ্ক — ক্যাশে থাকা মেসেজও পাঠানো হয়, যাতে সার্ভার রিস্টার্ট/
+  // স্লিপে ডেটা হারিয়ে থাকলে এই ক্যাশ দিয়েই আবার ফিরিয়ে আনা যায়
+  socket.emit("sync-direct-messages", {
+    myPhone: currentUser.phone,
+    friendPhone,
+    cachedMessages
+  }, (messages) => {
+    const merged = mergeDirectMessages(cachedMessages, messages);
     chatContainer.innerHTML = "";
 
     // পুরো হিস্ট্রি একবারে বসানো হয় (প্রতি মেসেজে স্ট্যাটাস রি-রেন্ডার নয়) —
     // তাই অনেক মেসেজ থাকলেও চ্যাট সাথে সাথে খোলে
-    (messages || []).forEach(msg =>
+    merged.forEach(msg =>
       appendDirectMessage(msg, { skipStatus: true, silentScroll: true })
     );
+    saveDirectMsgCache(friendPhone, merged);
 
     // সর্বশেষ নিজের মেসেজটা বন্ধু দেখেছে কিনা তার উপর স্ট্যাটাস
-    const mine = (messages || []).filter(m => m.senderPhone === currentUser.phone);
+    const mine = merged.filter(m => m.senderPhone === currentUser.phone);
     const last = mine[mine.length - 1];
     directStatusState = last && last.seen
       ? { text: "Seen", seen: true }
@@ -2855,6 +3000,14 @@ function appendDirectMessage(msg, options) {
     return null;
   }
 
+  // এই চ্যাটের প্রতিটা মেসেজ সাথে সাথে লোকাল ক্যাশেও রেখে দেওয়া হয়, যাতে সার্ভার
+  // স্লিপ/রিস্টার্টে ডেটা হারালেও এই ডিভাইস থেকে মেসেজ হারিয়ে না যায়
+  if (activeDirectChatFriend &&
+      (msg.senderPhone === activeDirectChatFriend.phone || msg.receiverPhone === activeDirectChatFriend.phone)) {
+    const nextCache = mergeDirectMessages(loadDirectMsgCache(activeDirectChatFriend.phone), [msg]);
+    saveDirectMsgCache(activeDirectChatFriend.phone, nextCache);
+  }
+
   const opts = options || {};
   const isMe = msg.senderPhone === currentUser.phone;
   const ts = msg.timestamp || Date.now();
@@ -3073,6 +3226,9 @@ function joinRoom(code, isRefresh = false) {
 
   socket.emit("join-room", { roomCode: code, user: currentUser, peerId: myPeerId });
 
+  // ফোনের ব্যাক বাটন চাপলে যেন ট্যাব বন্ধ না হয়ে রুম থেকে বেরিয়ে ড্যাশবোর্ডে আসে
+  ektNavPush("room", leaveCurrentRoom);
+
   chatMessages.innerHTML = "";
   chatLoadingOverlay.style.display = "flex";
 
@@ -3096,7 +3252,7 @@ function joinRoom(code, isRefresh = false) {
   });
 }
 
-leaveRoomBtn.addEventListener("click", () => {
+function leaveCurrentRoom() {
   socket.emit("leave-room", { roomCode: currentRoom });
   sessionStorage.removeItem("activeRoom");
   currentRoom = null;
@@ -3105,6 +3261,10 @@ leaveRoomBtn.addEventListener("click", () => {
   chatMessages.innerHTML = "";
   chatScreen.style.display = "none";
   showDashboard();
+}
+
+leaveRoomBtn.addEventListener("click", () => {
+  ektNavGoBack("room");
 });
 
 logoutBtn.addEventListener("click", () => {
