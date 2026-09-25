@@ -335,6 +335,13 @@
       var titleDone = false;
       var creditDone = false;
       var chargeDone = false;
+      var splashStartTs = Date.now();
+      // রিলোডের সময় স্পিনারটা যেন কমপক্ষে এতটুকু সময় চোখে পড়ে — নাহলে ডেটা
+      // তাড়াতাড়ি রেডি হয়ে গেলে (যেমন সরাসরি ড্যাশবোর্ড, কোনো চ্যাট রিস্টোর করার
+      // দরকার নেই) স্প্ল্যাশ প্রায় সাথে সাথেই সরে যেত — রিং-স্পিনার তখনও নিজের
+      // fade-in অ্যানিমেশনই শেষ করেনি, তাই স্পিনারটা "একদম হালকা" একটা ঝলকের
+      // মতো দেখাত, ঠিকমতো লোডিং ইন্ডিকেটর মনে হতো না
+      var MIN_RESUME_SPLASH_MS = 650;
 
       // সমস্যা ছিল আগের ভার্সনে: "আগে থেকে লগইন করা আছে কিনা" দিয়ে অ্যানিমেশন
       // দেখানো/না-দেখানো ঠিক করা হচ্ছিল — কিন্তু এতে লগইন করা অবস্থায় অ্যাপে নতুন
@@ -379,11 +386,20 @@
         splashDone = true;
         if (rafId) cancelAnimationFrame(rafId);
         var sp = document.getElementById("splashScreen");
-        if (!sp || sp.classList.contains("splash-hide")) return;
-        if (circleEl) circleEl.style.setProperty("--p", 100);
-        if (pctEl) pctEl.textContent = "100%";
-        sp.classList.add("splash-hide");
-        setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
+        if (!sp) return;
+        var doHide = function () {
+          if (sp.classList.contains("splash-hide")) return;
+          if (circleEl) circleEl.style.setProperty("--p", 100);
+          if (pctEl) pctEl.textContent = "100%";
+          sp.classList.add("splash-hide");
+          setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
+        };
+        if (isResumeSession) {
+          var waited = Date.now() - splashStartTs;
+          var remaining = MIN_RESUME_SPLASH_MS - waited;
+          if (remaining > 0) { setTimeout(doHide, remaining); return; }
+        }
+        doHide();
       };
 
       function tryFinish() {
