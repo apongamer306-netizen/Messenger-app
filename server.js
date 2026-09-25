@@ -617,6 +617,40 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback(directMessages[key] || []);
   });
 
+  // Render sleep/restart হলে ephemeral ডিস্ক থেকে app-data.json মুছে গেলে ফ্রেন্ডের
+  // সাথে করা মেসেজ যেন হারিয়ে না যায় — ক্লায়েন্ট নিজের ব্রাউজার-ক্যাশে রাখা মেসেজ
+  // এখানে পাঠায়, সার্ভার সেগুলো নিজের স্টোরের সাথে মার্জ করে ফিরিয়ে দেয়/সেভ করে
+  // রাখে, ঠিক যেমনটা "sync-user-data" ফ্রেন্ড-লিস্টের জন্য করে।
+  function mergeDirectMessageLists(a, b) {
+    const seen = new Set();
+    const out = [];
+    (a || []).concat(b || []).forEach((m) => {
+      if (!m || !m.senderPhone) return;
+      const key = m.clientId || [m.senderPhone, m.timestamp, m.text || m.fileContent || ""].join("|");
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(m);
+    });
+    out.sort((x, y) => (x.timestamp || 0) - (y.timestamp || 0));
+    return out;
+  }
+
+  socket.on("sync-direct-messages", ({ myPhone, friendPhone, cachedMessages }, callback) => {
+    if (!myPhone || !friendPhone) {
+      if (typeof callback === "function") callback([]);
+      return;
+    }
+    const key = directKey(myPhone, friendPhone);
+    const existing = directMessages[key] || [];
+    const safeCache = Array.isArray(cachedMessages) ? cachedMessages.slice(-200) : [];
+    const merged = mergeDirectMessageLists(existing, safeCache);
+    if (merged.length !== existing.length) {
+      directMessages[key] = merged;
+      saveData();
+    }
+    if (typeof callback === "function") callback(directMessages[key] || []);
+  });
+
   socket.on("send-direct-message", (msgData, callback) => {
     const { senderPhone, receiverPhone } = msgData;
 
