@@ -155,7 +155,12 @@ function playRemoteAudio() {
 function _getSoundCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
-  const c = window._ektAudioCtx || new AC();
+  // আগে এখানে নতুন AudioContext তৈরি হলেও window._ektAudioCtx-এ সেভ হতো না,
+  // ফলে প্রতিবার কল হলে নতুন নতুন AudioContext তৈরি হতো (লিক) এবং কিছুক্ষণ পর
+  // ব্রাউজারের AudioContext লিমিট (Chrome-এ সাধারণত ৬টা) পার হয়ে গেলে রিং/ডিং
+  // সাউন্ড একদম বন্ধ হয়ে যেত — এটাই ঠিক করা হলো নিচে।
+  if (!window._ektAudioCtx) window._ektAudioCtx = new AC();
+  const c = window._ektAudioCtx;
   if (c.state === "suspended") c.resume();
   return c;
 }
@@ -188,7 +193,11 @@ function _playClassicRingBurst() {
   }
 }
 function _startSynthRing() {
-  _ringCtx = _getSoundCtx();
+  try {
+    _ringCtx = _getSoundCtx();
+  } catch (e) {
+    _ringCtx = null;
+  }
   if (!_ringCtx) return;
   _playClassicRingBurst();
   setTimeout(() => { if (_ringCtx) _playClassicRingBurst(); }, 850);
@@ -201,22 +210,39 @@ function _startSynthRing() {
 // না পেলে Google Drive লিংক (এটা অনির্ভরযোগ্য — মাঝে মাঝে প্রথমবার বাজলেও পরে
 // আর কাজ করে না), এটাও ব্যর্থ হলে ক্লাসিক synth রিং-এ ফিরে যাবে
 const RINGTONE_SOURCES = [
-  "/rington.mp3",
+  "/rington.mpeg",
   "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp"
 ];
 function _tryRingSource(index) {
   if (index >= RINGTONE_SOURCES.length) { _startSynthRing(); return; }
+  let settled = false;
+  const advanceToNext = () => {
+    if (settled) return;
+    settled = true;
+    if (_ringAudioEl) { try { _ringAudioEl.pause(); } catch (e) {} }
+    _ringAudioEl = null;
+    _tryRingSource(index + 1);
+  };
   try {
     _ringAudioEl = new Audio(RINGTONE_SOURCES[index]);
     _ringAudioEl.loop = true;
     _ringAudioEl.volume = 1;
-    _ringAudioEl.onerror = () => { _ringAudioEl = null; _tryRingSource(index + 1); };
+    _ringAudioEl.onerror = advanceToNext;
+    // সোর্স আসলেই বাজানো যাচ্ছে কনফার্ম হলে টাইমআউটটা যেন আর ফলব্যাক না করে
+    _ringAudioEl.oncanplay = () => { settled = true; };
     const p = _ringAudioEl.play();
     if (p && typeof p.catch === "function") {
-      p.catch(() => { _ringAudioEl = null; _tryRingSource(index + 1); });
+      p.catch(advanceToNext);
     }
+    // Google Drive-এর মতো সোর্স মাঝে মাঝে 404/error ছোঁড়ে না, বরং ভুল কন্টেন্ট
+    // (যেমন HTML কনফার্মেশন পেজ) 200 status-এ রিটার্ন করে — তখন play() promise-ও
+    // reject হয় না আর error ইভেন্টও ফায়ার হয় না, ফলে কোনো শব্দ ছাড়াই আটকে থাকে।
+    // তাই একটা সময়সীমার মধ্যে সত্যিই বাজা শুরু না করলে জোর করে পরের সোর্সে যাওয়া হচ্ছে।
+    setTimeout(() => {
+      if (!settled && _ringAudioEl && _ringAudioEl.readyState < 2) advanceToNext();
+    }, 1500);
   } catch (e) {
-    _tryRingSource(index + 1);
+    advanceToNext();
   }
 }
 function startRingtone() {
@@ -3755,6 +3781,7 @@ async function initiateCall(type) {
 socket.on("incoming-call", (data) => {
   callContext = { mode: "room", phone: null };
   currentCallType = data.callType;
+  unlockRemoteAudio();
 
   openCallScreen({
     mode: "room",
