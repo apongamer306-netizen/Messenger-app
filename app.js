@@ -1042,10 +1042,10 @@ function checkActiveSession() {
     }
   } finally {
     topLoadingBar.style.display = "none";
-    // সেশন থাকলে (রিলোড কেস) আসল স্ক্রিন এখন বসে গেছে — তাই এখনই স্প্ল্যাশ
-    // স্পিনারটা সরিয়ে দেওয়া হয় (index.html-এর isResumeSession পাথ এই কলের
-    // অপেক্ষায় থাকে, নাহলে পুরো ব্র্যান্ডিং অ্যানিমেশন আবার দেখাতো)
-    if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
+    // এটা সত্যিকারের "রিলোড" হলেই (প্রথমবার ঢোকা নয়) আসল স্ক্রিন বসে যাওয়ার
+    // সাথে সাথে স্প্ল্যাশ স্পিনারটা সরানো হয় — ফ্রেশ এন্ট্রির পুরো ব্র্যান্ডিং
+    // অ্যানিমেশন যেন কখনো মাঝপথে কেটে না যায়
+    if (window.__ektSplashIsResume && typeof window.hideSplashScreen === "function") window.hideSplashScreen();
   }
 }
 
@@ -1094,7 +1094,7 @@ function grantAccess() {
   } else {
     authScreen.style.display = "block";
   }
-  if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
+  if (window.__ektSplashIsResume && typeof window.hideSplashScreen === "function") window.hideSplashScreen();
 }
 
 function updateDashboardPinUI() {
