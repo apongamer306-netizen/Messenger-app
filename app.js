@@ -200,6 +200,7 @@ function _startSynthRing() {
 // নিজস্ব ringtone-এর সোর্স — আগে Google Drive-এর ফাইল, না পেলে /ringtone.mp3 (রুট ফোল্ডারে রাখা হলে),
 // এটাও না পেলে ক্লাসিক synth রিং-এ ফিরে যাবে
 const RINGTONE_SOURCES = [
+  "/rington.mpeg",  // GitHub repo-তে আপলোড করা আসল ফাইল (root ফোল্ডারে থাকায় সরাসরি সার্ভ হবে)
   "https://drive.google.com/uc?export=download&id=1-EtdHFYbD-AgVqwZ6WT3IlPLPyCRraUp",
   "/ringtone.mp3"
 ];
