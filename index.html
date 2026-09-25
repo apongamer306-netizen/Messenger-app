@@ -327,6 +327,20 @@
       var creditDone = false;
       var chargeDone = false;
 
+      // সমস্যা ছিল: প্রতিবার রিলোড দিলেই (আগে থেকে লগইন করা থাকা সত্ত্বেও) পুরো
+      // কয়েক সেকেন্ডের ব্র্যান্ডিং অ্যানিমেশন (টাইটেল টাইপিং, % সার্কেল, ক্রেডিট
+      // টাইপরাইটার) আবার নতুন করে চলত — মনে হতো অ্যাপ পুরোপুরি নতুন করে চালু হচ্ছে।
+      // এখন: আগে থেকে সেশন/লগইন করা থাকলে (মানে এটা আসলে "রিলোড", প্রথমবার
+      // খোলা নয়) শুধু ঘোরানো রিং-স্পিনারটাই (sp-energy, যেটা এমনিতেই CSS দিয়ে
+      // অনন্তকাল ঘোরে) দেখানো হয় — টাইটেল/ট্যাগলাইন/% সার্কেল টেক্সট/ক্রেডিট
+      // টাইপিং স্কিপ করে দেওয়া হয়। app.js যখন আসল স্ক্রিন (ড্যাশবোর্ড/চ্যাট) বসিয়ে
+      // ফেলে, তখনই এই স্পিনারটা সরিয়ে দেয় — মানে স্পিনার ঠিক ওই জায়গাতেই ঘোরে,
+      // পুরো নতুন অ্যানিমেশন আর দেখায় না।
+      var isResumeSession = false;
+      try {
+        isResumeSession = sessionStorage.getItem("masterUnlocked") === "true" && !!localStorage.getItem("appUser");
+      } catch (e) {}
+
       var titleEl = document.getElementById("splashTitle");
       var tagEl = document.getElementById("splashTag");
       var circleEl = document.getElementById("splashCircle");
@@ -362,6 +376,21 @@
         if (creditEl) creditEl.textContent = "Developed by Eyamin";
         titleDone = creditDone = chargeDone = true;
         setTimeout(window.hideSplashScreen, 400);
+        return;
+      }
+
+      if (isResumeSession) {
+        // শুধু রিং-স্পিনারটা রেখে বাকি সব টেক্সট/টাইপিং অ্যানিমেশন বাদ — ব্র্যান্ডিং
+        // ইন্ট্রোটা শুধু প্রথমবার লগইনের সময়ই দেখানো হবে, প্রতিটা রিলোডে না।
+        if (titleEl) titleEl.style.display = "none";
+        if (tagEl) tagEl.style.display = "none";
+        if (circleEl) circleEl.style.display = "none";
+        var creditWrap = creditEl ? creditEl.closest(".sp-credit") : null;
+        if (creditWrap) creditWrap.style.display = "none";
+        titleDone = creditDone = chargeDone = true;
+        // app.js আসল স্ক্রিন রেডি হলে window.hideSplashScreen() কল করবে; এখানে শুধু
+        // একটা সেফটি ফলব্যাক রাখা হলো, যদি কোনো কারণে সেই কলটা মিস হয়ে যায়
+        setTimeout(window.hideSplashScreen, 4000);
         return;
       }
 
