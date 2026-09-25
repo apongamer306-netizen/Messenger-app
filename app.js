@@ -165,7 +165,20 @@ function showSoundHint() {
       "padding:12px 20px;border:none;border-radius:999px;background:#ffb300;color:#000;" +
       "font-weight:700;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.45);cursor:pointer;";
     soundHintEl.onclick = () => {
-      remoteAudioElement.play().then(hideSoundHint).catch(() => {});
+      // শুধু WebRTC রিমোট অডিও না, রিংটোনও (mp3/synth) এই এক ট্যাপেই আনলক ও রিট্রাই করা হচ্ছে
+      remoteAudioElement.play().catch(() => {});
+      try {
+        if (window._ektAudioCtx && window._ektAudioCtx.state === "suspended") {
+          window._ektAudioCtx.resume();
+        }
+      } catch (e) {}
+      if (_ringAudioEl) {
+        _ringAudioEl.play().catch(() => {});
+      } else if (_ringWasBlocked) {
+        // mp3/drive সোর্স সবগুলোই ব্লক হয়ে গিয়েছিল — এই জেসচার দিয়ে রিংটোন আবার শুরু করা
+        startRingtone();
+      }
+      hideSoundHint();
     };
     document.body.appendChild(soundHintEl);
   }
@@ -181,6 +194,26 @@ function playRemoteAudio() {
     p.then(hideSoundHint).catch(() => showSoundHint());
   }
 }
+
+// ================= প্রথম ট্যাপ/ক্লিকেই সাউন্ড "প্রাইম" করে রাখা =================
+// সমস্যা ছিল: ব্রাউজার সেশন আগে থেকেই আনলক (masterUnlocked) থাকলে Welcome স্ক্রিনে আর
+// ক্লিক করতে হয় না, ফলে requestAppPermissions() কখনো চলে না — আর প্রথম যে কলটা আসে
+// (বা প্রথম যে ডিভাইসে কল যায়) সেটার রিংটোন ব্রাউজারের অটোপ্লে-ব্লকে পুরোপুরি চুপচাপ
+// আটকে যেত (কোনো এরর/হিন্টও দেখাতো না)। ঠিক তার পরের কলে ঠিকমতো বাজতো, কারণ ততক্ষণে
+// ইউজার স্ক্রিনে অন্য কোথাও একবার ট্যাপ/ক্লিক করে ফেলেছিল, যেটা ব্রাউজারকে "ইউজার এই
+// পেজে ইন্টারঅ্যাক্ট করেছে" নিশ্চিত করে দিয়েছিল। তাই অ্যাপের যেকোনো প্রথম ট্যাপ/ক্লিকেই
+// (Welcome স্ক্রিনের বাইরেও — ড্যাশবোর্ডে, চ্যাটে, যেকোনো জায়গায়) অডিও প্রাইম করে রাখা হচ্ছে,
+// যাতে আসল কল আসার আগেই সাউন্ড আনলক হয়ে থাকে।
+let _audioPrimedOnce = false;
+function _primeAudioOnce() {
+  if (_audioPrimedOnce) return;
+  _audioPrimedOnce = true;
+  try { unlockRemoteAudio(); } catch (e) {}
+  try { _getSoundCtx(); } catch (e) {}
+}
+["pointerdown", "touchstart", "keydown"].forEach((evt) => {
+  document.addEventListener(evt, _primeAudioOnce, { passive: true });
+});
 
 // ================= শব্দ এফেক্ট (Web Audio API — কোনো বাইরের ফাইল লাগে না) =================
 function _getSoundCtx() {
@@ -214,6 +247,10 @@ function _tone(ac, freq, start, dur, peakGain, type) {
 let _ringCtx = null;
 let _ringInterval = null;
 let _ringAudioEl = null;
+// ব্রাউজারের অটোপ্লে-ব্লকের কারণে রিংটোন পুরোপুরি চুপচাপ আটকে গেলে (কোনো এরর ছাড়াই,
+// কারণ suspended AudioContext-এ tone() কল রিজেক্ট হয় না, শুধু শোনা যায় না) এই ফ্ল্যাগ দিয়ে
+// সেটা ট্র্যাক করা হয় যাতে "🔊 ট্যাপ করুন" হিন্ট দেখিয়ে ট্যাপেই আবার রিং শুরু করা যায়।
+let _ringWasBlocked = false;
 function _playClassicRingBurst() {
   const ac = _ringCtx;
   if (!ac) return;
@@ -229,7 +266,19 @@ function _startSynthRing() {
   } catch (e) {
     _ringCtx = null;
   }
-  if (!_ringCtx) return;
+  if (!_ringCtx) {
+    _ringWasBlocked = true;
+    showSoundHint();
+    return;
+  }
+  if (_ringCtx.state === "suspended") {
+    // resume() নিজে থেকে ব্যর্থ হলেও প্রমিস রিজেক্ট করে না — কোনো শব্দ ছাড়াই আটকে থাকে,
+    // তাই ইউজারকে দৃশ্যমান হিন্ট দিয়ে ট্যাপ করতে বলা হচ্ছে
+    _ringWasBlocked = true;
+    showSoundHint();
+  } else {
+    _ringWasBlocked = false;
+  }
   _playClassicRingBurst();
   setTimeout(() => { if (_ringCtx) _playClassicRingBurst(); }, 850);
   _ringInterval = setInterval(() => {
@@ -260,9 +309,11 @@ function _tryRingSource(index) {
     _ringAudioEl.volume = 1;
     _ringAudioEl.onerror = advanceToNext;
     // সোর্স আসলেই বাজানো যাচ্ছে কনফার্ম হলে টাইমআউটটা যেন আর ফলব্যাক না করে
-    _ringAudioEl.oncanplay = () => { settled = true; };
+    _ringAudioEl.oncanplay = () => { settled = true; _ringWasBlocked = false; hideSoundHint(); };
     const p = _ringAudioEl.play();
     if (p && typeof p.catch === "function") {
+      // NotAllowedError মানে অটোপ্লে ব্লক — synth ফলব্যাকেও একই কারণে আটকাবে,
+      // তাই এখানেই হিন্ট দেখিয়ে দেয়া হচ্ছে (advanceToNext-এর পর synth-ও নিজে থেকে দেখাবে, ডুপ্লিকেট নয়)
       p.catch(advanceToNext);
     }
     // Google Drive-এর মতো সোর্স মাঝে মাঝে 404/error ছোঁড়ে না, বরং ভুল কন্টেন্ট
@@ -284,6 +335,7 @@ function stopRingtone() {
   if (_ringInterval) { clearInterval(_ringInterval); _ringInterval = null; }
   _ringCtx = null; // window._ektAudioCtx নিজে বন্ধ করা হয় না, অন্য জায়গায়ও ব্যবহার হয়
   if (_ringAudioEl) { try { _ringAudioEl.pause(); } catch (e) {} _ringAudioEl = null; }
+  if (_ringWasBlocked) { _ringWasBlocked = false; hideSoundHint(); }
 }
 
 // ---- নতুন মেসেজ এলে হালকা "ডিং" নোটিফিকেশন সাউন্ড — সফট মারিম্বা স্টাইল ----
