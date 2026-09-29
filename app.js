@@ -1010,7 +1010,7 @@ function showCustomAlert(title, subtitle) {
   });
 }
 function showUploadLockout(kind) {
-  const label = (kind === "picture" || kind === "avatar" || kind === "photo" || kind === "cover") ? "your picture" : (kind === "post" ? "your post" : "your data");
+  const label = (kind === "picture" || kind === "avatar" || kind === "photo" || kind === "cover") ? "your picture" : (kind === "post" ? "your post" : (kind === "reel" ? "your reel" : "your data"));
   modalTitle.textContent = "Uploading…";
   modalSubtitle.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;justify-content:center;"><i class="fa-solid fa-spinner fa-spin" style="font-style:normal;"></i>Uploading ' + label + ', please wait</span>';
   modalInputGroup.style.display = "none";
@@ -1021,7 +1021,7 @@ function showUploadLockout(kind) {
 function showUploadResult(success, kind) {
   if (success) {
     modalTitle.textContent = "Uploaded";
-    modalSubtitle.textContent = kind === "post" ? "Your post has been uploaded successfully." : kind === "cover" ? "Your cover photo has been uploaded successfully." : "Your picture has been uploaded successfully.";
+    modalSubtitle.textContent = kind === "post" ? "Your post has been uploaded successfully." : kind === "reel" ? "Your reel has been uploaded successfully." : kind === "cover" ? "Your cover photo has been uploaded successfully." : "Your picture has been uploaded successfully.";
   } else {
     modalTitle.textContent = "Upload failed";
     modalSubtitle.textContent = "Could not upload. Please try again.";
@@ -1034,7 +1034,7 @@ function showUploadResult(success, kind) {
     document.getElementById("modalConfirmBtn").onclick = () => { customModalOverlay.style.display = "none"; resolve(true); };
   });
 }
-function runUploadWithLockout(kind, emitFn) {
+function runUploadWithLockout(kind, emitFn, timeoutMs) {
   showUploadLockout(kind);
   return new Promise((resolve) => {
     let settled = false;
@@ -1044,7 +1044,7 @@ function runUploadWithLockout(kind, emitFn) {
       resolve({ ok: !!ok, payload });
     };
     try { emitFn((res) => finish(res && res.success, res)); } catch (e) { finish(false, null); }
-    setTimeout(() => { if (!settled) finish(false, null); }, 45000);
+    setTimeout(() => { if (!settled) finish(false, null); }, timeoutMs || 45000);
   });
 }
 function applyPmCover(coverUrl, coverY, showPosBar) {
@@ -1742,11 +1742,12 @@ profileModalOverlay.innerHTML = `
         <button type="button" id="pmEditNameBtn" class="pm-edit-name-btn" style="display:none;" title="Change name"><i class="fa-solid fa-pen"></i></button>
       </div>
       <div id="pmSub" class="profile-modal-sub pm-bio-box">Friend on EKT Chatter</div>
+      <div id="pmAboutBox" class="pm-about-box"></div>
 
       <div class="profile-tabs">
         <button class="profile-tab active" data-tab="posts">Posts</button>
-        <button class="profile-tab" data-tab="about">About</button>
         <button class="profile-tab" data-tab="photos">Photos</button>
+        <button class="profile-tab" data-tab="reels">Reels</button>
       </div>
 
       <div id="pmTabPosts" class="profile-tab-panel">
@@ -1764,7 +1765,6 @@ profileModalOverlay.innerHTML = `
         <div id="pmPostsFeed" class="posts-feed"></div>
       </div>
 
-      <div id="pmTabAbout" class="profile-tab-panel" style="display:none;"></div>
       <div id="pmTabMedia" class="profile-tab-panel" style="display:none;">
         <div id="pmUploadRow" class="profile-upload-row" style="display:none;">
           <button class="profile-upload-btn" id="pmUploadBtn"><i class="fa-solid fa-plus"></i> <span id="pmUploadLabel">Add</span></button>
@@ -2074,110 +2074,108 @@ socket.on("post-updated", ({ phone, postId, likes, comments }) => {
 
 function renderProfileAbout() {
   const d = profileViewState.data || {};
-  const box = document.getElementById("pmTabAbout");
+  const box = document.getElementById("pmAboutBox");
   if (!box) return;
+  const isMe = !!profileViewState.isMe;
+  const editing = isMe && !!profileViewState.aboutEditing;
 
-  if (profileViewState.isMe) {
-    const editing = !!profileViewState.aboutEditing;
-    if (!editing) {
-      // View mode — only details + Edit (no Save / Close)
-      const html =
-        detailRow("fa-solid fa-quote-left", "Bio", d.bio) +
-        detailRow("fa-solid fa-location-dot", "Lives in", d.location) +
-        detailRow("fa-solid fa-briefcase", "Work", d.work) +
-        detailRow("fa-solid fa-graduation-cap", "Education", d.education) +
-        detailRow("fa-solid fa-circle-info", "About", d.about);
-      box.innerHTML =
-        (html || `<div class="profile-empty">এখনো About খালি। Edit দিয়ে যোগ করুন।</div>`) +
-        `<div class="profile-about-actions">
-           <button type="button" id="pfEditBtn" class="btn btn-primary">
-             <i class="fa-solid fa-pen"></i> Edit
-           </button>
-         </div>`;
-      const editBtn = document.getElementById("pfEditBtn");
-      if (editBtn) {
-        editBtn.onclick = function () {
-          profileViewState.aboutEditing = true;
-          profileViewState.aboutDirty = false;
-          renderProfileAbout();
-        };
-      }
-    } else {
-      // Edit mode — fields; Save/Close only after a change
-      box.innerHTML = `
-        <input class="profile-edit-field" id="pfBio" placeholder="Bio / স্ট্যাটাস" value="${escapeHtml(d.bio || "")}">
-        <input class="profile-edit-field" id="pfLocation" placeholder="কোথায় থাকেন" value="${escapeHtml(d.location || "")}">
-        <input class="profile-edit-field" id="pfWork" placeholder="কাজ / পেশা" value="${escapeHtml(d.work || "")}">
-        <input class="profile-edit-field" id="pfEducation" placeholder="পড়াশোনা" value="${escapeHtml(d.education || "")}">
-        <textarea class="profile-edit-field" id="pfAbout" placeholder="নিজের সম্পর্কে কিছু লিখুন...">${escapeHtml(d.about || "")}</textarea>
-        <div class="profile-about-actions" id="pfEditActions" style="display:none;">
-          <button type="button" id="pfSaveBtn" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-          <button type="button" id="pfCancelBtn" class="btn btn-secondary">Close</button>
-        </div>`;
-      const snap = {
-        bio: d.bio || "",
-        location: d.location || "",
-        work: d.work || "",
-        education: d.education || "",
-        about: d.about || ""
-      };
-      function currentVals() {
-        return {
-          bio: (document.getElementById("pfBio") || {}).value || "",
-          location: (document.getElementById("pfLocation") || {}).value || "",
-          work: (document.getElementById("pfWork") || {}).value || "",
-          education: (document.getElementById("pfEducation") || {}).value || "",
-          about: (document.getElementById("pfAbout") || {}).value || ""
-        };
-      }
-      function isDirty() {
-        const v = currentVals();
-        return v.bio !== snap.bio || v.location !== snap.location || v.work !== snap.work ||
-          v.education !== snap.education || v.about !== snap.about;
-      }
-      function syncActions() {
-        const dirty = isDirty();
-        profileViewState.aboutDirty = dirty;
-        const actions = document.getElementById("pfEditActions");
-        if (actions) actions.style.display = dirty ? "flex" : "none";
-      }
-      ["pfBio", "pfLocation", "pfWork", "pfEducation", "pfAbout"].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener("input", syncActions);
-        el.addEventListener("change", syncActions);
-      });
-      const saveBtn = document.getElementById("pfSaveBtn");
-      if (saveBtn) saveBtn.onclick = saveMyProfile;
-      const cancelBtn = document.getElementById("pfCancelBtn");
-      if (cancelBtn) {
-        cancelBtn.onclick = function () {
-          profileViewState.aboutEditing = false;
-          profileViewState.aboutDirty = false;
-          renderProfileAbout();
-        };
-      }
-      syncActions();
-    }
-  } else {
-    const html =
-      detailRow("fa-solid fa-phone", "Phone", d.phone) +
+  if (!editing) {
+    const rows =
+      (isMe ? "" : detailRow("fa-solid fa-phone", "Phone", d.phone)) +
       detailRow("fa-solid fa-location-dot", "Lives in", d.location) +
       detailRow("fa-solid fa-briefcase", "Work", d.work) +
       detailRow("fa-solid fa-graduation-cap", "Education", d.education) +
-      detailRow("fa-solid fa-circle-info", "About", d.about);
-    box.innerHTML = html || `<div class="profile-empty">এই বন্ধু এখনো প্রোফাইলে কিছু যোগ করেননি।</div>`;
+      detailRow("fa-solid fa-circle-info", "About me", d.about);
+    if (!isMe && !rows) { box.style.display = "none"; box.innerHTML = ""; return; }
+    box.style.display = "block";
+    box.innerHTML =
+      `<div class="pm-about-head">
+         <span class="pm-about-title"><i class="fa-solid fa-circle-info"></i> About</span>
+         ${isMe ? '<button type="button" id="pfEditBtn" class="pm-about-edit-btn" title="Edit"><i class="fa-solid fa-pen"></i></button>' : ""}
+       </div>` +
+      (rows || `<div class="profile-empty">এখনো কিছু যোগ করা হয়নি। ✎ চেপে যোগ করুন।</div>`);
+    const editBtn = document.getElementById("pfEditBtn");
+    if (editBtn) {
+      editBtn.onclick = function () {
+        profileViewState.aboutEditing = true;
+        profileViewState.aboutDirty = false;
+        renderProfileAbout();
+      };
+    }
+    return;
   }
+
+  box.style.display = "block";
+  box.innerHTML = `
+    <div class="pm-about-head">
+      <span class="pm-about-title"><i class="fa-solid fa-circle-info"></i> About</span>
+    </div>
+    <input class="profile-edit-field" id="pfBio" placeholder="Bio / স্ট্যাটাস" value="${escapeHtml(d.bio || "")}">
+    <input class="profile-edit-field" id="pfLocation" placeholder="কোথায় থাকেন" value="${escapeHtml(d.location || "")}">
+    <input class="profile-edit-field" id="pfWork" placeholder="কাজ / পেশা" value="${escapeHtml(d.work || "")}">
+    <input class="profile-edit-field" id="pfEducation" placeholder="পড়াশোনা" value="${escapeHtml(d.education || "")}">
+    <textarea class="profile-edit-field" id="pfAbout" placeholder="নিজের সম্পর্কে কিছু লিখুন...">${escapeHtml(d.about || "")}</textarea>
+    <div class="profile-about-actions" id="pfEditActions" style="display:none;">
+      <button type="button" id="pfSaveBtn" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+      <button type="button" id="pfCancelBtn" class="btn btn-secondary">Close</button>
+    </div>
+    <div class="profile-about-actions" id="pfCloseOnly">
+      <button type="button" id="pfCloseOnlyBtn" class="btn btn-secondary">Close</button>
+    </div>`;
+  const snap = {
+    bio: d.bio || "", location: d.location || "", work: d.work || "",
+    education: d.education || "", about: d.about || ""
+  };
+  function currentVals() {
+    return {
+      bio: (document.getElementById("pfBio") || {}).value || "",
+      location: (document.getElementById("pfLocation") || {}).value || "",
+      work: (document.getElementById("pfWork") || {}).value || "",
+      education: (document.getElementById("pfEducation") || {}).value || "",
+      about: (document.getElementById("pfAbout") || {}).value || ""
+    };
+  }
+  function isDirty() {
+    const v = currentVals();
+    return v.bio !== snap.bio || v.location !== snap.location || v.work !== snap.work ||
+      v.education !== snap.education || v.about !== snap.about;
+  }
+  function syncActions() {
+    const dirty = isDirty();
+    profileViewState.aboutDirty = dirty;
+    const actions = document.getElementById("pfEditActions");
+    const closeOnly = document.getElementById("pfCloseOnly");
+    if (actions) actions.style.display = dirty ? "flex" : "none";
+    if (closeOnly) closeOnly.style.display = dirty ? "none" : "flex";
+  }
+  ["pfBio", "pfLocation", "pfWork", "pfEducation", "pfAbout"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", syncActions);
+    el.addEventListener("change", syncActions);
+  });
+  function closeEdit() {
+    profileViewState.aboutEditing = false;
+    profileViewState.aboutDirty = false;
+    renderProfileAbout();
+  }
+  const saveBtn = document.getElementById("pfSaveBtn");
+  if (saveBtn) saveBtn.onclick = saveMyProfile;
+  const cancelBtn = document.getElementById("pfCancelBtn");
+  if (cancelBtn) cancelBtn.onclick = closeEdit;
+  const closeOnlyBtn = document.getElementById("pfCloseOnlyBtn");
+  if (closeOnlyBtn) closeOnlyBtn.onclick = closeEdit;
+  syncActions();
 }
 
 function renderProfileGallery(kind) {
   const gallery = document.getElementById("pmGallery");
   const items = (profileViewState.data.items || []).filter((it) => it.kind === kind);
 
-  gallery.className = "profile-gallery" + (profileViewState.isMe ? " editable" : "");
+  gallery.className = "profile-gallery" + (kind === "reel" ? " reels" : "") + (profileViewState.isMe ? " editable" : "");
 
   if (!items.length) {
-    const label = kind === "photo" ? "ছবি" : kind === "video" ? "ভিডিও" : "অডিও";
+    const label = kind === "photo" ? "ছবি" : kind === "reel" ? "রিলস" : kind === "video" ? "ভিডিও" : "অডিও";
     gallery.innerHTML = `<div class="profile-empty">এখনো কোনো ${label} নেই।</div>`;
     return;
   }
@@ -2185,7 +2183,7 @@ function renderProfileGallery(kind) {
   gallery.innerHTML = items.map((it) => {
     const inner =
       kind === "photo" ? `<img src="${it.src}" alt="">`
-      : kind === "video" ? `<video src="${it.src}#t=0.1" muted preload="metadata"></video><span class="pg-badge"><i class="fa-solid fa-play"></i></span>`
+      : (kind === "video" || kind === "reel") ? `<video src="${it.src}#t=0.1" muted preload="metadata"></video><span class="pg-badge"><i class="fa-solid fa-play"></i></span>`
       : `<i class="fa-solid fa-music"></i>`;
     return `<div class="profile-gallery-item ${kind === "audio" ? "audio-item" : ""}" data-id="${it.id}">
               ${inner}
@@ -2197,7 +2195,7 @@ function renderProfileGallery(kind) {
     el.onclick = (e) => {
       if (e.target.closest(".pg-delete")) return;
       const item = items.find((i) => i.id === el.dataset.id);
-      if (item) openMediaPreview(kind === "photo" ? "image" : kind, item.src, item.name);
+      if (item) openMediaPreview(kind === "photo" ? "image" : (kind === "reel" ? "video" : kind), item.src, item.name);
     };
   });
 
@@ -2214,23 +2212,18 @@ function renderProfileGallery(kind) {
 }
 
 function switchProfileTab(tab) {
-  if (tab !== "about") {
-    profileViewState.aboutEditing = false;
-    profileViewState.aboutDirty = false;
-  }
+  if (tab !== "posts" && tab !== "photos" && tab !== "reels") tab = "posts";
   profileViewState.tab = tab;
   document.querySelectorAll(".profile-tab").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
 
   const postsBox = document.getElementById("pmTabPosts");
-  const aboutBox = document.getElementById("pmTabAbout");
   const mediaBox = document.getElementById("pmTabMedia");
   const uploadRow = document.getElementById("pmUploadRow");
 
   if (tab === "posts") {
     postsBox.style.display = "block";
-    aboutBox.style.display = "none";
     mediaBox.style.display = "none";
 
     pmComposer.style.display = profileViewState.isMe ? "block" : "none";
@@ -2242,24 +2235,14 @@ function switchProfileTab(tab) {
   }
 
   postsBox.style.display = "none";
-
-  if (tab === "about") {
-    aboutBox.style.display = "block";
-    mediaBox.style.display = "none";
-    renderProfileAbout();
-    return;
-  }
-
-  aboutBox.style.display = "none";
   mediaBox.style.display = "block";
 
-  // শুধু Photos
-  const kind = "photo";
+  const kind = tab === "reels" ? "reel" : "photo";
   uploadRow.style.display = profileViewState.isMe ? "flex" : "none";
-  document.getElementById("pmUploadLabel").textContent = "Add Photo";
-  profileFileInput.accept = "image/*";
-  profileFileInput.dataset.kind = "photo";
-  renderProfileGallery("photo");
+  document.getElementById("pmUploadLabel").textContent = kind === "reel" ? "Upload Reel" : "Add Photo";
+  profileFileInput.accept = kind === "reel" ? "video/*" : "image/*";
+  profileFileInput.dataset.kind = kind;
+  renderProfileGallery(kind);
 }
 
 document.querySelectorAll(".profile-tab").forEach((btn) => {
@@ -2269,10 +2252,64 @@ document.querySelectorAll(".profile-tab").forEach((btn) => {
 // ---------- আপলোড ----------
 document.getElementById("pmUploadBtn").onclick = () => profileFileInput.click();
 
+// ---------- Reels আপলোড (শুধু ভিডিও) ----------
+const REEL_MAX_BYTES = 40 * 1024 * 1024; // ৪০ MB
+const REEL_MAX_SECONDS = 90;             // সর্বোচ্চ ৯০ সেকেন্ড
+
+function getVideoDuration(file) {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    v.preload = "metadata";
+    v.onloadedmetadata = () => { const d = v.duration; URL.revokeObjectURL(url); resolve(isFinite(d) ? d : 0); };
+    v.onerror = () => { URL.revokeObjectURL(url); resolve(-1); };
+    v.src = url;
+  });
+}
+
+async function handleReelUpload(file) {
+  if (!file.type || !file.type.startsWith("video/")) {
+    await showCustomAlert("Videos only", "Reels-এ শুধু ভিডিও আপলোড করা যাবে।");
+    return;
+  }
+  if (file.size > REEL_MAX_BYTES) {
+    await showCustomAlert("Too large", "ভিডিওটি অনেক বড়। সর্বোচ্চ ৪০ MB পর্যন্ত আপলোড করা যাবে।");
+    return;
+  }
+  const dur = await getVideoDuration(file);
+  if (dur === -1) {
+    await showCustomAlert("Error", "ভিডিওটি পড়া যায়নি, অন্য ভিডিও চেষ্টা করুন।");
+    return;
+  }
+  if (dur > REEL_MAX_SECONDS) {
+    await showCustomAlert("Too long", "Reel সর্বোচ্চ " + REEL_MAX_SECONDS + " সেকেন্ডের হতে পারবে।");
+    return;
+  }
+  let src;
+  try { src = await readFileAsDataUrl(file); }
+  catch (e) { await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।"); return; }
+
+  const item = {
+    id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    kind: "reel",
+    src: src,
+    name: file.name,
+    timestamp: Date.now()
+  };
+  const { ok, payload: res } = await runUploadWithLockout("reel", (done) => {
+    socket.emit("add-profile-reel", { phone: currentUser.phone, item }, done);
+  }, 180000);
+  if (ok && res) {
+    profileViewState.data.items = res.items;
+    if (profileViewState.tab === "reels") renderProfileGallery("reel");
+  }
+}
+
 profileFileInput.onchange = async () => {
   const file = profileFileInput.files[0];
   profileFileInput.value = "";
   if (!file || !currentUser) return;
+  if (profileFileInput.dataset.kind === "reel") { await handleReelUpload(file); return; }
   if (!file.type || !file.type.startsWith("image/")) {
     await showCustomAlert("Photos only", "শুধু ছবি আপলোড করা যাবে।");
     return;
@@ -2328,13 +2365,13 @@ function saveMyProfile() {
       if (sub) {
         const bioText = (profile.bio || "").trim();
         if (bioText) { sub.textContent = bioText; sub.classList.add("has-bio"); }
-        else { sub.textContent = "About ট্যাব থেকে bio যোগ করুন"; sub.classList.remove("has-bio"); }
+        else { sub.textContent = "About বক্সের ✎ চেপে bio যোগ করুন"; sub.classList.remove("has-bio"); }
       }
       try { localStorage.setItem("myProfileAbout_" + currentUser.phone, JSON.stringify(profile)); } catch (e) {}
       await showCustomAlert("Saved ✓", "আপনার প্রোফাইল সফলভাবে সেভ হয়েছে।");
       profileViewState.aboutEditing = false;
       profileViewState.aboutDirty = false;
-      if (profileViewState.tab === "about") renderProfileAbout();
+      renderProfileAbout();
       if (typeof showMiniToast === "function") showMiniToast("Profile saved");
     } else {
       showCustomAlert("Error", "সেভ করা যায়নি, আবার চেষ্টা করুন।");
@@ -2418,6 +2455,7 @@ function openProfile(phone, fallback) {
   pmComposerPreview.innerHTML = "";
   profileViewState = { phone, isMe, data: fallback || {}, tab: "posts" };
   profileModalOverlay.classList.add("active");
+  renderProfileAbout();
   switchProfileTab("posts");
   socket.emit("get-profile", { phone, viewerPhone: currentUser.phone }, (data) => {
     if (!data) return;
@@ -2427,9 +2465,10 @@ function openProfile(phone, fallback) {
     const subEl = document.getElementById("pmSub");
     const bioText = (data.bio || "").trim();
     if (bioText) { subEl.textContent = bioText; subEl.classList.add("has-bio"); }
-    else { subEl.textContent = isMe ? "About ট্যাব থেকে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
+    else { subEl.textContent = isMe ? "About বক্সের ✎ চেপে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
     applyPmCover(data.cover || null, data.coverY, false);
     updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
+    renderProfileAbout();
     switchProfileTab(profileViewState.tab);
   });
 }
@@ -2445,6 +2484,7 @@ socket.on("friend-profile-updated", ({ phone }) => {
     socket.emit("get-profile", { phone }, (data) => {
       if (data) {
         profileViewState.data = data;
+        if (!profileViewState.isMe) renderProfileAbout();
         switchProfileTab(profileViewState.tab);
       }
     });
