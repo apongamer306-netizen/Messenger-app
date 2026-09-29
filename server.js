@@ -54,6 +54,35 @@ async function uploadToCloudinary(dataUrl, name) {
   }
 }
 
+// ---- Cloudinary VIDEO (Reels) — একই unsigned preset, শুধু /video/upload এন্ডপয়েন্ট ----
+async function uploadVideoToCloudinary(dataUrl, name) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) return null;
+  try {
+    const raw = String(dataUrl || "");
+    if (!raw.startsWith("data:video/") || raw.length < 32) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+    const form = new FormData();
+    form.append("file", raw);
+    form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    if (name) form.append("public_id", String(name).replace(/\.[a-zA-Z0-9]+$/, "").slice(0, 60) + "_" + Date.now().toString(36));
+    const res = await doFetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, {
+      method: "POST",
+      body: form,
+    });
+    const json = await res.json();
+    if (json && json.secure_url) {
+      console.log("Cloudinary video upload OK:", json.secure_url);
+      return json.secure_url;
+    }
+    console.warn("Cloudinary video upload failed:", JSON.stringify((json && json.error) || json));
+    return null;
+  } catch (e) {
+    console.warn("Cloudinary video upload error:", e.message);
+    return null;
+  }
+}
+
 // ---- imgbb (legacy fallback — মাঝে মাঝে ওদের নিজস্ব bot-protection normal ব্যবহারকারীকেও ব্লক করে) ----
 async function uploadToImgbb(dataUrlOrBase64, name) {
   if (!IMGBB_API_KEY) return null;
@@ -935,10 +964,12 @@ io.on("connection", (socket) => {
     }
     if (!profiles[phone]) profiles[phone] = {};
     if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
-    // শুধু photo আইটেম + URL (ছোট) — অনেক বেশি রাখা যায়
-    profiles[phone].items = profiles[phone].items.filter((it) => it && it.kind === "photo");
-    profiles[phone].items.unshift(item);
-    profiles[phone].items = profiles[phone].items.slice(0, 100);
+    // ছবি (সর্বোচ্চ ১০০) + বিদ্যমান reels আলাদা রাখা
+    {
+      const keepReels = profiles[phone].items.filter((it) => it && it.kind === "reel");
+      const photos = [item].concat(profiles[phone].items.filter((it) => it && it.kind === "photo")).slice(0, 100);
+      profiles[phone].items = photos.concat(keepReels);
+    }
     saveData();
 
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
@@ -947,6 +978,42 @@ io.on("connection", (socket) => {
     });
 
     if (typeof callback === "function") callback({ success: true, items: profiles[phone].items });
+  });
+
+  // ---------- Reels (শুধু ভিডিও) ----------
+  socket.on("add-profile-reel", async ({ phone, item }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!phone || !item || !item.src) return reply({ success: false, error: "missing", message: "ভিডিও পাওয়া যায়নি।" });
+
+    let src = String(item.src);
+    if (src.startsWith("data:")) {
+      if (!src.startsWith("data:video/")) return reply({ success: false, error: "videos_only", message: "Reels-এ শুধু ভিডিও।" });
+      const remote = await uploadVideoToCloudinary(src, item.name || "reel");
+      if (!remote) return reply({ success: false, error: "upload_failed", message: "রিলস আপলোড হয়নি।" });
+      src = remote;
+    } else if (!/^https?:\/\//.test(src)) {
+      return reply({ success: false, error: "invalid", message: "ভিডিও ঠিক নেই।" });
+    }
+
+    const reel = {
+      id: String(item.id || ("r" + Date.now().toString(36))).slice(0, 60),
+      kind: "reel",
+      src,
+      name: String(item.name || "reel").slice(0, 120),
+      timestamp: Date.now(),
+    };
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+    const photos = profiles[phone].items.filter((it) => it && it.kind === "photo");
+    const reels = [reel].concat(profiles[phone].items.filter((it) => it && it.kind === "reel")).slice(0, 30);
+    profiles[phone].items = photos.concat(reels);
+    saveData();
+
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+    });
+    reply({ success: true, items: profiles[phone].items });
   });
 
   socket.on("delete-profile-item", ({ phone, itemId }, callback) => {
