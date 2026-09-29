@@ -193,49 +193,117 @@ function trimMessages(store) {
   return out;
 }
 
-function loadData() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) return;
-    const raw = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-    users = raw.users || {};
-    friendships = arraysToSets(raw.friendships);
-    friendRequests = arraysToSets(raw.friendRequests);
-    blockedUsers = arraysToSets(raw.blockedUsers);
-    directMessages = raw.directMessages || {};
-    roomMessages = raw.roomMessages || {};
-    profiles = raw.profiles || {};
-    directThemes = raw.directThemes || {};
-    reports = raw.reports || [];
-    bannedUsers = raw.bannedUsers || {};
-    console.log("Saved data loaded successfully.");
-  } catch (e) {
-    console.error("Could not load saved data:", e.message);
+// ================= স্থায়ী স্টোরেজ (MongoDB Atlas — ফ্রি) =================
+// MONGODB_URI সেট করা থাকলে সব ডেটা MongoDB-তে সেভ হবে, তাই Render রিস্টার্ট/ডিপ্লয় হলেও
+// ইউজার অ্যাকাউন্ট, ফ্রেন্ড লিস্ট, প্রোফাইল, মেসেজ মুছবে না — এবং যেকোনো ফোন থেকে লগইন চলবে।
+// সেট করা না থাকলে আগের মতোই app-data.json ফাইলে সেভ হবে।
+const MONGODB_URI = process.env.MONGODB_URI || "";
+let mongoCol = null;
+const lastSavedJson = {}; // key -> শেষবার যে JSON সেভ হয়েছে (বদলায়নি এমন অংশ আবার লেখা এড়াতে)
+
+async function connectMongo() {
+  if (!MONGODB_URI) return;
+  const { MongoClient } = require("mongodb");
+  const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 15000 });
+  await client.connect();
+  mongoCol = client.db(process.env.MONGODB_DB || "ektchatter").collection("appdata");
+  console.log("✅ MongoDB connected — user data is now persistent.");
+}
+
+async function readStoredData() {
+  if (mongoCol) {
+    const docs = await mongoCol.find({}).toArray();
+    if (docs.length) {
+      const raw = {};
+      docs.forEach((d) => {
+        try {
+          raw[d._id] = JSON.parse(d.json);
+          lastSavedJson[d._id] = d.json;
+        } catch (e) {
+          console.error("Bad stored doc for key", d._id, e.message);
+        }
+      });
+      return raw;
+    }
+    console.log("MongoDB is empty — trying to seed from local app-data.json (if any).");
   }
+  if (!fs.existsSync(DATA_FILE)) return null;
+  return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+}
+
+async function loadData() {
+  const raw = await readStoredData();
+  if (!raw) return;
+  users = raw.users || {};
+  friendships = arraysToSets(raw.friendships);
+  friendRequests = arraysToSets(raw.friendRequests);
+  blockedUsers = arraysToSets(raw.blockedUsers);
+  directMessages = raw.directMessages || {};
+  roomMessages = raw.roomMessages || {};
+  profiles = raw.profiles || {};
+  directThemes = raw.directThemes || {};
+  reports = raw.reports || [];
+  bannedUsers = raw.bannedUsers || {};
+  console.log("Saved data loaded successfully.");
+}
+
+function buildPayload() {
+  return {
+    users,
+    friendships: setsToArrays(friendships),
+    friendRequests: setsToArrays(friendRequests),
+    blockedUsers: setsToArrays(blockedUsers),
+    directMessages: trimMessages(directMessages),
+    roomMessages: trimMessages(roomMessages),
+    profiles,
+    directThemes,
+    reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
+    bannedUsers,
+  };
+}
+
+async function persistPayload() {
+  const payload = buildPayload();
+  if (mongoCol) {
+    const ops = [];
+    const pending = {};
+    for (const key of Object.keys(payload)) {
+      const json = JSON.stringify(payload[key]);
+      if (lastSavedJson[key] === json) continue;
+      pending[key] = json;
+      ops.push({
+        replaceOne: {
+          filter: { _id: key },
+          replacement: { json, updated: new Date() },
+          upsert: true,
+        },
+      });
+    }
+    if (ops.length) {
+      await mongoCol.bulkWrite(ops);
+      Object.assign(lastSavedJson, pending);
+    }
+    return;
+  }
+  fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
+}
+
+// একসাথে দুটো সেভ যেন ওভারল্যাপ না করে — লাইন ধরে একটার পর একটা চলবে
+let saveChain = Promise.resolve();
+function enqueueSave() {
+  saveChain = saveChain
+    .then(persistPayload)
+    .catch((e) => console.error("Could not save data:", e.message));
+  return saveChain;
 }
 
 let saveTimer = null;
 function saveData() {
-  // বারবার ডিস্কে লেখা এড়াতে অল্প সময় অপেক্ষা করে একসাথে সেভ করা হয়
+  // বারবার ডিস্কে/ডাটাবেসে লেখা এড়াতে অল্প সময় অপেক্ষা করে একসাথে সেভ করা হয়
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try {
-      const payload = {
-        users,
-        friendships: setsToArrays(friendships),
-        friendRequests: setsToArrays(friendRequests),
-        blockedUsers: setsToArrays(blockedUsers),
-        directMessages: trimMessages(directMessages),
-        roomMessages: trimMessages(roomMessages),
-        profiles,
-        directThemes,
-        reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
-        bannedUsers,
-      };
-      fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
-    } catch (e) {
-      console.error("Could not save data:", e.message);
-    }
+    enqueueSave();
   }, 1500);
 }
 
@@ -245,34 +313,22 @@ try {
   console.error("Could not prepare DATA_DIR:", e.message);
 }
 console.log(
-  process.env.DATA_DIR
+  MONGODB_URI
+    ? "Using MongoDB for persistent storage."
+    : process.env.DATA_DIR
     ? `Using persistent DATA_DIR: ${DATA_DIR} (user data will survive redeploys)`
     : `⚠️ No DATA_DIR set — using ephemeral local folder for app-data.json. ` +
       `User accounts WILL be lost on redeploy/restart unless you add a Render ` +
       `Persistent Disk and set the DATA_DIR env var to its mount path.`
 );
 
-loadData();
-
 // সার্ভার বন্ধ হওয়ার আগে শেষবার সেভ করা
 ["SIGINT", "SIGTERM"].forEach((sig) => {
-  process.on(sig, () => {
+  process.on(sig, async () => {
+    setTimeout(() => process.exit(0), 8000).unref(); // আটকে গেলে জোর করে বন্ধ
     try {
-      fs.writeFileSync(
-        DATA_FILE,
-        JSON.stringify({
-          users,
-          friendships: setsToArrays(friendships),
-          friendRequests: setsToArrays(friendRequests),
-          blockedUsers: setsToArrays(blockedUsers),
-          directMessages: trimMessages(directMessages),
-          roomMessages: trimMessages(roomMessages),
-          profiles,
-          directThemes,
-          reports: reports.slice(-300),
-          bannedUsers,
-        })
-      );
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      await enqueueSave();
     } catch (e) {}
     process.exit(0);
   });
@@ -1187,6 +1243,21 @@ app.get("*", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+(async () => {
+  try {
+    await connectMongo();
+  } catch (e) {
+    // MongoDB সেট করা আছে কিন্তু কানেক্ট হয়নি — ফাঁকা ডেটা নিয়ে চালু হলে পরে সব মুছে যেতে পারে, তাই বন্ধ করে দেওয়া হলো
+    console.error("❌ MongoDB connection failed:", e.message);
+    process.exit(1);
+  }
+  try {
+    await loadData();
+  } catch (e) {
+    console.error("Could not load saved data:", e.message);
+    if (mongoCol) process.exit(1); // লোড না হলে সেভ করলে পুরোনো ডেটা ওভাররাইট হয়ে যাবে
+  }
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+})();
