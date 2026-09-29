@@ -953,6 +953,7 @@ io.on("connection", (socket) => {
       return;
     }
     item.kind = "photo";
+    item.caption = String(item.caption || "").slice(0, 500);
     if (item.src && String(item.src).startsWith("data:")) {
       const resolved = await resolveImageSrc(item.src, item.name || "photo");
       if (!resolved || !resolved.src) {
@@ -1000,6 +1001,7 @@ io.on("connection", (socket) => {
       kind: "reel",
       src,
       name: String(item.name || "reel").slice(0, 120),
+      caption: String(item.caption || "").slice(0, 500),
       timestamp: Date.now(),
     };
     if (!profiles[phone]) profiles[phone] = {};
@@ -1043,17 +1045,29 @@ io.on("connection", (socket) => {
     let mediaOut = media || null;
     if (mediaOut) {
       if (mediaOut.type === "video") {
-        if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি।" });
-        return;
-      }
-      mediaOut.type = "image";
-      if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
-        const resolved = await resolveImageSrc(mediaOut.src, "post");
-        if (!resolved || !resolved.src) {
-          if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+        let vsrc = String(mediaOut.src || "");
+        if (vsrc.startsWith("data:video/")) {
+          const remote = await uploadVideoToCloudinary(vsrc, "post-video");
+          if (!remote) {
+            if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ভিডিও আপলোড হয়নি।" });
+            return;
+          }
+          vsrc = remote;
+        } else if (!/^https?:\/\//.test(vsrc)) {
+          if (typeof callback === "function") callback({ success: false, error: "invalid", message: "ভিডিও ঠিক নেই।" });
           return;
         }
-        mediaOut = { type: "image", src: resolved.src, host: resolved.host };
+        mediaOut = { type: "video", src: vsrc };
+      } else {
+        mediaOut.type = "image";
+        if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
+          const resolved = await resolveImageSrc(mediaOut.src, "post");
+          if (!resolved || !resolved.src) {
+            if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+            return;
+          }
+          mediaOut = { type: "image", src: resolved.src, host: resolved.host };
+        }
       }
     }
 
