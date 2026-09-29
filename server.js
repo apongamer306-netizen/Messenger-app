@@ -164,7 +164,7 @@ let bannedUsers = {};        // phone -> { reason, time }
 // ================= অ্যাডমিন প্যানেল =================
 // অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
 // ভ্যারিয়েবল ADMIN_PASSWORD সেট করে এটা পরিবর্তন করা যাবে (নিরাপত্তার জন্য উত্তম)।
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Tawsiya Loved Me";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "tawsiya i love you";
 
 const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
 const phoneToSocket = {};    // phone -> socket.id
