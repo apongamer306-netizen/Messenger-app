@@ -845,13 +845,10 @@ mediaPreviewModal.id = "mediaPreviewModal";
 mediaPreviewModal.style.cssText = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; justify-content:center; align-items:center; flex-direction:column;";
 // ডাউনলোড বাটন আগে নিচে চওড়া নীল বার হয়ে থাকত — এখন উপরের কোণায় ছোট গোল আইকন
 mediaPreviewModal.innerHTML = `
-  <div class="media-preview-topbar">
-    <span id="mediaPreviewTitle" class="media-preview-title"></span>
-    <div class="media-preview-tools">
-      <a id="mediaDownloadBtn" class="media-tool-btn" title="Download" download><i class="fa-solid fa-download"></i></a>
-      <button id="closeMediaPreview" class="media-tool-btn" title="Close"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-  </div>
+  <button id="closeMediaPreview" class="media-corner-btn media-corner-close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+  <a id="mediaDownloadBtn" class="media-corner-btn media-corner-download" title="Download" download><i class="fa-solid fa-download"></i></a>
+  <span id="mediaPreviewTitle" class="media-preview-title" style="display:none;"></span>
+  <div id="mediaPreviewCaption" class="media-preview-caption" style="display:none;"></div>
   <div id="mediaPreviewContent" style="display:flex; justify-content:center; align-items:center;"></div>
 `;
 document.body.appendChild(mediaPreviewModal);
@@ -875,8 +872,13 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ছবি, ভিডিও ও অডিও — তিনটাই সুন্দর ফুল-স্ক্রিন প্লেয়ারে খুলবে
-function openMediaPreview(type, src, name) {
+function openMediaPreview(type, src, name, caption) {
   mediaPreviewTitle.textContent = name || "";
+  const capEl = document.getElementById("mediaPreviewCaption");
+  if (capEl) {
+    capEl.textContent = caption || "";
+    capEl.style.display = caption ? "block" : "none";
+  }
 
   if (type === "video") {
     mediaPreviewContent.innerHTML =
@@ -894,8 +896,40 @@ function openMediaPreview(type, src, name) {
 
   mediaDownloadBtn.style.display = "inline-flex";
   mediaDownloadBtn.href = src;
-  mediaDownloadBtn.download = name || "file";
+  mediaDownloadBtn.dataset.name = name || (type === "video" ? "video" : type === "audio" ? "audio" : "photo");
   mediaPreviewModal.style.display = "flex";
+}
+
+// ডাউনলোড: অন্য ডোমেইনের (Cloudinary) ফাইলেও কাজ করবে — blob বানিয়ে সেভ করে
+mediaDownloadBtn.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const src = mediaDownloadBtn.href;
+  const name = mediaDownloadBtn.dataset.name || "file";
+  const save = (href, fname) => {
+    const a = document.createElement("a");
+    a.href = href; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const extFromType = (t) => {
+    const m = (t || "").split("/")[1] || "";
+    return m ? "." + m.split(";")[0].replace("jpeg", "jpg") : "";
+  };
+  try {
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const fname = /\.[a-z0-9]{2,4}$/i.test(name) ? name : name + extFromType(blob.type);
+    save(url, fname);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    window.open(src, "_blank");
+  }
+});
+
+// ক্লাউডিনারি ভিডিওর জন্য থাম্বনেইল (কালো বক্স না দেখিয়ে ফ্রেম দেখাবে)
+function videoPosterUrl(src) {
+  if (typeof src !== "string" || src.indexOf("res.cloudinary.com") === -1 || src.indexOf("/video/upload/") === -1) return "";
+  return src.replace("/video/upload/", "/video/upload/so_0,w_480,f_jpg/").replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg");
 }
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
@@ -1759,6 +1793,7 @@ profileModalOverlay.innerHTML = `
           <div id="pmComposerPreview" class="post-composer-preview" style="display:none;"></div>
           <div class="post-composer-actions">
             <button class="post-composer-btn" id="pmAddPhotoBtn"><i class="fa-solid fa-image" style="color:#45bd62;"></i> Photo</button>
+            <button class="post-composer-btn" id="pmAddVideoBtn"><i class="fa-solid fa-video" style="color:#f3425f;"></i> Video</button>
             <button class="btn btn-primary post-submit-btn" id="pmSubmitPostBtn">Post</button>
           </div>
         </div>
@@ -1852,8 +1887,9 @@ function renderPostCardHtml(post) {
   if (post.media && post.media.src) {
     if (post.media.type === "video") {
       mediaHtml = `<div class="post-media-wrap previewable-media" data-type="video" data-src="${post.media.src}" data-name="post-video">
-                     <video class="post-media" preload="metadata" muted playsinline src="${post.media.src}#t=0.1"></video>
+                     <video class="post-media" preload="metadata" muted playsinline ${videoPosterUrl(post.media.src) ? 'poster="' + videoPosterUrl(post.media.src) + '"' : ""} src="${post.media.src}#t=0.1"></video>
                      <span class="video-play-badge"><i class="fa-solid fa-play"></i></span>
+                     <button type="button" class="post-expand-btn" title="Full view"><i class="fa-solid fa-expand"></i></button>
                    </div>`;
     } else {
       mediaHtml = `<div class="post-media-wrap previewable-media" data-type="image" data-src="${post.media.src}" data-name="post-photo">
@@ -1920,9 +1956,34 @@ function wirePostCardEvents(post) {
 
   const mediaEl = card.querySelector(".previewable-media");
   if (mediaEl) {
-    mediaEl.onclick = () => {
-      openMediaPreview(mediaEl.getAttribute("data-type"), mediaEl.getAttribute("data-src"), mediaEl.getAttribute("data-name"));
-    };
+    const mType = mediaEl.getAttribute("data-type");
+    const mSrc = mediaEl.getAttribute("data-src");
+    const mName = mediaEl.getAttribute("data-name");
+    if (mType === "video") {
+      // ভিডিও: প্রথম ট্যাপে পোস্টের ভেতরেই চলবে (লাইক/কমেন্ট থাকবে),
+      // কোণার ⤢ বাটনে চাপলে শুধু ভিডিও পপআপে খুলবে
+      const vid = mediaEl.querySelector("video");
+      const expandBtn = mediaEl.querySelector(".post-expand-btn");
+      if (expandBtn) {
+        expandBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (vid) vid.pause();
+          openMediaPreview("video", mSrc, mName);
+        };
+      }
+      mediaEl.onclick = (e) => {
+        if (e.target.closest(".post-expand-btn")) return;
+        if (mediaEl.classList.contains("playing")) return; // চলার সময় নেটিভ কন্ট্রোল কাজ করবে
+        mediaEl.classList.add("playing");
+        if (vid) {
+          vid.muted = false;
+          vid.controls = true;
+          vid.play().catch(() => {});
+        }
+      };
+    } else {
+      mediaEl.onclick = () => openMediaPreview(mType, mSrc, mName);
+    }
   }
 
   const delBtn = card.querySelector("[data-post-del]");
@@ -2015,26 +2076,46 @@ document.getElementById("pmAddPhotoBtn").onclick = () => {
   postMediaInput.dataset.kind = "image";
   postMediaInput.click();
 };
+document.getElementById("pmAddVideoBtn").onclick = () => {
+  postMediaInput.accept = "video/*";
+  postMediaInput.dataset.kind = "video";
+  postMediaInput.click();
+};
 postMediaInput.onchange = async () => {
   const file = postMediaInput.files[0];
+  const wantVideo = postMediaInput.dataset.kind === "video";
   postMediaInput.value = "";
   if (!file || !currentUser) return;
-  if (!file.type || !file.type.startsWith("image/")) {
-    await showCustomAlert("Photos only", "পোস্টে শুধু ছবি যোগ করা যাবে।");
-    return;
-  }
   let src;
-  try {
-    const compressed = await compressImageFile(file);
-    src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
-  } catch (e) {
-    await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
-    return;
+  if (wantVideo) {
+    if (!file.type || !file.type.startsWith("video/")) {
+      await showCustomAlert("Videos only", "শুধু ভিডিও সিলেক্ট করুন।");
+      return;
+    }
+    if (file.size > REEL_MAX_BYTES) {
+      await showCustomAlert("Too large", "ভিডিওটি অনেক বড়। সর্বোচ্চ ৪০ MB পর্যন্ত আপলোড করা যাবে।");
+      return;
+    }
+    try { src = await readFileAsDataUrl(file); }
+    catch (e) { await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।"); return; }
+  } else {
+    if (!file.type || !file.type.startsWith("image/")) {
+      await showCustomAlert("Photos only", "ছবি সিলেক্ট করুন।");
+      return;
+    }
+    try {
+      const compressed = await compressImageFile(file);
+      src = compressed ? compressed.dataUrl : await readFileAsDataUrl(file);
+    } catch (e) {
+      await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।");
+      return;
+    }
   }
-  pendingPostMedia = { type: "image", src, name: file.name };
+  pendingPostMedia = { type: wantVideo ? "video" : "image", src, name: file.name };
   pmComposerPreview.style.display = "block";
   pmComposerPreview.innerHTML =
-    `<img src="${src}" alt=""><button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`;
+    (wantVideo ? `<video src="${src}" controls playsinline></video>` : `<img src="${src}" alt="">`) +
+    `<button class="post-preview-remove" id="pmRemoveMedia"><i class="fa-solid fa-xmark"></i></button>`;
   document.getElementById("pmRemoveMedia").onclick = () => {
     pendingPostMedia = null;
     pmComposerPreview.style.display = "none";
@@ -2049,7 +2130,7 @@ document.getElementById("pmSubmitPostBtn").onclick = async () => {
   const mediaSnapshot = pendingPostMedia;
   const { ok, payload: res } = await runUploadWithLockout("post", (done) => {
     socket.emit("create-post", { phone: currentUser.phone, text, media: mediaSnapshot }, done);
-  });
+  }, mediaSnapshot && mediaSnapshot.type === "video" ? 180000 : undefined);
   if (ok && res && res.post) {
     profileViewState.data.posts = profileViewState.data.posts || [];
     profileViewState.data.posts.unshift(res.post);
@@ -2183,10 +2264,11 @@ function renderProfileGallery(kind) {
   gallery.innerHTML = items.map((it) => {
     const inner =
       kind === "photo" ? `<img src="${it.src}" alt="">`
-      : (kind === "video" || kind === "reel") ? `<video src="${it.src}#t=0.1" muted preload="metadata"></video><span class="pg-badge"><i class="fa-solid fa-play"></i></span>`
+      : (kind === "video" || kind === "reel") ? `<video ${videoPosterUrl(it.src) ? 'poster="' + videoPosterUrl(it.src) + '"' : ""} src="${it.src}#t=0.1" muted preload="metadata" playsinline></video><span class="pg-badge"><i class="fa-solid fa-play"></i></span>`
       : `<i class="fa-solid fa-music"></i>`;
     return `<div class="profile-gallery-item ${kind === "audio" ? "audio-item" : ""}" data-id="${it.id}">
               ${inner}
+              ${it.caption ? `<div class="pg-caption">${escapeHtml(it.caption)}</div>` : ""}
               <button class="pg-delete" data-del="${it.id}"><i class="fa-solid fa-trash"></i></button>
             </div>`;
   }).join("");
@@ -2195,7 +2277,7 @@ function renderProfileGallery(kind) {
     el.onclick = (e) => {
       if (e.target.closest(".pg-delete")) return;
       const item = items.find((i) => i.id === el.dataset.id);
-      if (item) openMediaPreview(kind === "photo" ? "image" : (kind === "reel" ? "video" : kind), item.src, item.name);
+      if (item) openMediaPreview(kind === "photo" ? "image" : (kind === "reel" ? "video" : kind), item.src, item.name, item.caption);
     };
   });
 
@@ -2252,6 +2334,35 @@ document.querySelectorAll(".profile-tab").forEach((btn) => {
 // ---------- আপলোড ----------
 document.getElementById("pmUploadBtn").onclick = () => profileFileInput.click();
 
+// ---------- ফেসবুকের মতো ক্যাপশন ডায়ালগ (ছবি/ভিডিও আপলোডের আগে) ----------
+// রিটার্ন: ক্যাপশন (string, খালি হতে পারে) — বাতিল করলে null
+function askMediaCaption(file, isVideo) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const ov = document.createElement("div");
+    ov.className = "caption-dialog-overlay";
+    ov.innerHTML = `
+      <div class="caption-dialog">
+        <div class="caption-dialog-title">${isVideo ? "Reel" : "Photo"} যোগ করুন</div>
+        <textarea class="caption-dialog-input" maxlength="500" rows="2" placeholder="ক্যাপশন লিখুন..."></textarea>
+        <div class="caption-dialog-preview">
+          ${isVideo ? `<video src="${url}" controls playsinline muted></video>` : `<img src="${url}" alt="">`}
+        </div>
+        <div class="caption-dialog-actions">
+          <button type="button" class="btn btn-secondary" data-cancel>Cancel</button>
+          <button type="button" class="btn btn-primary" data-ok>Upload</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const input = ov.querySelector("textarea");
+    const done = (val) => { URL.revokeObjectURL(url); ov.remove(); resolve(val); };
+    ov.querySelector("[data-cancel]").onclick = () => done(null);
+    ov.querySelector("[data-ok]").onclick = () => done(input.value.trim());
+    ov.addEventListener("click", (e) => { if (e.target === ov) done(null); });
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
 // ---------- Reels আপলোড (শুধু ভিডিও) ----------
 const REEL_MAX_BYTES = 40 * 1024 * 1024; // ৪০ MB
 const REEL_MAX_SECONDS = 90;             // সর্বোচ্চ ৯০ সেকেন্ড
@@ -2285,6 +2396,8 @@ async function handleReelUpload(file) {
     await showCustomAlert("Too long", "Reel সর্বোচ্চ " + REEL_MAX_SECONDS + " সেকেন্ডের হতে পারবে।");
     return;
   }
+  const caption = await askMediaCaption(file, true);
+  if (caption === null) return;
   let src;
   try { src = await readFileAsDataUrl(file); }
   catch (e) { await showCustomAlert("Error", "ফাইলটি পড়া যায়নি।"); return; }
@@ -2294,6 +2407,7 @@ async function handleReelUpload(file) {
     kind: "reel",
     src: src,
     name: file.name,
+    caption: caption,
     timestamp: Date.now()
   };
   const { ok, payload: res } = await runUploadWithLockout("reel", (done) => {
@@ -2315,6 +2429,8 @@ profileFileInput.onchange = async () => {
     return;
   }
 
+  const caption = await askMediaCaption(file, false);
+  if (caption === null) return;
   let src = null;
   try {
     const compressed = await compressImageFile(file);
@@ -2329,6 +2445,7 @@ profileFileInput.onchange = async () => {
     kind: "photo",
     src: src,
     name: file.name,
+    caption: caption,
     timestamp: Date.now()
   };
 
@@ -2339,7 +2456,7 @@ profileFileInput.onchange = async () => {
     profileViewState.data.items = res.items;
     try {
       const slim = (res.items || []).filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:")).slice(0, 40)
-        .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, timestamp: it.timestamp }));
+        .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, caption: it.caption || "", timestamp: it.timestamp }));
       localStorage.setItem("myProfileItems_" + currentUser.phone, JSON.stringify(slim));
     } catch (e) {}
     renderProfileGallery("photo");
