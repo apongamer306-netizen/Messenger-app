@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EKT CHATTER</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%234f8cff'/%3E%3Cstop%20offset='0.55'%20stop-color='%237c5cff'/%3E%3Cstop%20offset='1'%20stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='64'%20height='64'%20rx='16'%20fill='url(%23g)'/%3E%3Crect%20x='4'%20y='4'%20width='56'%20height='56'%20rx='13'%20fill='none'%20stroke='white'%20stroke-opacity='0.22'%20stroke-width='2'/%3E%3Cpath%20d='M14%2016H50a3%203%200%200%201%203%203V31C53%2042.6%2043.6%2052%2032%2052C20.4%2052%2011%2042.6%2011%2031V19a3%203%200%200%201%203-3Z'%20fill='white'/%3E%3Cpolyline%20points='22,27%2032,37%2042,27'%20fill='none'%20stroke='%237c5cff'%20stroke-width='5'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%236366f1'/%3E%3Cstop%20offset='0.5'%20stop-color='%237c5cff'/%3E%3Cstop%20offset='1'%20stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3CradialGradient%20id='core'%20cx='32%25'%20cy='28%25'%20r='70%25'%3E%3Cstop%20offset='0'%20stop-color='%23ddd6fe'/%3E%3Cstop%20offset='0.45'%20stop-color='%236366f1'/%3E%3Cstop%20offset='1'%20stop-color='%231e1b4b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width='64'%20height='64'%20rx='16'%20fill='url(%23g)'/%3E%3Ccircle%20cx='32'%20cy='32'%20r='22'%20fill='url(%23core)'/%3E%3Cpath%20d='M18%2032.5L46%2018l-10%2028-6.5-8.5L18%2032.5zm12.2%206.2l4.3%205.6L41.5%2024.5%2030.2%2038.7z'%20fill='white'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=Poppins:ital,wght@1,400;1,500;1,600;1,700&family=Pacifico&display=swap">
@@ -30,7 +30,7 @@
       position:fixed; inset:0; z-index:2147483647;
       display:flex; align-items:center; justify-content:center; flex-direction:column;
       background:#02040a;
-      opacity:1; transition:opacity .85s ease, visibility .85s ease;
+      opacity:1; transition:opacity .28s ease, visibility .28s ease;
       padding:env(safe-area-inset-top,0px) max(16px, 4vw) env(safe-area-inset-bottom,0px);
       overflow:hidden;
     }
@@ -410,7 +410,7 @@
           if (circleEl) { circleEl.classList.remove("waiting"); circleEl.style.setProperty("--p", 100); }
           if (pctEl) pctEl.textContent = "100%";
           sp.classList.add("splash-hide");
-          setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
+          setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 320);
         };
         var finish = function () {
           if (isResumeSession) {
@@ -434,7 +434,7 @@
       function goFinish() {
         if (splashDone) return;
         if (noTick || isResumeSession) { realHide(); return; }
-        var wait = Math.max(0, 600 - (Date.now() - splashStartTs)); // ঝলকানি এড়াতে সর্বনিম্ন ~০.৬ সেকেন্ড
+        var wait = Math.max(0, 200 - (Date.now() - splashStartTs)); // ঝলকানি এড়াতে সর্বনিম্ন ~০.২ সেকেন্ড
         setTimeout(function () { finishing = true; }, wait);
       }
       window.__ektReady.then(function () { hideRequested = true; goFinish(); });
@@ -443,7 +443,7 @@
         if (hideScheduled) return;
         if (titleDone && creditDone && chargeDone) {
           hideScheduled = true;
-          setTimeout(window.hideSplashScreen, 480);
+          setTimeout(window.hideSplashScreen, 120);
         }
       }
 
@@ -521,24 +521,25 @@
         if (splashDone) return;
         var dt = Math.min(100, now - lastTs); lastTs = now;
         var goal, rate;
-        if (finishing) { goal = 100; rate = 140; }
-        else {
+        if (finishing) {
+          // ডেটা রেডি — সাথে সাথে 100% দেখিয়ে Home-এ যাওয়া (বাড়তি দেরি নেই)
+          shownPct = 100;
+          if (circleEl) { circleEl.classList.remove("waiting"); circleEl.style.setProperty("--p", 100); }
+          if (pctEl) pctEl.textContent = "100%";
+          realHide();
+          return;
+        } else {
           // ধাপের ভেতরেও ধীরে এগোবে (সর্বোচ্চ ~9 পয়েন্ট), তবে 97-এর বেশি না
           var creep = 9 * (1 - Math.exp(-(now - stageTs) / 5000));
           goal = Math.min(97, targetPct + creep);
           rate = 450;
         }
         shownPct += (goal - shownPct) * (1 - Math.exp(-dt / rate));
-        if (finishing && shownPct > 99.4) shownPct = 100;
         var shown = Math.round(shownPct);
         if (shown !== lastPct) {
           lastPct = shown;
           if (circleEl) circleEl.style.setProperty("--p", shownPct);
           if (pctEl) pctEl.textContent = shown + "%";
-        }
-        if (finishing && shownPct >= 100) {
-          setTimeout(realHide, 220);
-          return;
         }
         rafId = requestAnimationFrame(tick);
       }
