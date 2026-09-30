@@ -2804,3 +2804,64 @@ body.tab-reels .footer-text { display: none; }
   .tm-empty-desktop i { font-size: 46px; margin-bottom: 10px; opacity: .5; }
   body.tab-messages .direct-chat-screen { top: 52px; left: 360px; }
 }
+
+
+/* =====================================================================
+   প্রোফাইল খুললেও উপরের আইকন বার দেখা যাবে
+   ===================================================================== */
+body.dashboard-active .profile-modal-overlay {
+  top: 104px;               /* ফোন: ব্র্যান্ড বার (52) + ট্যাব বার (52) */
+  padding: 10px;
+  background: var(--bg);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  align-items: flex-start;
+  overflow-y: auto;
+}
+body.dashboard-active .profile-modal {
+  max-height: none; min-height: calc(100dvh - 124px); margin: 0 auto;
+  border-radius: 18px; overflow: visible;
+}
+@media (min-width: 900px) {
+  body.dashboard-active .profile-modal-overlay { top: 52px; padding: 16px; }
+  body.dashboard-active .profile-modal { min-height: calc(100dvh - 84px); }
+}
+
+/* ---------- লোডিং স্প্ল্যাশ ---------- */
+#appSplash {
+  position: fixed; inset: 0; z-index: 500000; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  transition: opacity .3s ease;
+}
+#appSplash.hide { opacity: 0; pointer-events: none; }
+.splash-logo { font-size: 34px; font-weight: 800; letter-spacing: -1px; color: var(--brand); }
+.splash-logo span { color: var(--text); font-weight: 700; }
+.splash-spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid var(--surface-3); border-top-color: var(--brand); animation: splashSpin .8s linear infinite; }
+.splash-text { font-size: 13px; color: var(--text-3); }
+@keyframes splashSpin { to { transform: rotate(360deg); } }
+
+/* ---------- Create post ডায়ালগ ---------- */
+.cp-card { width: 100%; max-width: 480px; max-height: 96dvh; overflow-y: auto; background: var(--surface); color: var(--text); border-radius: 16px; padding: 14px; box-sizing: border-box; }
+.cp-who { display: flex; align-items: center; gap: 10px; margin: 6px 0 8px; }
+.cp-who img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+#cpText { width: 100%; box-sizing: border-box; resize: none; border: none; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; min-height: 90px; }
+.cp-preview { position: relative; border-radius: 12px; overflow: hidden; background: #000; margin: 8px 0; text-align: center; }
+.cp-preview img, .cp-preview video { max-width: 100%; max-height: 38vh; display: block; margin: 0 auto; }
+.cp-preview .post-preview-remove { position: absolute; top: 8px; right: 8px; }
+.cp-add { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 8px 0 12px; }
+.cp-add span { flex: 1; font-size: 14px; font-weight: 600; }
+.cp-add button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--surface-2); font-size: 18px; cursor: pointer; }
+
+/* ---------- স্টোরি: সময় ও গান ---------- */
+.story-opts { margin: 4px 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.story-opt-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.story-opt-row > span { flex: 0 0 auto; color: var(--text-2); font-weight: 600; }
+.story-opt-row button { border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); border-radius: 16px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.story-opt-row button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.story-music-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3) !important; font-weight: 500 !important; }
+#storyMusicClear { width: 28px; height: 28px; padding: 0; align-items: center; justify-content: center; border-radius: 50%; }
+.story-opts.is-video #storyDurRow, .story-opts.is-video #storyMusicRow, .story-opts.is-video audio { display: none !important; }
+.story-music-tag { position: absolute; left: 12px; top: calc(66px + env(safe-area-inset-top, 0px)); z-index: 6; color: #fff; font-size: 12px; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 12px; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
+/* ড্যাশবোর্ড লোগো: আগের মতো বড় হাতের EKT CHATTER + টাইপ/মোছা অ্যানিমেশন + রঙিন গ্রেডিয়েন্ট */
+.dash-topbar .dash-logo { font-size: clamp(1.15rem, 4.6vw, 1.55rem); letter-spacing: 2px; }
