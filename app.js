@@ -4695,8 +4695,8 @@ window.addEventListener("load", () => {
   let groups = [];        // [{phone,name,pic,items:[...]}]
   let gi = 0, si = 0, timer = null;
   let bgIndex = 0, pickedFile = null, pickedIsVideo = false;
-  let pickedMusic = null, pickedDur = 5000, storyAudio = null;
-  const MUSIC_MAX = 8 * 1024 * 1024, STORY_MAX_SEC = 15;
+  let pickedMusic = null, pickedDur = 15000, storyAudio = null; // ছবি/লেখার স্টোরি সবসময় ১৫ সেকেন্ড (ইউজার বাছতে পারে না)
+  const MUSIC_MAX = 8 * 1024 * 1024;
 
   const me = () => (typeof currentUser !== "undefined" ? currentUser : null);
   const esc = (t) => (typeof escapeHtml === "function" ? escapeHtml(t) : String(t || ""));
@@ -4757,7 +4757,7 @@ window.addEventListener("load", () => {
     $("storyDurRow").querySelectorAll("[data-d]").forEach((b) => b.classList.toggle("on", +b.dataset.d === ms));
   }
   function syncOpts() {
-    // ভিডিও স্টোরিতে সময় ভিডিওর নিজের (সর্বোচ্চ ১৫ সে.), গান শুধু ছবি/লেখার স্টোরিতে
+    // ভিডিও স্টোরিতে সময় ভিডিওর নিজের (কোনো লিমিট নেই), গান শুধু ছবি/লেখার স্টোরিতে
     $("storyOpts").classList.toggle("is-video", !!(pickedFile && pickedIsVideo));
   }
   $("storyDurRow").onclick = (e) => { const b = e.target.closest("[data-d]"); if (b) setDur(+b.dataset.d); };
@@ -4802,16 +4802,7 @@ window.addEventListener("load", () => {
     if (f.type.startsWith("video/") && f.size > STORY_VIDEO_MAX) { showCustomAlert("Too large", "স্টোরির ভিডিও সর্বোচ্চ ২৫ MB হতে পারবে।"); return; }
     if (!f.type.startsWith("video/") && !f.type.startsWith("image/")) return;
     if (f.type.startsWith("video/")) {
-      // স্টোরির ভিডিও সর্বোচ্চ ১৫ সেকেন্ড
-      const ok = await new Promise((resolve) => {
-        const v = document.createElement("video");
-        const u = URL.createObjectURL(f);
-        v.preload = "metadata";
-        v.onloadedmetadata = () => { URL.revokeObjectURL(u); resolve(v.duration <= STORY_MAX_SEC + 0.5); };
-        v.onerror = () => { URL.revokeObjectURL(u); resolve(true); };
-        v.src = u;
-      });
-      if (!ok) { showCustomAlert("Too long", "স্টোরির ভিডিও সর্বোচ্চ ১৫ সেকেন্ডের হতে পারবে।"); return; }
+      // ভিডিও স্টোরির কোনো সময়সীমা নেই (শুধু ফাইল সাইজ ২৫ MB)
       setMusic(null);
     }
     pickedFile = f; pickedIsVideo = f.type.startsWith("video/");
@@ -4873,7 +4864,7 @@ window.addEventListener("load", () => {
     $("storyBars").innerHTML = g.items.map((_, i) => `<div class="story-bar"><i class="${i < si ? "full" : ""}"></i></div>`).join("");
     const body = $("storyBody");
     const textHtml = st.text ? `<div class="story-text ${st.media ? "on-media" : ""}">${esc(st.text)}</div>` : "";
-    let dur = Math.max(3000, Math.min(15000, st.duration || 5000));
+    let dur = 15000; // ছবি/লেখার স্টোরি সবসময় ১৫ সেকেন্ড; ভিডিওর সময় নিচে ভিডিওর নিজের দৈর্ঘ্য থেকে আসে
     if (st.music && st.music.src && !(st.media && st.media.type === "video")) {
       storyAudio = new Audio(st.music.src);
       storyAudio.play().catch(() => {});
@@ -4882,7 +4873,7 @@ window.addEventListener("load", () => {
       body.innerHTML = `<video src="${esc(st.media.src)}" autoplay playsinline></video>${textHtml}`;
       const v = body.querySelector("video");
       dur = 0;
-      v.onloadedmetadata = () => runBar(Math.min((v.duration || 5) * 1000, STORY_MAX_SEC * 1000));
+      v.onloadedmetadata = () => runBar((v.duration && isFinite(v.duration) ? v.duration : 5) * 1000 + 500); // ভিডিওর পুরো দৈর্ঘ্য, কোনো লিমিট নেই; শেষ হলে onended-ই next() ডাকবে
       v.onended = next;
       v.onerror = () => runBar(5000);
       v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
