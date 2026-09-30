@@ -385,7 +385,6 @@ const authToggleMsg = document.getElementById("authToggleMsg");
 
 const dashboardAvatar = document.getElementById("dashboardAvatar");
 const dashboardUserName = document.getElementById("dashboardUserName");
-const avatarUpload = document.getElementById("avatarUpload");
 
 let editNameBtn = document.getElementById("editNameBtn");
 if (editNameBtn && editNameBtn.parentNode) { try { editNameBtn.remove(); } catch (e) {} editNameBtn = null; }
@@ -1004,7 +1003,7 @@ function showCustomModal(options) {
   
   if (options.hasInput) {
     modalInputGroup.style.display = "block";
-    modalInput.value = "";
+    modalInput.value = options.defaultValue != null ? String(options.defaultValue) : "";
     modalInput.placeholder = options.placeholder || "Enter value";
     modalInput.type = options.isPassword ? "password" : "text";
     attachPasswordToggle(modalInput);
@@ -1014,8 +1013,8 @@ function showCustomModal(options) {
 
   modalActionContainer.innerHTML = `
     <div style="display: flex; gap: 10px; width: 100%; justify-content: center;">
-      <button id="modalConfirmBtn" class="btn btn-primary">Confirm</button>
-      <button id="modalCancelBtn" class="btn btn-secondary">Cancel</button>
+      <button id="modalConfirmBtn" class="btn btn-primary">${options.confirmText || "Confirm"}</button>
+      <button id="modalCancelBtn" class="btn btn-secondary">${options.cancelText || "Cancel"}</button>
     </div>
   `;
 
@@ -1985,6 +1984,140 @@ function renderPostsFeed() {
   posts.forEach((post) => wirePostCardEvents(post));
 }
 
+
+// ---------- COMMENT: এডিট / ডিলিট / হাইড UI ----------
+function commentRowHtml(c, opts) {
+  opts = opts || {};
+  const esc = typeof escapeHtml === "function" ? escapeHtml : (s) => String(s || "");
+  const myPhone = (typeof currentUser !== "undefined" && currentUser) ? currentUser.phone : (opts.myPhone || null);
+  const isOwner = !!opts.postOwnerPhone && myPhone && opts.postOwnerPhone === myPhone;
+  const isAuthor = myPhone && c.authorPhone === myPhone;
+  // হাইড করা কমেন্ট: মালিক ছাড়া আর কেউ দেখবে না
+  if (c.hidden && !isOwner && !isAuthor) return "";
+  const hiddenTag = c.hidden ? `<em class="cm-hidden-tag">Hidden</em>` : "";
+  const editedTag = c.edited ? `<em class="cm-edited-tag">edited</em>` : "";
+  let actions = "";
+  if (isAuthor || isOwner) {
+    const items = [];
+    if (isAuthor) {
+      items.push(`<button type="button" class="cm-act" data-cm-edit>Edit</button>`);
+      items.push(`<button type="button" class="cm-act cm-danger" data-cm-del>Delete</button>`);
+    }
+    if (isOwner) {
+      items.push(`<button type="button" class="cm-act" data-cm-hide>${c.hidden ? "Unhide" : "Hide"}</button>`);
+      if (!isAuthor) items.push(`<button type="button" class="cm-act cm-danger" data-cm-del>Delete</button>`);
+    }
+    actions = `<div class="cm-actions">${items.join("")}</div>`;
+  }
+  return `<div class="post-comment" data-cm-id="${esc(c.id)}" data-cm-author="${esc(c.authorPhone || "")}">
+    <img class="post-comment-avatar" src="${esc(c.authorPic || "https://via.placeholder.com/32")}" alt="">
+    <div class="post-comment-body">
+      <div class="post-comment-bubble${c.hidden ? " cm-is-hidden" : ""}">
+        <span class="post-comment-name">${esc(c.authorName || "User")} ${hiddenTag}${editedTag}</span>
+        <span class="post-comment-text">${esc(c.text)}</span>
+      </div>
+      ${actions}
+    </div>
+  </div>`;
+}
+
+function bindCommentActions(root, getCtx) {
+  if (!root || root._cmBound) return;
+  root._cmBound = true;
+  root.addEventListener("click", async (e) => {
+    const row = e.target.closest(".post-comment[data-cm-id]");
+    if (!row) return;
+    const ctx = typeof getCtx === "function" ? getCtx(row) : null;
+    if (!ctx || !ctx.ownerPhone || !ctx.postId) return;
+    const commentId = row.dataset.cmId;
+    const kind = ctx.kind || "post";
+    const me = currentUser;
+    if (!me) return;
+
+    if (e.target.closest("[data-cm-edit]")) {
+      const textEl = row.querySelector(".post-comment-text");
+      const old = textEl ? textEl.textContent : "";
+      const next = await showCustomModal({
+        title: "Edit comment",
+        subtitle: "কমেন্ট এডিট করুন:",
+        hasInput: true,
+        defaultValue: old,
+        placeholder: "Write a comment...",
+        confirmText: "Save",
+      });
+      if (next == null) return;
+      const clean = String(next).trim();
+      if (!clean) return;
+      socket.emit("edit-comment", {
+        kind, ownerPhone: ctx.ownerPhone, postId: ctx.postId, commentId,
+        editorPhone: me.phone, text: clean
+      }, (res) => {
+        if (res && res.success) {
+          if (typeof ctx.onUpdate === "function") ctx.onUpdate(res);
+          else if (textEl) {
+            textEl.textContent = clean;
+            const nameEl = row.querySelector(".post-comment-name");
+            if (nameEl && !nameEl.querySelector(".cm-edited-tag")) {
+              nameEl.insertAdjacentHTML("beforeend", ` <em class="cm-edited-tag">edited</em>`);
+            }
+          }
+          if (typeof showMiniToast === "function") showMiniToast("কমেন্ট আপডেট হয়েছে");
+        } else if (typeof showMiniToast === "function") showMiniToast((res && res.message) || "এডিট করা যায়নি");
+      });
+      return;
+    }
+
+    if (e.target.closest("[data-cm-del]")) {
+      const ok = await showCustomModal({
+        title: "Delete comment",
+        subtitle: "এই কমেন্ট মুছে ফেলতে চান?",
+        confirmText: "Delete",
+        cancelText: "Cancel",
+      });
+      // showCustomModal may return true/false or string — treat cancel as falsy
+      if (ok === false || ok === null || ok === undefined) return;
+      // If it returns a string from input-less, confirm means truthy
+      socket.emit("delete-comment", {
+        kind, ownerPhone: ctx.ownerPhone, postId: ctx.postId, commentId, actorPhone: me.phone
+      }, (res) => {
+        if (res && res.success) {
+          if (typeof ctx.onUpdate === "function") ctx.onUpdate(res);
+          else row.remove();
+          if (typeof showMiniToast === "function") showMiniToast("কমেন্ট মুছে ফেলা হয়েছে");
+        } else if (typeof showMiniToast === "function") showMiniToast((res && res.message) || "ডিলিট করা যায়নি");
+      });
+      return;
+    }
+
+    if (e.target.closest("[data-cm-hide]")) {
+      const bubble = row.querySelector(".post-comment-bubble");
+      const currentlyHidden = bubble && bubble.classList.contains("cm-is-hidden");
+      socket.emit("hide-comment", {
+        kind, ownerPhone: ctx.ownerPhone, postId: ctx.postId, commentId,
+        actorPhone: me.phone, hide: !currentlyHidden
+      }, (res) => {
+        if (res && res.success) {
+          if (typeof ctx.onUpdate === "function") ctx.onUpdate(res);
+          else {
+            if (bubble) bubble.classList.toggle("cm-is-hidden", !currentlyHidden);
+            const tag = row.querySelector(".cm-hidden-tag");
+            const nameEl = row.querySelector(".post-comment-name");
+            const btn = row.querySelector("[data-cm-hide]");
+            if (!currentlyHidden) {
+              if (!tag && nameEl) nameEl.insertAdjacentHTML("beforeend", ` <em class="cm-hidden-tag">Hidden</em>`);
+              if (btn) btn.textContent = "Unhide";
+            } else {
+              if (tag) tag.remove();
+              if (btn) btn.textContent = "Hide";
+            }
+          }
+          if (typeof showMiniToast === "function") showMiniToast(currentlyHidden ? "কমেন্ট আনহাইড হয়েছে" : "কমেন্ট হাইড করা হয়েছে");
+        } else if (typeof showMiniToast === "function") showMiniToast((res && res.message) || "হাইড করা যায়নি");
+      });
+    }
+  });
+}
+
 function renderPostCardHtml(post) {
   const d = profileViewState.data;
   const likeCount = (post.likes || []).length;
@@ -2006,15 +2139,10 @@ function renderPostCardHtml(post) {
     }
   }
 
-  const commentsHtml = (post.comments || []).map((c) => `
-    <div class="post-comment">
-      <img class="post-comment-avatar" src="${c.authorPic || 'https://via.placeholder.com/32'}" alt="">
-      <div class="post-comment-bubble">
-        <span class="post-comment-name">${escapeHtml(c.authorName || "User")}</span>
-        <span class="post-comment-text">${escapeHtml(c.text)}</span>
-      </div>
-    </div>
-  `).join("");
+  const commentsHtml = (post.comments || []).map((c) => commentRowHtml(c, {
+    postOwnerPhone: profileViewState.phone,
+    myPhone: currentUser && currentUser.phone
+  })).join("");
 
   const moreItems =
     (post.text ? `<div class="menu-item" data-post-copy><i class="fa-regular fa-copy"></i><span>Copy text</span></div>` : "") +
@@ -2166,6 +2294,20 @@ function wirePostCardEvents(post) {
         }
       });
     };
+  }
+  const cmList = card.querySelector(".post-comments-list");
+  if (cmList) {
+    bindCommentActions(cmList, () => ({
+      kind: "post",
+      ownerPhone: profileViewState.phone,
+      postId: post.id,
+      onUpdate: (res) => {
+        if (res.comments) post.comments = res.comments;
+        renderPostsFeed();
+        const reopened = document.getElementById("comments-" + post.id);
+        if (reopened) reopened.style.display = "block";
+      }
+    }));
   }
 }
 
@@ -2837,6 +2979,11 @@ if (dashboardUserName) {
       const compAv = document.getElementById("pmComposerAvatar"); if (compAv) compAv.src = res.pic;
       try { localStorage.setItem("appUser", JSON.stringify(currentUser)); saveUserToStorage(currentUser); } catch (e) {}
       if (profileViewState.data) profileViewState.data.pic = res.pic;
+      // প্রোফাইল ছবি পোস্ট/ফটোতেও আসে — প্রোফাইল রিফ্রেশ
+      if (typeof openProfile === "function" && currentUser) {
+        try { openProfile(currentUser.phone, currentUser); } catch (e) {}
+      }
+      if (typeof loadFeed === "function") try { loadFeed(true); } catch (e) {}
     }
   };
   const coverRange = document.getElementById("pmCoverPosRange");
@@ -2876,6 +3023,10 @@ if (dashboardUserName) {
       if (profileViewState.data) { profileViewState.data.cover = res.cover; profileViewState.data.coverY = 50; }
       saveCoverPosition(50);
       applyPmCover(res.cover, 50, false);
+      if (typeof openProfile === "function" && currentUser) {
+        try { openProfile(currentUser.phone, currentUser); } catch (e) {}
+      }
+      if (typeof loadFeed === "function") try { loadFeed(true); } catch (e) {}
     } else {
       await showCustomAlert("Error", "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।");
     }
@@ -2901,6 +3052,10 @@ if (dashboardUserName) {
         if (profileViewState.data) { profileViewState.data.cover = res.cover; profileViewState.data.coverY = y; }
         saveCoverPosition(y);
         applyPmCover(res.cover, y, false);
+        if (typeof openProfile === "function" && currentUser) {
+          try { openProfile(currentUser.phone, currentUser); } catch (e) {}
+        }
+        if (typeof loadFeed === "function") try { loadFeed(true); } catch (e) {}
       } else {
         await showCustomAlert("Error", "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।");
       }
@@ -3712,6 +3867,7 @@ logoutBtn.addEventListener("click", () => {
   sessionStorage.removeItem("activeRoom");
   sessionStorage.removeItem("activeDirectChat");
   sessionStorage.removeItem("masterUnlocked");
+  sessionStorage.removeItem("ektOpenProfile");
   currentUser = null;
   location.reload();
 });
@@ -4423,6 +4579,10 @@ socket.on("direct-incoming-call", (data) => {
 
 socket.on("direct-call-accepted", () => { markCallConnected(); });
 socket.on("direct-call-ended", endCallCleanup);
+socket.on("direct-call-rejected", async () => {
+  endCallCleanup();
+  try { await showCustomAlert("Call", "কলটি রিজেক্ট করা হয়েছে।"); } catch (e) {}
+});
 
 // ============================================================
 //  রিপোর্ট সিস্টেম + অ্যাডমিন প্যানেল
@@ -5518,6 +5678,17 @@ window.EktReact = (function () {
   }
   new MutationObserver(syncTabHighlight).observe(profileModalOverlay, { attributes: true, attributeFilter: ["class"] });
 
+  // রিলোড হলেও নিজের প্রোফাইল খোলা থাকলে সেখানেই ফিরে আসবে (আগে হোমে চলে যেত)
+  const PROFILE_KEY = "ektOpenProfile";
+  let restoreProfileOnce = false;
+  try { restoreProfileOnce = sessionStorage.getItem(PROFILE_KEY) === "me"; } catch (e) {}
+  new MutationObserver(() => {
+    try {
+      if (profileModalOverlay.classList.contains("active") && profileViewState && profileViewState.isMe) sessionStorage.setItem(PROFILE_KEY, "me");
+      else sessionStorage.removeItem(PROFILE_KEY);
+    } catch (e) {}
+  }).observe(profileModalOverlay, { attributes: true, attributeFilter: ["class"] });
+
   function openUserProfile(u) {
     const m = me();
     if (m && u.phone === m.phone) { $("myProfileBtn").click(); return; }
@@ -5707,7 +5878,10 @@ window.EktReact = (function () {
         ? `<div class="post-media-wrap feed-media" data-src="${src}" data-type="video"><video class="post-media" preload="metadata" muted playsinline ${videoPosterUrl(p.media.src) ? 'poster="' + videoPosterUrl(p.media.src) + '"' : ""} src="${src}#t=0.1"></video><span class="video-play-badge"><i class="fa-solid fa-play"></i></span></div>`
         : `<div class="post-media-wrap feed-media" data-src="${src}" data-type="image"><img class="post-media" src="${esc(oi(p.media.src, 720))}" alt=""></div>`;
     }
-    const cm = comments.map((c) => `<div class="post-comment"><img class="post-comment-avatar" src="${esc(c.authorPic || PH)}" alt=""><div class="post-comment-bubble"><span class="post-comment-name">${esc(c.authorName || "User")}</span><span class="post-comment-text">${esc(c.text)}</span></div></div>`).join("");
+    const cm = comments.map((c) => commentRowHtml(c, {
+      postOwnerPhone: p.ownerPhone || p.phone,
+      myPhone: m && m.phone
+    })).join("");
     return `<div class="post-card" data-fid="${esc(p.id)}" data-owner="${esc(p.ownerPhone)}">
       <div class="post-card-header">
         <img class="post-avatar" data-open-owner src="${esc(oi(p.ownerPic, 96, true))}" alt="">
@@ -5771,6 +5945,23 @@ window.EktReact = (function () {
     socket.emit("add-comment", { phone: post.ownerPhone, postId: post.id, comment: { authorPhone: m.phone, authorName: m.name, authorPic: m.pic, text } }, (res) => {
       if (res && res.success) { post.comments = (post.comments || []).concat(res.comment); openComments.add(post.id); card.outerHTML = feedCardHtml(post); }
     });
+  });
+  // Home feed: কমেন্ট এডিট/ডিলিট/হাইড (ইভেন্ট ডেলিগেশন — রি-রেন্ডার হলেও কাজ করে)
+  bindCommentActions($("homeFeed"), (row) => {
+    const card = row.closest(".post-card");
+    if (!card) return null;
+    const post = feedPosts.find((x) => x.id === card.dataset.fid);
+    if (!post) return null;
+    return {
+      kind: "post",
+      ownerPhone: post.ownerPhone,
+      postId: post.id,
+      onUpdate: (res) => {
+        if (res.comments) post.comments = res.comments;
+        openComments.add(post.id);
+        card.outerHTML = feedCardHtml(post);
+      }
+    };
   });
 
   // ---------- FRIENDS ----------
@@ -5909,8 +6100,13 @@ window.EktReact = (function () {
   const findReel = (id) => reelsCache.find((x) => x.id === id);
   function reelCommentsListHtml(reel) {
     const list = reel.comments || [];
-    return list.length
-      ? list.map((c) => `<div class="post-comment"><img class="post-comment-avatar" src="${esc(oi(c.authorPic, 64, true))}" alt=""><div class="post-comment-bubble"><span class="post-comment-name">${esc(c.authorName || "User")}</span><span class="post-comment-text">${esc(c.text)}</span></div></div>`).join("")
+    const m = me();
+    const rows = list.map((c) => commentRowHtml(c, {
+      postOwnerPhone: reel.ownerPhone,
+      myPhone: m && m.phone
+    })).filter(Boolean);
+    return rows.length
+      ? rows.join("")
       : `<div class="reel-cm-empty">এখনো কোনো কমেন্ট নেই। প্রথম কমেন্টটি আপনিই করুন।</div>`;
   }
   function drawReelComments(sheet, reel) {
@@ -5932,6 +6128,22 @@ window.EktReact = (function () {
       <div class="reel-cm-input"><img class="post-comment-avatar" src="${esc(oi((m && m.pic) || "", 64, true))}" alt=""><input type="text" maxlength="500" placeholder="Write a comment..."><button type="button" class="reel-cm-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button></div>`;
     item.appendChild(sheet);
     drawReelComments(sheet, reel);
+    const listBox = sheet.querySelector(".reel-cm-list");
+    if (listBox) {
+      listBox._cmBound = false;
+      bindCommentActions(listBox, () => ({
+        kind: "reel",
+        ownerPhone: reel.ownerPhone,
+        postId: reel.id,
+        onUpdate: (res) => {
+          if (res.comments) {
+            reel.comments = res.comments;
+            reel.commentCount = res.comments.length;
+          }
+          drawReelComments(sheet, reel);
+        }
+      }));
+    }
     const input = sheet.querySelector("input");
     const sendIt = () => {
       const text = input.value.trim();
@@ -6067,6 +6279,10 @@ window.EktReact = (function () {
     setTab("Home");
     syncMenu();
     refreshBadges();
+    if (restoreProfileOnce && m) {
+      restoreProfileOnce = false;
+      setTimeout(() => { try { $("myProfileBtn").click(); } catch (e) {} }, 0);
+    }
     // আলাদা লোডিং স্ক্রিন নেই: ইন্ট্রো স্প্ল্যাশের পেছনেই সব লোড হয়, শেষ হলে স্প্ল্যাশ সরে
     if (!splashDone) {
       splashDone = true;
