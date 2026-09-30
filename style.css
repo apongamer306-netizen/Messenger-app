@@ -2974,3 +2974,34 @@ body.dashboard-active .profile-modal {
 @keyframes storyFly { 0% { transform: translate(0, 0) scale(.6); opacity: 1; } 100% { transform: translate(var(--dx, 0), -320px) scale(1.5); opacity: 0; } }
 .story-foot-btn { background: rgba(0, 0, 0, .5); color: #fff; border: none; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; cursor: pointer; }
 .story-foot-btn i { font-size: 10px; margin-left: 4px; }
+
+
+/* =====================================================================
+   উন্নত টপ নেভিগেশন আইকন + Create story লেখা
+   ===================================================================== */
+.main-tabs { -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 4px 18px rgba(0, 0, 0, .10); padding: 0 4px; gap: 2px; }
+.mt-btn { border-bottom: none !important; border-radius: 14px; font-size: 19px; }
+.mt-btn i {
+  width: 46px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 17px;
+  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.mt-btn:hover { background: transparent; }
+.mt-btn:hover i { background: rgba(127, 127, 127, .14); transform: translateY(-1px) scale(1.06); }
+.mt-btn:active i { transform: scale(.92); }
+.mt-btn.active i {
+  background: rgba(127, 127, 127, .16);
+  background: color-mix(in srgb, var(--tc) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tc) 35%, transparent);
+}
+.mt-btn::after {
+  content: ""; position: absolute; left: 28%; right: 28%; bottom: 0; height: 3px; border-radius: 3px 3px 0 0;
+  background: var(--tc); transform: scaleX(0); transition: transform .22s ease;
+}
+.mt-btn.active::after { transform: scaleX(1); }
+.mt-badge { left: calc(50% + 8px); top: 2px; box-shadow: 0 0 0 2px var(--surface); }
+
+.story-add .story-name {
+  left: 8px; right: 8px; bottom: 8px; padding: 5px 6px; border-radius: 999px; text-align: center;
+  background: var(--brand-grad); color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .2px;
+  text-shadow: none; box-shadow: 0 3px 10px rgba(79, 140, 255, .45);
+}
