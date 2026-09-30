@@ -596,7 +596,7 @@
     <!-- Screen 3: Dashboard -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="dash-topbar">
-        <span class="dash-eyebrow">Home</span>
+        <span class="dash-brand">ekt<span>chatter</span></span>
         <div class="direct-menu-container">
           <button id="dashMenuToggle" class="dots-btn" aria-label="More options"><i class="fa-solid fa-ellipsis-vertical"></i></button>
           <div id="dashDropdownMenu" class="direct-dropdown-menu">
@@ -608,13 +608,14 @@
         </div>
       </div>
 
-      <div class="profile-header">
-        <div class="avatar-container dash-avatar-readonly">
-          <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture" title="View profile">
-        </div>
-        <div class="dash-name-row"><h3 id="dashboardUserName">User Name</h3></div>
-      </div>
-
+      <nav class="main-tabs" id="mainTabs">
+        <button type="button" class="mt-btn active" data-tab="Home" style="--tc:#1877f2"><i class="fa-solid fa-house"></i><span>Home</span></button>
+        <button type="button" class="mt-btn" data-tab="Friends" style="--tc:#10b981"><i class="fa-solid fa-user-group"></i><span>Friends</span><em class="mt-badge" id="tabFriendsBadge" style="display:none;">0</em></button>
+        <button type="button" class="mt-btn" data-tab="Profile" style="--tc:#7c5cff"><i class="fa-solid fa-circle-user"></i><span>Profile</span></button>
+        <button type="button" class="mt-btn" data-tab="Messages" style="--tc:#c026d3"><i class="fa-solid fa-message"></i><span>Messages</span><em class="mt-badge" id="tabMsgBadge" style="display:none;">0</em></button>
+        <button type="button" class="mt-btn" data-tab="Reels" style="--tc:#f97316"><i class="fa-solid fa-clapperboard"></i><span>Reels</span></button>
+        <button type="button" class="mt-btn" data-tab="Menu" style="--tc:#475569"><i class="fa-solid fa-bars"></i><span>Menu</span><em class="mt-badge" id="tabMenuBadge" style="display:none;">0</em></button>
+      </nav>
       <div class="dash-actions">
         <button id="friendIconBtn" type="button" class="dash-tile tile-friends">
           <span class="tile-icon"><i class="fa-solid fa-user-group"></i></span>
@@ -643,6 +644,69 @@
           <span id="adminReportBadge" class="friend-req-badge">0</span>
         </button>
       </div>
+
+      <section id="tabHome" class="tab-panel active">
+      <div class="stories-row" id="storiesRow">
+        <button type="button" class="story-card story-add" id="addStoryBtn">
+          <img id="storyAddAvatar" src="https://via.placeholder.com/100" alt="">
+          <span class="story-plus"><i class="fa-solid fa-plus"></i></span>
+          <span class="story-name">Create story</span>
+        </button>
+      </div>
+
+        <div class="home-composer" id="homeComposer">
+          <img id="homeComposerAvatar" src="https://via.placeholder.com/40" alt="">
+          <button type="button" id="homeComposerBtn" class="hc-input">What's on your mind?</button>
+          <button type="button" class="hc-ico" id="homeComposerPhoto" style="color:#10b981" aria-label="Photo"><i class="fa-solid fa-image"></i></button>
+          <button type="button" class="hc-ico" id="homeComposerVideo" style="color:#f43f5e" aria-label="Video"><i class="fa-solid fa-video"></i></button>
+        </div>
+        <div id="homeFeed" class="home-feed"></div>
+      </section>
+
+      <section id="tabFriends" class="tab-panel">
+        <div class="tp-search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="tfSearchInput" placeholder="Search people by name or number" autocomplete="off"></div>
+        <div id="tfSearchResults" class="tp-list" style="display:none;"></div>
+        <h4 class="tp-title" id="tfReqTitle" style="display:none;">Friend requests</h4>
+        <div id="tfRequests" class="tp-list"></div>
+        <h4 class="tp-title">People you may know</h4>
+        <div id="tfSuggest" class="tp-grid"></div>
+        <h4 class="tp-title" id="tfFriendsTitle">Your friends</h4>
+        <div id="tfFriends" class="tp-grid"></div>
+      </section>
+
+      <section id="tabMessages" class="tab-panel">
+        <div class="tp-head"><h3>Chats</h3>
+          <div class="tp-head-btns"><button type="button" id="tmCreateRoom" title="Create room"><i class="fa-solid fa-plus"></i></button><button type="button" id="tmJoinRoom" title="Join room"><i class="fa-solid fa-right-to-bracket"></i></button></div>
+        </div>
+        <div class="tp-search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="tmSearchInput" placeholder="Search chats" autocomplete="off"></div>
+        <div id="tmList" class="tp-list"></div>
+        <div class="tm-empty-desktop" id="tmEmptyDesktop"><i class="fa-regular fa-message"></i><p>একটি চ্যাট বেছে নিন</p></div>
+      </section>
+
+      <section id="tabReels" class="tab-panel">
+        <div class="tp-head"><h3>Reels</h3><div class="tp-head-btns"><button type="button" id="trUpload" title="Upload reel"><i class="fa-solid fa-video"></i></button></div></div>
+        <div id="reelsList" class="reels-list"></div>
+      </section>
+
+      <section id="tabMenu" class="tab-panel">
+      <div class="profile-header">
+        <div class="avatar-container dash-avatar-readonly">
+          <img id="dashboardAvatar" src="https://via.placeholder.com/100" alt="Profile Picture" title="View profile">
+        </div>
+        <div class="dash-name-row"><h3 id="dashboardUserName">User Name</h3></div>
+      </div>
+
+        <div class="menu-list">
+          <button type="button" class="menu-row" data-go="themeToggleBtn"><i style="background:#f59e0b" class="fa-solid fa-palette"></i><span>Theme (Light / Dark)</span></button>
+          <button type="button" class="menu-row" data-go="createRoomBtn"><i style="background:#10b981" class="fa-solid fa-plus"></i><span>Create room</span></button>
+          <button type="button" class="menu-row" data-go="joinRoomBtn"><i style="background:#0ea5e9" class="fa-solid fa-right-to-bracket"></i><span>Join room</span></button>
+          <button type="button" class="menu-row" data-go="openAdminPanelBtn"><i style="background:#7c5cff" class="fa-solid fa-user-shield"></i><span>Admin panel</span></button>
+          <button type="button" class="menu-row" data-go="openReportBtn"><i style="background:#f43f5e" class="fa-solid fa-flag"></i><span>Report</span></button>
+          <button type="button" class="menu-row" data-go="setPinBtn"><i style="background:#0284c7" class="fa-solid fa-key"></i><span>Security PIN</span></button>
+          <button type="button" class="menu-row" data-go="removePinBtn"><i style="background:#64748b" class="fa-solid fa-lock-open"></i><span>Remove Security PIN</span></button>
+          <button type="button" class="menu-row menu-row-danger" data-go="logoutBtn"><i style="background:#dc2626" class="fa-solid fa-power-off"></i><span>Logout</span></button>
+        </div>
+      </section>
 
       <p class="footer-text dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
     </div>
@@ -791,6 +855,7 @@
 
           <div class="admin-tabs">
             <button id="adminTabUsers" class="admin-tab-btn active" type="button">User Data</button>
+            <button id="adminTabStories" class="admin-tab-btn" type="button">Stories</button>
             <button id="adminTabNotifications" class="admin-tab-btn" type="button">
               Notifications
               <span id="adminNotifBadge" class="admin-report-badge inline" style="display:none;">0</span>
@@ -799,6 +864,11 @@
 
           <div id="adminUsersPanel" class="admin-tab-panel">
             <div id="adminUsersList" class="admin-users-list"></div>
+          </div>
+
+          <div id="adminStoriesPanel" class="admin-tab-panel" style="display:none;">
+            <h4 class="admin-section-title">Live Stories (২৪ ঘণ্টা)</h4>
+            <div id="adminStoriesList" class="admin-reports-list"></div>
           </div>
 
           <div id="adminNotificationsPanel" class="admin-tab-panel" style="display:none;">
@@ -810,6 +880,41 @@
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- STORY: তৈরি করা -->
+    <div id="storyCreateOverlay" class="story-overlay" style="display:none;">
+      <div class="story-create-card">
+        <div class="story-create-head"><b>Create story</b><button type="button" id="storyCreateClose" class="story-x"><i class="fa-solid fa-xmark"></i></button></div>
+        <div id="storyCreatePreview" class="story-create-preview" style="background:linear-gradient(135deg,#1877f2,#6a11cb)">
+          <textarea id="storyTextInput" maxlength="300" placeholder="আপনার স্টোরিতে কী লিখবেন?"></textarea>
+        </div>
+        <div class="story-bg-row" id="storyBgRow"></div>
+        <div class="story-create-actions">
+          <button type="button" class="btn btn-secondary" id="storyPickMediaBtn"><i class="fa-solid fa-image"></i> Photo / Video</button>
+          <button type="button" class="btn btn-primary" id="storyShareBtn">Share to story</button>
+        </div>
+        <p class="story-note">স্টোরি ২৪ ঘণ্টা পর নিজে থেকেই মুছে যাবে।</p>
+        <input type="file" id="storyFileInput" accept="image/*,video/*" style="display:none;">
+      </div>
+    </div>
+
+    <!-- STORY: দেখা -->
+    <div id="storyViewerOverlay" class="story-overlay story-viewer" style="display:none;">
+      <div class="story-stage" id="storyStage">
+        <div class="story-bars" id="storyBars"></div>
+        <div class="story-viewer-head">
+          <img id="storyViewerAvatar" src="" alt="">
+          <div class="story-viewer-who"><b id="storyViewerName"></b><span id="storyViewerTime"></span></div>
+          <button type="button" id="storyMenuBtn" class="story-x"><i class="fa-solid fa-ellipsis"></i></button>
+          <button type="button" id="storyViewerClose" class="story-x"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="storyBody" class="story-body"></div>
+        <div id="storyMenuSheet" class="story-sheet" style="display:none;"></div>
+        <div id="storyFooter" class="story-footer"></div>
+        <div class="story-tap story-tap-left" id="storyTapLeft"></div>
+        <div class="story-tap story-tap-right" id="storyTapRight"></div>
       </div>
     </div>
 
