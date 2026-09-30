@@ -588,7 +588,7 @@ io.on("connection", (socket) => {
     allowed.forEach((p) => {
       if (bannedUsers[p]) return;
       const posts = (profiles[p] && profiles[p].posts) || [];
-      posts.forEach((post) => out.push({ ...post, ...ownerInfo(p) }));
+      posts.forEach((post) => out.push({ ...post, reacts: reactsOf(post), ...ownerInfo(p) }));
     });
     out.sort((a, b) => b.timestamp - a.timestamp);
     callback({ success: true, posts: out.slice(0, 40) });
@@ -601,7 +601,12 @@ io.on("connection", (socket) => {
     Object.keys(profiles).forEach((p) => {
       if (bannedUsers[p]) return;
       ((profiles[p] && profiles[p].items) || []).forEach((it) => {
-        if (it && it.kind === "reel" && it.src) out.push({ id: it.id, src: it.src, caption: it.caption || "", timestamp: it.timestamp || 0, ...ownerInfo(p) });
+        if (it && it.kind === "reel" && it.src) {
+          // রিলস সাধারণত একটা পোস্টের সাথে যুক্ত — রিঅ্যাকশন/কমেন্ট/শেয়ার সেই পোস্টেই জমা হয়
+          const t = resolveTarget("reel", p, it.id);
+          const o = t ? t.obj : it;
+          out.push({ id: it.id, src: it.src, caption: it.caption || "", timestamp: it.timestamp || 0, reacts: reactsOf(o), comments: (o.comments || []).slice(-100), commentCount: (o.comments || []).length, shares: o.shares || 0, ...ownerInfo(p) });
+        }
       });
     });
     out.sort((a, b) => b.timestamp - a.timestamp);
@@ -1385,56 +1390,199 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback({ success: true, items: pr.items || [], posts: pr.posts || [] });
   });
 
-  socket.on("toggle-like-post", ({ phone, postId, likerPhone }, callback) => {
-    const list = profiles[phone] && profiles[phone].posts;
-    const post = Array.isArray(list) ? list.find((p) => p.id === postId) : null;
-    if (!post) {
-      if (typeof callback === "function") callback({ success: false });
-      return;
+  // ---------- REACTIONS (Like/Love/Care/Haha/Wow/Sad/Angry) · COMMENTS · SHARE ----------
+  // পোস্ট, রিলস আর স্টোরি — তিন জায়গার জন্যই একই লজিক।
+  // ডেটা: obj.reacts = { phone: "love" }, obj.likes = [phone...] (পুরনো কোডের সাথে মিল রাখতে), obj.shares = সংখ্যা
+  const REACT_TYPES = ["like", "love", "care", "haha", "wow", "sad", "angry"];
+
+  function reactsOf(o) {
+    const r = Object.assign({}, (o && o.reacts) || {});
+    ((o && o.likes) || []).forEach((ph) => { if (!r[ph]) r[ph] = "like"; }); // পুরনো লাইক = "like"
+    return r;
+  }
+
+  // kind: "post" | "reel" | "story" → আসল অবজেক্ট খুঁজে দেয়
+  function resolveTarget(kind, ownerPhone, id) {
+    if (kind === "story") {
+      const st = stories.find((x) => x.id === id);
+      return st ? { obj: st, kind: "story", owner: st.phone, media: st.media || null, caption: st.text || "" } : null;
     }
-    if (!Array.isArray(post.likes)) post.likes = [];
-    const idx = post.likes.indexOf(likerPhone);
-    let liked;
-    if (idx === -1) { post.likes.push(likerPhone); liked = true; }
-    else { post.likes.splice(idx, 1); liked = false; }
+    const pr = profiles[ownerPhone];
+    if (!pr) return null;
+    if (kind === "reel") {
+      const item = (pr.items || []).find((i) => i && i.id === id && i.kind === "reel");
+      if (!item) return null;
+      const post = item.postId ? (pr.posts || []).find((x) => x && x.id === item.postId) : null;
+      return { obj: post || item, kind: "reel", owner: ownerPhone, postId: post ? post.id : null, reelId: item.id, media: { type: "video", src: item.src }, caption: item.caption || (post && post.text) || "" };
+    }
+    const post = (pr.posts || []).find((x) => x && x.id === id);
+    if (!post) return null;
+    const item = post.itemId ? (pr.items || []).find((i) => i && i.id === post.itemId && i.kind === "reel") : null;
+    return { obj: post, kind: "post", owner: ownerPhone, postId: post.id, reelId: item ? item.id : null, media: post.media || null, caption: post.text || "" };
+  }
+
+  function itemPayload(t, id) {
+    const o = t.obj;
+    return {
+      kind: t.kind, ownerPhone: t.owner, id,
+      postId: t.postId || null, reelId: t.reelId || null,
+      reacts: reactsOf(o), likes: o.likes || [],
+      commentCount: (o.comments || []).length, shares: o.shares || 0,
+    };
+  }
+
+  // মালিক + মালিকের বন্ধুরা (+ যে করল সে) সাথে সাথে আপডেট পাবে
+  function broadcastItem(t, id, extra, alsoPhone) {
+    const payload = Object.assign(itemPayload(t, id), extra || {});
+    if (t.kind === "story") return payload;
+    const targets = new Set(Array.from(ensureSet(friendships, t.owner)).concat([t.owner]));
+    if (alsoPhone) targets.add(alsoPhone);
+    targets.forEach((ph) => { const sid = phoneToSocket[ph]; if (sid) io.to(sid).emit("item-updated", payload); });
+    return payload;
+  }
+
+  function setReaction(t, phone, type) {
+    const o = t.obj;
+    const reacts = reactsOf(o);
+    if (REACT_TYPES.includes(type)) reacts[phone] = type; else delete reacts[phone];
+    o.reacts = reacts;
+    o.likes = Object.keys(reacts);
+    return reacts;
+  }
+
+  function applyReaction(kind, ownerPhone, id, reactorPhone, type, callback) {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!reactorPhone || bannedUsers[reactorPhone] || !["post", "reel", "story"].includes(kind)) return reply({ success: false });
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return reply({ success: false });
+    const reacts = setReaction(t, reactorPhone, type);
     saveData();
+    const payload = broadcastItem(t, id, {}, reactorPhone);
+    if (t.kind === "story" && t.owner !== reactorPhone) {
+      const u = users[reactorPhone] || {};
+      const sid = phoneToSocket[t.owner];
+      if (sid) io.to(sid).emit("story-reacted", { storyId: id, phone: reactorPhone, name: u.name || "Someone", type: reacts[reactorPhone] || null, reacts });
+    }
+    reply({ success: true, reacts, likes: t.obj.likes, my: reacts[reactorPhone] || null, payload });
+  }
 
-    // পোস্টের মালিককে জানানো (তার প্রোফাইল খোলা থাকলে লাইভ আপডেট হবে)
-    const ownerSocket = phoneToSocket[phone];
-    if (ownerSocket) io.to(ownerSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
-
-    if (typeof callback === "function") callback({ success: true, liked, likes: post.likes });
+  socket.on("react-item", ({ kind, ownerPhone, id, reactorPhone, type }, callback) => {
+    applyReaction(kind, ownerPhone, id, reactorPhone, type, callback);
   });
 
-  socket.on("add-comment", ({ phone, postId, comment }, callback) => {
-    const list = profiles[phone] && profiles[phone].posts;
-    const post = Array.isArray(list) ? list.find((p) => p.id === postId) : null;
-    if (!post || !comment) {
-      if (typeof callback === "function") callback({ success: false });
-      return;
-    }
-    if (!Array.isArray(post.comments)) post.comments = [];
+  // পুরনো "লাইক" বাটনের সাথে সামঞ্জস্য
+  socket.on("toggle-like-post", ({ phone, postId, likerPhone }, callback) => {
+    const t = resolveTarget("post", phone, postId);
+    if (!t) { if (typeof callback === "function") callback({ success: false }); return; }
+    const had = !!reactsOf(t.obj)[likerPhone];
+    applyReaction("post", phone, postId, likerPhone, had ? null : "like", (res) => {
+      if (typeof callback === "function") callback(res && res.success ? Object.assign({ liked: !had }, res) : res);
+    });
+  });
+
+  // কারা রিঅ্যাক্ট করেছে (পোস্ট/রিলস/স্টোরি)
+  socket.on("get-reactors", ({ kind, ownerPhone, id }, callback) => {
+    if (typeof callback !== "function") return;
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return callback({ success: false });
+    const r = reactsOf(t.obj);
+    callback({ success: true, list: Object.keys(r).map((ph) => Object.assign({}, publicUser(ph), { phone: ph, type: r[ph] })) });
+  });
+
+  // স্টোরির ভিউয়ার + তাদের রিঅ্যাকশন (শুধু মালিক দেখতে পাবে)
+  socket.on("get-story-viewers", ({ phone, storyId }, callback) => {
+    if (typeof callback !== "function") return;
+    const st = stories.find((x) => x.id === storyId);
+    if (!st || st.phone !== phone) return callback({ success: false });
+    const r = reactsOf(st);
+    const all = Array.from(new Set((st.views || []).concat(Object.keys(r))));
+    callback({ success: true, list: all.map((ph) => Object.assign({}, publicUser(ph), { phone: ph, type: r[ph] || null })) });
+  });
+
+  socket.on("add-comment", ({ phone, postId, comment, kind }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", phone, postId);
+    if (!t || !comment || !String(comment.text || "").trim() || bannedUsers[comment.authorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) o.comments = [];
 
     const newComment = {
       id: "cm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       authorPhone: comment.authorPhone,
       authorName: comment.authorName,
       authorPic: comment.authorPic,
-      text: (comment.text || "").slice(0, 500),
+      text: String(comment.text || "").slice(0, 500),
       timestamp: Date.now()
     };
-    post.comments.push(newComment);
+    o.comments.push(newComment);
     saveData();
 
-    const ownerSocket = phoneToSocket[phone];
-    if (ownerSocket) io.to(ownerSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
-    // কমেন্টকারী যদি অন্য কেউ হয়, তাকেও আপডেট পাঠানো (তার স্ক্রিনেও যেন সাথে সাথে দেখা যায়)
-    const commenterSocket = phoneToSocket[comment.authorPhone];
-    if (commenterSocket && comment.authorPhone !== phone) {
-      io.to(commenterSocket).emit("post-updated", { phone, postId, likes: post.likes, comments: post.comments });
+    // মালিক, তার বন্ধুরা আর কমেন্টকারী — সবার স্ক্রিনে সাথে সাথে কমেন্ট দেখা যাবে
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, comment.authorPhone);
+    reply({ success: true, comment: newComment });
+  });
+
+  // ---------- SHARE ----------
+  // mode: "feed" = নিজের ফিডে শেয়ার · "friend" = বন্ধুকে মেসেজে পাঠানো · "link" = লিংক কপি/সিস্টেম শেয়ার (শুধু গণনা)
+  socket.on("share-item", ({ kind, ownerPhone, id, sharerPhone, mode, text, toPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!sharerPhone || bannedUsers[sharerPhone] || (kind !== "post" && kind !== "reel")) return reply({ success: false });
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return reply({ success: false, message: "এটি আর পাওয়া যাচ্ছে না।" });
+    const owner = users[t.owner] || {};
+    const sharer = users[sharerPhone] || {};
+    const note = String(text || "").slice(0, 2000);
+    const cap = String(t.caption || "").replace(/\s+/g, " ").trim();
+    const mediaOut = t.media && t.media.src ? { type: t.media.type === "video" ? "video" : "image", src: t.media.src } : null;
+
+    if (mode === "feed") {
+      if (!profiles[sharerPhone]) profiles[sharerPhone] = {};
+      if (!Array.isArray(profiles[sharerPhone].posts)) profiles[sharerPhone].posts = [];
+      const post = {
+        id: "post_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        text: note,
+        media: mediaOut ? Object.assign({}, mediaOut, t.media && t.media.host ? { host: t.media.host } : {}) : null,
+        timestamp: Date.now(), likes: [], comments: [],
+        itemId: "shared", // Photos/Reels-এ ডুপ্লিকেট আইটেম তৈরি হবে না
+        sharedFrom: { ownerPhone: t.owner, ownerName: owner.name || "User", text: cap.slice(0, 500), kind },
+      };
+      profiles[sharerPhone].posts.unshift(post);
+      profiles[sharerPhone].posts = profiles[sharerPhone].posts.slice(0, 100);
+      t.obj.shares = (t.obj.shares || 0) + 1;
+      saveData();
+      notifyFriendsOfProfile(sharerPhone);
+      const payload = broadcastItem(t, id, {}, sharerPhone);
+      return reply({ success: true, post, shares: t.obj.shares, payload });
     }
 
-    if (typeof callback === "function") callback({ success: true, comment: newComment });
+    if (mode === "friend") {
+      if (!toPhone || toPhone === sharerPhone) return reply({ success: false });
+      if (ensureSet(blockedUsers, sharerPhone).has(toPhone)) return reply({ success: false, message: "আপনি এই ইউজারকে ব্লক করে রেখেছেন।" });
+      if (ensureSet(blockedUsers, toPhone).has(sharerPhone)) return reply({ success: false, message: "মেসেজ পাঠানো যায়নি।" });
+      const label = kind === "reel" ? "Reel" : "পোস্ট";
+      const msg = {
+        clientId: "sh" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        senderPhone: sharerPhone, senderName: sharer.name || "User", senderPic: sharer.pic || "",
+        receiverPhone: toPhone, timestamp: Date.now(),
+        text: "↪️ " + (owner.name || "User") + " এর " + label + (cap ? ": " + cap.slice(0, 80) : ""),
+        shared: { kind, ownerPhone: t.owner, ownerName: owner.name || "User", caption: cap.slice(0, 200), note: note.slice(0, 500), mediaType: mediaOut ? mediaOut.type : "", mediaSrc: mediaOut ? mediaOut.src : "" },
+      };
+      const key = directKey(sharerPhone, toPhone);
+      if (!directMessages[key]) directMessages[key] = [];
+      directMessages[key].push(msg);
+      t.obj.shares = (t.obj.shares || 0) + 1;
+      saveData();
+      const targetSocket = phoneToSocket[toPhone];
+      if (targetSocket) io.to(targetSocket).emit("receive-direct-message", msg);
+      const payload = broadcastItem(t, id, {}, sharerPhone);
+      return reply({ success: true, delivered: !!targetSocket, shares: t.obj.shares, payload });
+    }
+
+    // "link"
+    t.obj.shares = (t.obj.shares || 0) + 1;
+    saveData();
+    const payload = broadcastItem(t, id, {}, sharerPhone);
+    reply({ success: true, shares: t.obj.shares, payload, link: mediaOut ? mediaOut.src : "" });
   });
 
   // ---------- CALL: অডিও থেকে ভিডিওতে সুইচ ----------
