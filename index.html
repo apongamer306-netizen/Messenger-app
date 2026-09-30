@@ -596,7 +596,7 @@
     <!-- Screen 3: Dashboard -->
     <div id="dashboardScreen" class="card-screen" style="display: none;">
       <div class="dash-topbar">
-        <span class="dash-brand">ekt<span>chatter</span></span>
+        <div class="logo dash-logo" aria-label="EKT CHATTER"><span class="logo-sizer" aria-hidden="true">EKT CHATTER</span><span class="logo-type"><span class="logo-loop-text" id="dashLogoLoopText"></span><span class="logo-loop-cursor"></span></span></div>
         <div class="direct-menu-container">
           <button id="dashMenuToggle" class="dots-btn" aria-label="More options"><i class="fa-solid fa-ellipsis-vertical"></i></button>
           <div id="dashDropdownMenu" class="direct-dropdown-menu">
@@ -707,8 +707,6 @@
           <button type="button" class="menu-row menu-row-danger" data-go="logoutBtn"><i style="background:#dc2626" class="fa-solid fa-power-off"></i><span>Logout</span></button>
         </div>
       </section>
-
-      <p class="footer-text dev-credit"><span class="dev-credit-sizer" aria-hidden="true">Developed by Eyamin</span><span class="dev-credit-type" aria-label="Developed by Eyamin"><span class="dev-credit-text"></span><span class="dev-credit-cursor"></span></span></p>
     </div>
 
     <!-- Screen 4: Chat Room -->
@@ -891,12 +889,35 @@
           <textarea id="storyTextInput" maxlength="300" placeholder="আপনার স্টোরিতে কী লিখবেন?"></textarea>
         </div>
         <div class="story-bg-row" id="storyBgRow"></div>
+        <div class="story-opts" id="storyOpts">
+          <div class="story-opt-row" id="storyDurRow"><span><i class="fa-regular fa-clock"></i> সময়</span>
+            <button type="button" class="on" data-d="5000">5s</button><button type="button" data-d="10000">10s</button><button type="button" data-d="15000">15s</button></div>
+          <div class="story-opt-row" id="storyMusicRow"><button type="button" id="storyMusicBtn"><i class="fa-solid fa-music"></i> Music</button>
+            <span id="storyMusicName" class="story-music-name">কোনো গান নেই</span><button type="button" id="storyMusicClear" style="display:none;">&times;</button></div>
+          <audio id="storyMusicPreview" controls style="display:none;width:100%;height:34px;margin-top:6px;"></audio>
+          <input type="file" id="storyMusicInput" accept="audio/*" style="display:none;">
+        </div>
         <div class="story-create-actions">
           <button type="button" class="btn btn-secondary" id="storyPickMediaBtn"><i class="fa-solid fa-image"></i> Photo / Video</button>
           <button type="button" class="btn btn-primary" id="storyShareBtn">Share to story</button>
         </div>
         <p class="story-note">স্টোরি ২৪ ঘণ্টা পর নিজে থেকেই মুছে যাবে।</p>
         <input type="file" id="storyFileInput" accept="image/*,video/*" style="display:none;">
+      </div>
+    </div>
+
+    <!-- Home: Create post -->
+    <div id="cpOverlay" class="story-overlay" style="display:none;">
+      <div class="cp-card">
+        <div class="story-create-head"><b>Create post</b><button type="button" id="cpClose" class="story-x"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="cp-who"><img id="cpAvatar" src="https://via.placeholder.com/40" alt=""><b id="cpName"></b></div>
+        <textarea id="cpText" maxlength="2000" rows="3" placeholder="What's on your mind?"></textarea>
+        <div id="cpPreview" class="cp-preview" style="display:none;"></div>
+        <div class="cp-add"><span>Add to your post</span>
+          <button type="button" id="cpPhoto" style="color:#10b981"><i class="fa-solid fa-image"></i></button>
+          <button type="button" id="cpVideo" style="color:#f43f5e"><i class="fa-solid fa-video"></i></button></div>
+        <button type="button" class="btn btn-primary" id="cpSubmit" style="width:100%;">Post</button>
+        <input type="file" id="cpFile" style="display:none;">
       </div>
     </div>
 
@@ -969,6 +990,8 @@
     (function () {
       var logoEl = document.getElementById("logoLoopText");
       if (logoEl) startTypeEraseLoop(logoEl, "EKT CHATTER", { typeMs: 130, eraseMs: 65, holdMs: 2600, gapMs: 600, startDelay: 500 });
+      var dashLogoEl = document.getElementById("dashLogoLoopText");
+      if (dashLogoEl) startTypeEraseLoop(dashLogoEl, "EKT CHATTER", { typeMs: 130, eraseMs: 65, holdMs: 2600, gapMs: 600, startDelay: 500 });
 
       document.querySelectorAll(".dev-credit-text").forEach(function (el, order) {
         startTypeEraseLoop(el, "Developed by Eyamin", { startDelay: 250 + order * 120 });
