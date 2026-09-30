@@ -5376,7 +5376,6 @@ window.addEventListener("load", () => {
     return Promise.all(imgs.map((i) => new Promise((r) => { i.addEventListener("load", r, { once: true }); i.addEventListener("error", r, { once: true }); })));
   }
   async function preloadEverything() {
-    const splash = makeSplash();
     try {
       fetchFriendData();
       await withTimeout(Promise.all([
@@ -5393,8 +5392,6 @@ window.addEventListener("load", () => {
         firstReady,
       ]), 7000);
     } catch (e) {}
-    splash.classList.add("hide");
-    setTimeout(() => splash.remove(), 350);
   }
 
   window.__tabsOnDashboard = function () {
@@ -5403,7 +5400,8 @@ window.addEventListener("load", () => {
     setTab("Home");
     syncMenu();
     refreshBadges();
-    if (!splashDone) { splashDone = true; preloadEverything(); }
+    // আলাদা লোডিং স্ক্রিন নেই: ইন্ট্রো স্প্ল্যাশের পেছনেই সব লোড হয়, শেষ হলে স্প্ল্যাশ সরে
+    if (!splashDone) { splashDone = true; window.__ektSplashHold = preloadEverything(); }
   };
   // অন্য ডিভাইসে নতুন পোস্ট/স্টোরি হলে Home রিফ্রেশ
   setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden) loadFeed(); }, 45000);
