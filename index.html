@@ -430,11 +430,15 @@
         hideRequested = true;
         window.__ektReady.then(goFinish, goFinish);
       };
-      // ডেটা লোড শেষ হওয়া মাত্র % দ্রুত 100 হয়ে Home-এ নিয়ে যাবে — ব্র্যান্ডিং অ্যানিমেশনের জন্য বাড়তি অপেক্ষা নেই
+      // ডেটা রেডি হলে 100% এ নিয়ে যাবে।
+      // কিন্তু যার ডেটা নেই (লোড তাড়াতাড়ি শেষ) — তাদেরও টাইটেল/ক্রেডিট/রিং অ্যানিমেশন
+      // পুরো দেখানোর জন্য ন্যূনতম সময় অপেক্ষা করা হয়, তারপর % মসৃণভাবে 100 হয়ে সরে।
+      var MIN_BRANDING_MS = 5000;
       function goFinish() {
         if (splashDone) return;
         if (noTick || isResumeSession) { realHide(); return; }
-        var wait = Math.max(0, 200 - (Date.now() - splashStartTs)); // ঝলকানি এড়াতে সর্বনিম্ন ~০.২ সেকেন্ড
+        var elapsed = Date.now() - splashStartTs;
+        var wait = Math.max(180, MIN_BRANDING_MS - elapsed);
         setTimeout(function () { finishing = true; }, wait);
       }
       window.__ektReady.then(function () { hideRequested = true; goFinish(); });
@@ -443,7 +447,7 @@
         if (hideScheduled) return;
         if (titleDone && creditDone && chargeDone) {
           hideScheduled = true;
-          setTimeout(window.hideSplashScreen, 120);
+          setTimeout(window.hideSplashScreen, 200);
         }
       }
 
@@ -522,12 +526,9 @@
         var dt = Math.min(100, now - lastTs); lastTs = now;
         var goal, rate;
         if (finishing) {
-          // ডেটা রেডি — সাথে সাথে 100% দেখিয়ে Home-এ যাওয়া (বাড়তি দেরি নেই)
-          shownPct = 100;
-          if (circleEl) { circleEl.classList.remove("waiting"); circleEl.style.setProperty("--p", 100); }
-          if (pctEl) pctEl.textContent = "100%";
-          realHide();
-          return;
+          // 100% পর্যন্ত মসৃণভাবে পূর্ণ করো, তারপর Home
+          goal = 100;
+          rate = 90;
         } else {
           // ধাপের ভেতরেও ধীরে এগোবে (সর্বোচ্চ ~9 পয়েন্ট), তবে 97-এর বেশি না
           var creep = 9 * (1 - Math.exp(-(now - stageTs) / 5000));
@@ -535,11 +536,17 @@
           rate = 450;
         }
         shownPct += (goal - shownPct) * (1 - Math.exp(-dt / rate));
+        if (finishing && shownPct > 99.2) shownPct = 100;
         var shown = Math.round(shownPct);
         if (shown !== lastPct) {
           lastPct = shown;
           if (circleEl) circleEl.style.setProperty("--p", shownPct);
           if (pctEl) pctEl.textContent = shown + "%";
+        }
+        if (finishing && shownPct >= 100) {
+          if (circleEl) circleEl.classList.remove("waiting");
+          realHide();
+          return;
         }
         rafId = requestAnimationFrame(tick);
       }
