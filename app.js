@@ -1996,7 +1996,8 @@ function wirePostCardEvents(post) {
       if (ok === null) return;
       socket.emit("delete-post", { phone: profileViewState.phone, postId: post.id }, (res) => {
         if (res && res.success) {
-          profileViewState.data.posts = (profileViewState.data.posts || []).filter((p) => p.id !== post.id);
+          profileViewState.data.posts = res.posts || (profileViewState.data.posts || []).filter((p) => p.id !== post.id);
+          if (res.items) profileViewState.data.items = res.items;
           renderPostsFeed();
         }
       });
@@ -2135,8 +2136,8 @@ document.getElementById("pmSubmitPostBtn").onclick = async () => {
     socket.emit("create-post", { phone: currentUser.phone, text, media: mediaSnapshot }, done);
   }, mediaSnapshot && mediaSnapshot.type === "video" ? 180000 : undefined);
   if (ok && res && res.post) {
-    profileViewState.data.posts = profileViewState.data.posts || [];
-    profileViewState.data.posts.unshift(res.post);
+    profileViewState.data.posts = res.posts || [res.post].concat(profileViewState.data.posts || []);
+    if (res.items) profileViewState.data.items = res.items;
     pmComposerText.value = ""; pmComposerText.style.height = "auto";
     pendingPostMedia = null; pmComposerPreview.style.display = "none"; pmComposerPreview.innerHTML = "";
     renderPostsFeed();
@@ -2288,8 +2289,9 @@ function renderProfileGallery(kind) {
     btn.onclick = (e) => {
       e.stopPropagation();
       const id = btn.dataset.del;
-      socket.emit("delete-profile-item", { phone: currentUser.phone, itemId: id }, () => {
-        profileViewState.data.items = (profileViewState.data.items || []).filter((i) => i.id !== id);
+      socket.emit("delete-profile-item", { phone: currentUser.phone, itemId: id }, (res) => {
+        profileViewState.data.items = (res && res.items) || (profileViewState.data.items || []).filter((i) => i.id !== id);
+        if (res && res.posts) profileViewState.data.posts = res.posts;
         renderProfileGallery(kind);
       });
     };
@@ -2418,6 +2420,7 @@ async function handleReelUpload(file) {
   }, 180000);
   if (ok && res) {
     profileViewState.data.items = res.items;
+    if (res.posts) profileViewState.data.posts = res.posts;
     if (profileViewState.tab === "reels") renderProfileGallery("reel");
   }
 }
@@ -2457,6 +2460,7 @@ profileFileInput.onchange = async () => {
   });
   if (ok && res) {
     profileViewState.data.items = res.items;
+    if (res.posts) profileViewState.data.posts = res.posts;
     try {
       const slim = (res.items || []).filter((it) => it && it.kind === "photo" && it.src && !String(it.src).startsWith("data:")).slice(0, 40)
         .map((it) => ({ id: it.id, kind: "photo", src: it.src, name: it.name, caption: it.caption || "", timestamp: it.timestamp }));
@@ -4691,6 +4695,8 @@ window.addEventListener("load", () => {
   let groups = [];        // [{phone,name,pic,items:[...]}]
   let gi = 0, si = 0, timer = null;
   let bgIndex = 0, pickedFile = null, pickedIsVideo = false;
+  let pickedMusic = null, pickedDur = 5000, storyAudio = null;
+  const MUSIC_MAX = 8 * 1024 * 1024, STORY_MAX_SEC = 15;
 
   const me = () => (typeof currentUser !== "undefined" ? currentUser : null);
   const esc = (t) => (typeof escapeHtml === "function" ? escapeHtml(t) : String(t || ""));
@@ -4722,22 +4728,53 @@ window.addEventListener("load", () => {
     });
   }
 
-  window.loadStoriesRow = function () {
+  window.loadStoriesRow = function (cb) {
     const u = me();
-    if (!u || typeof socket === "undefined") return;
+    if (!u || typeof socket === "undefined") { if (cb) cb(); return; }
     socket.emit("get-stories", { phone: u.phone }, (res) => {
-      if (!res || !res.success) return;
+      if (!res || !res.success) { if (cb) cb(); return; }
       allStories = res.stories || [];
       buildGroups();
       renderRow();
+      if (cb) cb();
     });
   };
   socket.on("stories-updated", () => window.loadStoriesRow());
   setInterval(() => { if (document.body.classList.contains("dashboard-active")) window.loadStoriesRow(); }, 60000);
 
   // ---------- তৈরি ----------
+  function setMusic(file) {
+    pickedMusic = file || null;
+    const pv = $("storyMusicPreview");
+    $("storyMusicName").textContent = file ? file.name : "কোনো গান নেই";
+    $("storyMusicClear").style.display = file ? "inline-flex" : "none";
+    if (pv.src) { try { URL.revokeObjectURL(pv.src); } catch (e) {} }
+    if (file) { pv.src = URL.createObjectURL(file); pv.style.display = "block"; pv.play().catch(() => {}); }
+    else { pv.pause(); pv.removeAttribute("src"); pv.style.display = "none"; }
+  }
+  function setDur(ms) {
+    pickedDur = ms;
+    $("storyDurRow").querySelectorAll("[data-d]").forEach((b) => b.classList.toggle("on", +b.dataset.d === ms));
+  }
+  function syncOpts() {
+    // ভিডিও স্টোরিতে সময় ভিডিওর নিজের (সর্বোচ্চ ১৫ সে.), গান শুধু ছবি/লেখার স্টোরিতে
+    $("storyOpts").classList.toggle("is-video", !!(pickedFile && pickedIsVideo));
+  }
+  $("storyDurRow").onclick = (e) => { const b = e.target.closest("[data-d]"); if (b) setDur(+b.dataset.d); };
+  $("storyMusicBtn").onclick = () => $("storyMusicInput").click();
+  $("storyMusicClear").onclick = () => setMusic(null);
+  $("storyMusicInput").onchange = () => {
+    const f = $("storyMusicInput").files[0];
+    $("storyMusicInput").value = "";
+    if (!f) return;
+    if (!f.type.startsWith("audio/")) { showCustomAlert("Audio only", "শুধু অডিও (mp3, m4a...) ফাইল দিন।"); return; }
+    if (f.size > MUSIC_MAX) { showCustomAlert("Too large", "গানের ফাইল সর্বোচ্চ ৮ MB হতে পারবে।"); return; }
+    setMusic(f);
+  };
+
   function resetCreate() {
     pickedFile = null; pickedIsVideo = false; bgIndex = 0;
+    setMusic(null); setDur(5000); syncOpts();
     $("storyTextInput").value = "";
     applyPreview();
   }
@@ -4754,7 +4791,7 @@ window.addEventListener("load", () => {
     $("storyTextInput").classList.toggle("over-media", !!pickedFile);
   }
   $("storyBgRow").innerHTML = BGS.map((g, i) => `<button type="button" class="story-bg-dot" data-i="${i}" style="background:${g}"></button>`).join("");
-  $("storyBgRow").onclick = (e) => { const b = e.target.closest("[data-i]"); if (!b) return; bgIndex = +b.dataset.i; pickedFile = null; applyPreview(); };
+  $("storyBgRow").onclick = (e) => { const b = e.target.closest("[data-i]"); if (!b) return; bgIndex = +b.dataset.i; pickedFile = null; applyPreview(); syncOpts(); };
   $("addStoryBtn").onclick = () => { resetCreate(); $("storyCreateOverlay").style.display = "flex"; };
   $("storyCreateClose").onclick = () => { $("storyCreateOverlay").style.display = "none"; };
   $("storyPickMediaBtn").onclick = () => $("storyFileInput").click();
@@ -4764,8 +4801,21 @@ window.addEventListener("load", () => {
     if (!f) return;
     if (f.type.startsWith("video/") && f.size > STORY_VIDEO_MAX) { showCustomAlert("Too large", "স্টোরির ভিডিও সর্বোচ্চ ২৫ MB হতে পারবে।"); return; }
     if (!f.type.startsWith("video/") && !f.type.startsWith("image/")) return;
+    if (f.type.startsWith("video/")) {
+      // স্টোরির ভিডিও সর্বোচ্চ ১৫ সেকেন্ড
+      const ok = await new Promise((resolve) => {
+        const v = document.createElement("video");
+        const u = URL.createObjectURL(f);
+        v.preload = "metadata";
+        v.onloadedmetadata = () => { URL.revokeObjectURL(u); resolve(v.duration <= STORY_MAX_SEC + 0.5); };
+        v.onerror = () => { URL.revokeObjectURL(u); resolve(true); };
+        v.src = u;
+      });
+      if (!ok) { showCustomAlert("Too long", "স্টোরির ভিডিও সর্বোচ্চ ১৫ সেকেন্ডের হতে পারবে।"); return; }
+      setMusic(null);
+    }
     pickedFile = f; pickedIsVideo = f.type.startsWith("video/");
-    applyPreview();
+    applyPreview(); syncOpts();
   };
   $("storyShareBtn").onclick = async () => {
     const u = me();
@@ -4789,13 +4839,19 @@ window.addEventListener("load", () => {
       if (res && res.success) { $("storyCreateOverlay").style.display = "none"; window.loadStoriesRow(); }
       else showCustomAlert("Failed", (res && res.message) || "স্টোরি আপলোড হয়নি।");
     };
-    socket.emit("add-story", { phone: u.phone, text, bg: BGS[bgIndex], media }, fin);
+    let music = null;
+    if (pickedMusic && !(pickedFile && pickedIsVideo)) {
+      try { music = { src: await readFileAsDataUrl(pickedMusic), name: pickedMusic.name }; }
+      catch (e) { btn.disabled = false; btn.textContent = "Share to story"; showCustomAlert("Error", "গানের ফাইল পড়া যায়নি।"); return; }
+    }
+    socket.emit("add-story", { phone: u.phone, text, bg: BGS[bgIndex], media, music, duration: pickedDur }, fin);
     setTimeout(() => fin(null), 120000);
   };
 
   // ---------- দেখা ----------
   function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
-  function closeViewer() { clearTimer(); $("storyViewerOverlay").style.display = "none"; $("storyBody").innerHTML = ""; $("storyMenuSheet").style.display = "none"; window.loadStoriesRow(); }
+  function stopMusic() { if (storyAudio) { try { storyAudio.pause(); } catch (e) {} storyAudio = null; } }
+  function closeViewer() { clearTimer(); stopMusic(); $("storyViewerOverlay").style.display = "none"; $("storyBody").innerHTML = ""; $("storyMenuSheet").style.display = "none"; window.loadStoriesRow(); }
   function openViewer(idx) {
     gi = idx; si = 0;
     const g = groups[gi];
@@ -4808,7 +4864,7 @@ window.addEventListener("load", () => {
   function next() { const g = groups[gi]; if (si < g.items.length - 1) { si++; showStory(); } else if (gi < groups.length - 1) { gi++; si = 0; showStory(); } else closeViewer(); }
   function prev() { if (si > 0) { si--; showStory(); } else if (gi > 0) { gi--; si = 0; showStory(); } else showStory(); }
   function showStory() {
-    clearTimer();
+    clearTimer(); stopMusic();
     $("storyMenuSheet").style.display = "none";
     const g = groups[gi], st = g.items[si], u = me();
     $("storyViewerAvatar").src = g.pic || "https://via.placeholder.com/60";
@@ -4817,12 +4873,16 @@ window.addEventListener("load", () => {
     $("storyBars").innerHTML = g.items.map((_, i) => `<div class="story-bar"><i class="${i < si ? "full" : ""}"></i></div>`).join("");
     const body = $("storyBody");
     const textHtml = st.text ? `<div class="story-text ${st.media ? "on-media" : ""}">${esc(st.text)}</div>` : "";
-    let dur = 5000;
+    let dur = Math.max(3000, Math.min(15000, st.duration || 5000));
+    if (st.music && st.music.src && !(st.media && st.media.type === "video")) {
+      storyAudio = new Audio(st.music.src);
+      storyAudio.play().catch(() => {});
+    }
     if (st.media && st.media.type === "video") {
       body.innerHTML = `<video src="${esc(st.media.src)}" autoplay playsinline></video>${textHtml}`;
       const v = body.querySelector("video");
       dur = 0;
-      v.onloadedmetadata = () => runBar(v.duration * 1000);
+      v.onloadedmetadata = () => runBar(Math.min((v.duration || 5) * 1000, STORY_MAX_SEC * 1000));
       v.onended = next;
       v.onerror = () => runBar(5000);
       v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
@@ -4833,6 +4893,7 @@ window.addEventListener("load", () => {
     }
     if (dur) runBar(dur);
     const own = g.phone === u.phone;
+    if (st.music && st.music.name) { const mn = document.createElement("div"); mn.className = "story-music-tag"; mn.innerHTML = '<i class="fa-solid fa-music"></i> ' + esc(st.music.name); body.appendChild(mn); }
     $("storyFooter").textContent = own ? `👁 ${(st.views || []).length} views · ${Math.max(0, Math.ceil((st.expires - Date.now()) / 3600000))} ঘণ্টা বাকি` : "";
     if (!own) socket.emit("view-story", { phone: u.phone, storyId: st.id });
     if (!(st.views || []).includes(u.phone) && !own) st.views = (st.views || []).concat(u.phone);
@@ -4895,6 +4956,18 @@ window.addEventListener("load", () => {
   const openComments = new Set();
   const isDesktop = () => window.matchMedia("(min-width: 900px)").matches;
   const PH = "https://via.placeholder.com/48";
+  // Cloudinary ছবি ছোট/হালকা করে লোড (দ্রুত)
+  const oi = (url, w, face) => {
+    if (!url) return PH;
+    const u = String(url);
+    if (u.indexOf("res.cloudinary.com") === -1 || u.indexOf("/image/upload/") === -1) return u;
+    return u.replace("/image/upload/", "/image/upload/f_auto,q_auto,w_" + w + (face ? ",h_" + w + ",c_fill,g_face" : "") + "/");
+  };
+  function syncTabHighlight() {
+    const showProfile = profileModalOverlay.classList.contains("active") && profileViewState && profileViewState.isMe;
+    tabsEl.querySelectorAll(".mt-btn").forEach((b) => b.classList.toggle("active", showProfile ? b.dataset.tab === "Profile" : b.dataset.tab === current));
+  }
+  new MutationObserver(syncTabHighlight).observe(profileModalOverlay, { attributes: true, attributeFilter: ["class"] });
 
   function openUserProfile(u) {
     const m = me();
@@ -4905,6 +4978,7 @@ window.addEventListener("load", () => {
   // ---------- ট্যাব বদল ----------
   function setTab(name) {
     if (name === "Profile") { $("myProfileBtn").click(); return; }
+    profileModalOverlay.classList.remove("active"); // অন্য ট্যাবে গেলে প্রোফাইল বন্ধ
     if (current === "Messages" && name !== "Messages" && isDesktop() && directChatScreen.classList.contains("active")) {
       try { ektNavGoBack("directChat"); } catch (e) { closeDirectChatScreen(); }
     }
@@ -4956,19 +5030,82 @@ window.addEventListener("load", () => {
       if (afterFn) afterFn();
     }, 350);
   }
-  $("homeComposerBtn").onclick = () => openMyComposer(() => { try { pmComposerText.focus(); } catch (e) {} });
-  $("homeComposerPhoto").onclick = () => openMyComposer(() => $("pmAddPhotoBtn").click());
-  $("homeComposerVideo").onclick = () => openMyComposer(() => $("pmAddVideoBtn").click());
+  // ---- Facebook-এর মতো Create post ডায়ালগ ----
+  let cpMedia = null;
+  function cpReset() {
+    cpMedia = null; $("cpText").value = "";
+    $("cpPreview").style.display = "none"; $("cpPreview").innerHTML = "";
+  }
+  function openCreatePost(kind) {
+    const m = me(); if (!m) return;
+    cpReset();
+    $("cpAvatar").src = oi(m.pic, 96, true);
+    $("cpName").textContent = m.name || "";
+    $("cpOverlay").style.display = "flex";
+    if (kind) pickCpFile(kind); else setTimeout(() => $("cpText").focus(), 60);
+  }
+  function pickCpFile(kind) {
+    const f = $("cpFile");
+    f.accept = kind === "video" ? "video/*" : "image/*";
+    f.dataset.kind = kind;
+    f.click();
+  }
+  $("homeComposerBtn").onclick = () => openCreatePost();
+  $("homeComposerPhoto").onclick = () => openCreatePost("image");
+  $("homeComposerVideo").onclick = () => openCreatePost("video");
+  $("cpPhoto").onclick = () => pickCpFile("image");
+  $("cpVideo").onclick = () => pickCpFile("video");
+  $("cpClose").onclick = () => { $("cpOverlay").style.display = "none"; };
+  $("cpFile").onchange = async () => {
+    const f = $("cpFile").files[0], kind = $("cpFile").dataset.kind;
+    $("cpFile").value = "";
+    if (!f) return;
+    let src;
+    try {
+      if (kind === "video") {
+        if (!f.type.startsWith("video/")) { showCustomAlert("Videos only", "শুধু ভিডিও সিলেক্ট করুন।"); return; }
+        if (f.size > REEL_MAX_BYTES) { showCustomAlert("Too large", "ভিডিওটি অনেক বড়। সর্বোচ্চ ৪০ MB।"); return; }
+        src = await readFileAsDataUrl(f);
+      } else {
+        if (!f.type.startsWith("image/")) { showCustomAlert("Photos only", "ছবি সিলেক্ট করুন।"); return; }
+        const c = await compressImageFile(f);
+        src = c ? c.dataUrl : await readFileAsDataUrl(f);
+      }
+    } catch (e) { showCustomAlert("Error", "ফাইলটি পড়া যায়নি।"); return; }
+    cpMedia = { type: kind === "video" ? "video" : "image", src, name: f.name };
+    const pv = $("cpPreview");
+    pv.style.display = "block";
+    pv.innerHTML = (kind === "video" ? `<video src="${src}" controls playsinline></video>` : `<img src="${src}" alt="">`) + `<button type="button" class="post-preview-remove" id="cpRemove"><i class="fa-solid fa-xmark"></i></button>`;
+    $("cpRemove").onclick = () => { cpMedia = null; pv.style.display = "none"; pv.innerHTML = ""; };
+  };
+  $("cpSubmit").onclick = async () => {
+    const m = me(); if (!m) return;
+    const text = $("cpText").value.trim();
+    if (!text && !cpMedia) return;
+    const snap = cpMedia;
+    const btn = $("cpSubmit");
+    btn.disabled = true; btn.textContent = "Posting...";
+    const { ok } = await runUploadWithLockout("post", (done) => {
+      socket.emit("create-post", { phone: m.phone, text, media: snap }, done);
+    }, snap && snap.type === "video" ? 180000 : undefined);
+    btn.disabled = false; btn.textContent = "Post";
+    if (ok) { $("cpOverlay").style.display = "none"; cpReset(); loadFeed(true); if (snap && snap.type === "video") loadReels(true); }
+  };
   $("pmCloseBtn").addEventListener("click", () => setTimeout(() => { if (current === "Home") loadFeed(); }, 350));
 
-  function loadFeed() {
+  const feedSig = (l) => l.map((p) => p.id + ":" + (p.likes || []).length + ":" + (p.comments || []).length).join("|");
+  function loadFeed(force) {
     const m = me();
-    if (!m) return;
-    $("homeComposerAvatar").src = m.pic || PH;
-    socket.emit("get-feed", { phone: m.phone }, (res) => {
-      if (!res || !res.success) return;
-      feedPosts = res.posts || [];
-      renderFeed();
+    if (!m) return Promise.resolve();
+    $("homeComposerAvatar").src = oi(m.pic, 96, true);
+    return new Promise((resolve) => {
+      socket.emit("get-feed", { phone: m.phone }, (res) => {
+        if (res && res.success && (force || feedSig(res.posts || []) !== feedSig(feedPosts) || !$("homeFeed").children.length)) {
+          feedPosts = res.posts || [];
+          renderFeed();
+        }
+        resolve();
+      });
     });
   }
   socket.on("friend-profile-updated", () => { if (current === "Home") loadFeed(); });
@@ -4982,12 +5119,12 @@ window.addEventListener("load", () => {
       const src = esc(p.media.src);
       media = p.media.type === "video"
         ? `<div class="post-media-wrap feed-media" data-src="${src}" data-type="video"><video class="post-media" preload="metadata" muted playsinline ${videoPosterUrl(p.media.src) ? 'poster="' + videoPosterUrl(p.media.src) + '"' : ""} src="${src}#t=0.1"></video><span class="video-play-badge"><i class="fa-solid fa-play"></i></span></div>`
-        : `<div class="post-media-wrap feed-media" data-src="${src}" data-type="image"><img class="post-media" src="${src}" alt=""></div>`;
+        : `<div class="post-media-wrap feed-media" data-src="${src}" data-type="image"><img class="post-media" src="${esc(oi(p.media.src, 720))}" alt=""></div>`;
     }
     const cm = comments.map((c) => `<div class="post-comment"><img class="post-comment-avatar" src="${esc(c.authorPic || PH)}" alt=""><div class="post-comment-bubble"><span class="post-comment-name">${esc(c.authorName || "User")}</span><span class="post-comment-text">${esc(c.text)}</span></div></div>`).join("");
     return `<div class="post-card" data-fid="${esc(p.id)}" data-owner="${esc(p.ownerPhone)}">
       <div class="post-card-header">
-        <img class="post-avatar" data-open-owner src="${esc(p.ownerPic || PH)}" alt="">
+        <img class="post-avatar" data-open-owner src="${esc(oi(p.ownerPic, 96, true))}" alt="">
         <div class="post-header-text"><span class="post-author-name" data-open-owner>${esc(p.ownerName)}</span><span class="post-time">${timeAgo(p.timestamp)}</span></div>
       </div>
       ${p.text ? `<div class="post-text">${esc(p.text)}</div>` : ""}
@@ -5053,10 +5190,10 @@ window.addEventListener("load", () => {
 
   // ---------- FRIENDS ----------
   function personRow(u, actionHtml) {
-    return `<div class="tp-row" data-phone="${esc(u.phone)}"><img src="${esc(u.pic || PH)}" alt="" data-open><div class="tp-row-info" data-open><b>${esc(u.name || "User")}</b><span>${esc(u.sub || "")}</span></div>${actionHtml || ""}</div>`;
+    return `<div class="tp-row" data-phone="${esc(u.phone)}"><img src="${esc(oi(u.pic, 120, true))}" alt="" data-open><div class="tp-row-info" data-open><b>${esc(u.name || "User")}</b><span>${esc(u.sub || "")}</span></div>${actionHtml || ""}</div>`;
   }
   function personCard(u, actionHtml) {
-    return `<div class="tp-card" data-phone="${esc(u.phone)}"><img src="${esc(u.pic || PH)}" alt="" data-open><b data-open>${esc(u.name || "User")}</b>${actionHtml || `<button class="tp-btn tp-btn-soft" data-open type="button">View profile</button>`}</div>`;
+    return `<div class="tp-card" data-phone="${esc(u.phone)}"><img src="${esc(oi(u.pic, 120, true))}" alt="" data-open><b data-open>${esc(u.name || "User")}</b>${actionHtml || `<button class="tp-btn tp-btn-soft" data-open type="button">View profile</button>`}</div>`;
   }
   const byPhone = (phone) => lastFriends.friends.concat(lastFriends.requests).concat(suggestCache).concat(searchCache).find((u) => u.phone === phone) || { phone };
   let suggestCache = [], searchCache = [];
@@ -5130,7 +5267,7 @@ window.addEventListener("load", () => {
       .sort((a, b) => (unread[b.phone] || 0) - (unread[a.phone] || 0));
     $("tmList").innerHTML = list.length ? list.map((f) => {
       const n = unread[f.phone] || 0;
-      return `<div class="tp-row tp-chat ${n ? "unread" : ""} ${activeDirectChatFriend && activeDirectChatFriend.phone === f.phone ? "current" : ""}" data-phone="${esc(f.phone)}"><img src="${esc(f.pic || PH)}" alt=""><div class="tp-row-info"><b>${esc(f.name)}</b><span>${n ? n + " new message" + (n > 1 ? "s" : "") : "Tap to message"}</span></div>${n ? `<em class="tp-dot">${n > 99 ? "99+" : n}</em>` : ""}</div>`;
+      return `<div class="tp-row tp-chat ${n ? "unread" : ""} ${activeDirectChatFriend && activeDirectChatFriend.phone === f.phone ? "current" : ""}" data-phone="${esc(f.phone)}"><img src="${esc(oi(f.pic, 96, true))}" alt=""><div class="tp-row-info"><b>${esc(f.name)}</b><span>${n ? n + " new message" + (n > 1 ? "s" : "") : "Tap to message"}</span></div>${n ? `<em class="tp-dot">${n > 99 ? "99+" : n}</em>` : ""}</div>`;
     }).join("") : `<div class="tp-empty"><i class="fa-regular fa-message"></i><p>${q ? "কোনো চ্যাট পাওয়া যায়নি" : "চ্যাট করতে আগে বন্ধু যোগ করুন (Friends ট্যাব)।"}</p></div>`;
   }
   $("tmSearchInput").addEventListener("input", renderChats);
@@ -5144,29 +5281,38 @@ window.addEventListener("load", () => {
   $("tmJoinRoom").onclick = () => $("joinRoomBtn").click();
 
   // ---------- REELS ----------
-  let reelObserver = null, reelMuted = true;
+  let reelObserver = null, reelMuted = true, reelsCache = [];
+  const reelSig = (l) => l.map((r) => r.id).join("|");
   function pauseReels() { document.querySelectorAll("#reelsList video").forEach((v) => v.pause()); }
-  function loadReels() {
-    socket.emit("get-reels", {}, (res) => {
-      if (!res || !res.success) return;
-      const box = $("reelsList");
-      if (!res.reels.length) {
-        box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-clapperboard"></i><p>এখনো কোনো Reel নেই। উপরের ভিডিও বাটনে চেপে প্রথম Reel আপলোড করুন।</p></div>`;
-        return;
-      }
-      box.innerHTML = res.reels.map((r) => `<div class="reel-item" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
-        <video src="${esc(r.src)}" ${videoPosterUrl(r.src) ? 'poster="' + videoPosterUrl(r.src) + '"' : ""} loop playsinline muted preload="metadata"></video>
-        <div class="reel-info"><div class="reel-owner" data-reel-owner><img src="${esc(r.ownerPic || PH)}" alt=""><b>${esc(r.ownerName)}</b></div>${r.caption ? `<p>${esc(r.caption)}</p>` : ""}</div>
-        <div class="reel-side"><button type="button" data-reel-sound title="Sound"><i class="fa-solid fa-volume-xmark"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
-      </div>`).join("");
-      if (reelObserver) reelObserver.disconnect();
-      reelObserver = new IntersectionObserver((entries) => {
-        entries.forEach((en) => {
-          const v = en.target.querySelector("video");
-          if (en.isIntersecting && en.intersectionRatio > 0.6) { v.muted = reelMuted; v.play().catch(() => {}); } else v.pause();
-        });
-      }, { threshold: [0, 0.6, 1] });
-      box.querySelectorAll(".reel-item").forEach((el) => reelObserver.observe(el));
+  function renderReels(list) {
+    const box = $("reelsList");
+    if (!list.length) {
+      box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-clapperboard"></i><p>এখনো কোনো Reel নেই। কেউ ভিডিও পোস্ট করলে বা Reel আপলোড করলে এখানে দেখা যাবে।</p></div>`;
+      return;
+    }
+    box.innerHTML = list.map((r, i) => `<div class="reel-item" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
+      <video src="${esc(r.src)}" ${videoPosterUrl(r.src) ? 'poster="' + videoPosterUrl(r.src) + '"' : ""} loop playsinline muted preload="${i === 0 ? "auto" : "metadata"}"></video>
+      <div class="reel-info"><div class="reel-owner" data-reel-owner><img src="${esc(oi(r.ownerPic, 96, true))}" alt=""><b>${esc(r.ownerName)}</b></div>${r.caption ? `<p>${esc(r.caption)}</p>` : ""}</div>
+      <div class="reel-side"><button type="button" data-reel-sound title="Sound"><i class="fa-solid ${reelMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
+    </div>`).join("");
+    if (reelObserver) reelObserver.disconnect();
+    reelObserver = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        const v = en.target.querySelector("video");
+        if (en.isIntersecting && en.intersectionRatio > 0.6) { v.muted = reelMuted; v.play().catch(() => {}); } else v.pause();
+      });
+    }, { threshold: [0, 0.6, 1] });
+    box.querySelectorAll(".reel-item").forEach((el) => reelObserver.observe(el));
+  }
+  function loadReels(force) {
+    return new Promise((resolve) => {
+      socket.emit("get-reels", {}, (res) => {
+        if (res && res.success && (force || reelSig(res.reels || []) !== reelSig(reelsCache) || !$("reelsList").children.length)) {
+          reelsCache = res.reels || [];
+          renderReels(reelsCache);
+        }
+        resolve();
+      });
     });
   }
   $("reelsList").addEventListener("click", (e) => {
@@ -5211,13 +5357,68 @@ window.addEventListener("load", () => {
   setInterval(() => { if (current !== "Menu") syncMenu(); }, 4000);
 
   // ---------- ড্যাশবোর্ড খুললে ----------
+  // প্রথমবার: সব ডেটা + ছবি + প্রথম রিল আগে লোড হবে, তারপর Home দেখাবে
+  let splashDone = false, friendsReadyResolve = null;
+  const friendsReady = new Promise((r) => { friendsReadyResolve = r; });
+  const _rfd2 = renderFriendData;
+  renderFriendData = function (d) { _rfd2(d); if (friendsReadyResolve) { friendsReadyResolve(); friendsReadyResolve = null; } };
+
+  function makeSplash() {
+    const el = document.createElement("div");
+    el.id = "appSplash";
+    el.innerHTML = `<div class="splash-logo">ekt<span>chatter</span></div><div class="splash-spinner"></div><div class="splash-text">লোড হচ্ছে...</div>`;
+    document.body.appendChild(el);
+    return el;
+  }
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
+  function imagesReady(root, max) {
+    const imgs = Array.from(root.querySelectorAll("img")).filter((i) => i.src && !i.complete).slice(0, max);
+    return Promise.all(imgs.map((i) => new Promise((r) => { i.addEventListener("load", r, { once: true }); i.addEventListener("error", r, { once: true }); })));
+  }
+  async function preloadEverything() {
+    const splash = makeSplash();
+    try {
+      fetchFriendData();
+      await withTimeout(Promise.all([
+        loadFeed(true),
+        new Promise((r) => window.loadStoriesRow(r)),
+        friendsReady,
+        loadReels(true),
+      ]), 9000);
+      renderFriends(); renderChats();
+      const first = document.querySelector("#reelsList video");
+      const firstReady = first && first.readyState < 2 ? new Promise((r) => { first.addEventListener("loadeddata", r, { once: true }); first.addEventListener("error", r, { once: true }); }) : null;
+      await withTimeout(Promise.all([
+        imagesReady($("tabHome"), 40), imagesReady($("tabFriends"), 30), imagesReady($("tabMessages"), 20), imagesReady($("tabReels"), 10),
+        firstReady,
+      ]), 7000);
+    } catch (e) {}
+    splash.classList.add("hide");
+    setTimeout(() => splash.remove(), 350);
+  }
+
   window.__tabsOnDashboard = function () {
     const m = me();
-    if (m) $("homeComposerAvatar").src = m.pic || PH;
+    if (m) $("homeComposerAvatar").src = oi(m.pic, 96, true);
     setTab("Home");
     syncMenu();
     refreshBadges();
+    if (!splashDone) { splashDone = true; preloadEverything(); }
   };
   // অন্য ডিভাইসে নতুন পোস্ট/স্টোরি হলে Home রিফ্রেশ
   setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden) loadFeed(); }, 45000);
+})();
+
+
+// কোনো ছবি লোড না হলে (যেমন via.placeholder.com বন্ধ থাকলে) সাধারণ প্রোফাইল আইকন দেখাবে
+(function imgFallback() {
+  const FALLBACK = "data:image/svg+xml;utf8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#cfd8e6"/><circle cx="50" cy="38" r="18" fill="#8a97ab"/><path d="M14 100c0-22 16-36 36-36s36 14 36 36z" fill="#8a97ab"/></svg>'
+  );
+  document.addEventListener("error", (e) => {
+    const t = e.target;
+    if (!t || t.tagName !== "IMG" || t.dataset.fb === "1" || t.src === FALLBACK) return;
+    t.dataset.fb = "1";
+    t.src = FALLBACK;
+  }, true);
 })();
