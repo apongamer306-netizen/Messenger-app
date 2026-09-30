@@ -8,6 +8,9 @@ const path = require("path");
 
 // ---------- Image host (Cloudinary primary CDN; imgbb legacy fallback) ----------
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";       // মুছতে দরকার (শুধু সার্ভারে)
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || ""; // মুছতে দরকার (শুধু সার্ভারে)
+const nodeCrypto = require("crypto");
 const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || "";
 const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
 const MAX_FALLBACK_DATA_URL = 900000;
@@ -189,6 +192,66 @@ let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
 let roomMessages = {};       // roomCode -> [ messages ]
 const STORY_TTL = 24 * 60 * 60 * 1000; // ২৪ ঘণ্টা
 let stories = [];            // [ { id, phone, name, pic, media, text, bg, time, expires, views:[phone] } ]
+// ---- Cloudinary থেকে ফাইল মোছা (ইউজার কিছু ডিলিট করলে ক্লাউডেও মুছে যাবে) ----
+function parseCloudinaryUrl(url) {
+  const m = String(url || "").match(/^https?:\/\/res\.cloudinary\.com\/([^/]+)\/(image|video|raw)\/upload\/(.+)$/);
+  if (!m) return null;
+  let parts = m[3].split("/");
+  const vi = parts.findIndex((p) => /^v\d+$/.test(p));
+  if (vi >= 0) parts = parts.slice(vi + 1);
+  else parts = parts.filter((p) => p.indexOf(",") === -1 && !/^[a-z]{1,3}_[^/]+$/.test(p));
+  if (!parts.length) return null;
+  let publicId = parts.join("/");
+  try { publicId = decodeURIComponent(publicId); } catch (e) {}
+  if (m[2] !== "raw") publicId = publicId.replace(/\.[a-zA-Z0-9]+$/, "");
+  return { cloud: m[1], type: m[2], publicId };
+}
+
+async function deleteFromCloudinary(url) {
+  const info = parseCloudinaryUrl(url);
+  if (!info) return false; // Cloudinary-র ফাইল না (যেমন imgbb) — কিছু করার নেই
+  if (!CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    console.warn("Cloudinary delete skipped: CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET সেট করা নেই →", info.publicId);
+    return false;
+  }
+  if (CLOUDINARY_CLOUD_NAME && info.cloud !== CLOUDINARY_CLOUD_NAME) return false;
+  try {
+    const doFetch = await getFetch();
+    if (!doFetch) return false;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const toSign = "invalidate=true&public_id=" + info.publicId + "&timestamp=" + timestamp + CLOUDINARY_API_SECRET;
+    const signature = nodeCrypto.createHash("sha1").update(toSign).digest("hex");
+    const body = new URLSearchParams({ public_id: info.publicId, timestamp: String(timestamp), invalidate: "true", api_key: CLOUDINARY_API_KEY, signature });
+    const res = await doFetch(`https://api.cloudinary.com/v1_1/${info.cloud}/${info.type}/destroy`, { method: "POST", body });
+    const json = await res.json();
+    console.log("Cloudinary delete:", info.type, info.publicId, "→", (json && (json.result || (json.error && json.error.message))) || "?");
+    return !!(json && json.result === "ok");
+  } catch (e) {
+    console.warn("Cloudinary delete error:", e.message);
+    return false;
+  }
+}
+
+// অন্য কোথাও একই ফাইল ব্যবহার হচ্ছে কি? (থাকলে ক্লাউড থেকে মুছব না)
+function isMediaReferenced(url) {
+  if (!url) return false;
+  for (const ph of Object.keys(profiles)) {
+    const p = profiles[ph] || {};
+    if (p.cover === url) return true;
+    if ((p.posts || []).some((x) => x && x.media && x.media.src === url)) return true;
+    if ((p.items || []).some((x) => x && x.src === url)) return true;
+  }
+  if (stories.some((st) => (st.media && st.media.src === url) || (st.music && st.music.src === url))) return true;
+  if (Object.values(users).some((u) => u && u.pic === url)) return true;
+  return false;
+}
+function cleanupMedia(urls) {
+  Array.from(new Set((urls || []).filter(Boolean))).forEach((u) => {
+    if (!isMediaReferenced(u)) deleteFromCloudinary(u);
+  });
+}
+const storyUrls = (st) => (st ? [st.media && st.media.src, st.music && st.music.src] : []);
+
 // ---- পোস্ট ↔ ছবি/রিলস সংযোগ: যেভাবেই আপলোড হোক, সব জায়গায় দেখা যাবে ----
 // পোস্টে ছবি → Photos-এও, পোস্টে ভিডিও → Reels-এও; Photos/Reels-এ আপলোড → Posts-এও
 function syncMediaLinks(p) {
@@ -226,8 +289,9 @@ function syncAllMediaLinks() { Object.keys(profiles).forEach((ph) => syncMediaLi
 function purgeExpiredStories() {
   const before = stories.length;
   const now = Date.now();
+  const expired = stories.filter((st) => st.expires <= now);
   stories = stories.filter((st) => st.expires > now);
-  if (stories.length !== before) saveData();
+  if (stories.length !== before) { saveData(); expired.forEach((st) => cleanupMedia(storyUrls(st))); }
 }
 setInterval(() => purgeExpiredStories(), 5 * 60 * 1000);
 setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.warn("sync media links:", e.message); } }, 1500); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
@@ -620,7 +684,7 @@ io.on("connection", (socket) => {
 
   socket.on("delete-story", ({ phone, storyId }, callback) => {
     const st = stories.find((x) => x.id === storyId);
-    if (st && st.phone === phone) { stories = stories.filter((x) => x.id !== storyId); saveData(); notifyStoryChange(phone); }
+    if (st && st.phone === phone) { stories = stories.filter((x) => x.id !== storyId); saveData(); notifyStoryChange(phone); cleanupMedia(storyUrls(st)); }
     if (typeof callback === "function") callback({ success: true });
   });
 
@@ -649,6 +713,7 @@ io.on("connection", (socket) => {
     stories = stories.filter((x) => x.id !== storyId);
     reports.forEach((r) => { if (r.storyId === storyId && r.status === "pending") r.status = "resolved"; });
     saveData();
+    cleanupMedia(storyUrls(st));
     if (st) notifyStoryChange(st.phone);
     if (typeof callback === "function") callback({ success: true, stories: stories.slice().reverse(), reports: reports.slice().reverse() });
   });
@@ -759,7 +824,7 @@ io.on("connection", (socket) => {
     if (action === "remove-story" && report.storyId) {
       const st = stories.find((x) => x.id === report.storyId);
       stories = stories.filter((x) => x.id !== report.storyId);
-      if (st) notifyStoryChange(st.phone);
+      if (st) { notifyStoryChange(st.phone); cleanupMedia(storyUrls(st)); }
       action = "resolve";
     }
     report.status = action === "resolve" ? "resolved" : "dismissed";
@@ -1095,8 +1160,10 @@ io.on("connection", (socket) => {
       return;
     }
     if (!users[phone]) users[phone] = { phone };
+    const oldPic = users[phone].pic;
     users[phone].pic = resolved.src;
     saveData();
+    if (oldPic && oldPic !== resolved.src) cleanupMedia([oldPic]);
     if (typeof callback === "function") callback({ success: true, pic: resolved.src });
   });
 
@@ -1111,8 +1178,10 @@ io.on("connection", (socket) => {
       return;
     }
     if (!profiles[phone]) profiles[phone] = {};
+    const oldCover = profiles[phone].cover;
     profiles[phone].cover = resolved.src;
     saveData();
+    if (oldCover && oldCover !== resolved.src) cleanupMedia([oldCover]);
     if (typeof callback === "function") callback({ success: true, cover: resolved.src });
   });
 
@@ -1219,9 +1288,15 @@ io.on("connection", (socket) => {
   socket.on("delete-profile-item", ({ phone, itemId }, callback) => {
     if (profiles[phone] && Array.isArray(profiles[phone].items)) {
       const it = profiles[phone].items.find((x) => x.id === itemId);
+      const gone = [it && it.src];
       profiles[phone].items = profiles[phone].items.filter((x) => x.id !== itemId);
-      if (it && it.postId && Array.isArray(profiles[phone].posts)) profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== it.postId);
+      if (it && it.postId && Array.isArray(profiles[phone].posts)) {
+        const linked = profiles[phone].posts.find((p) => p.id === it.postId);
+        if (linked && linked.media) gone.push(linked.media.src);
+        profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== it.postId);
+      }
       saveData();
+      cleanupMedia(gone);
       notifyFriendsOfProfile(phone);
     }
     const pr = profiles[phone] || {};
@@ -1295,9 +1370,15 @@ io.on("connection", (socket) => {
   socket.on("delete-post", ({ phone, postId }, callback) => {
     if (profiles[phone] && Array.isArray(profiles[phone].posts)) {
       const post = profiles[phone].posts.find((p) => p.id === postId);
+      const gone = [post && post.media && post.media.src];
       profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== postId);
-      if (post && post.itemId && Array.isArray(profiles[phone].items)) profiles[phone].items = profiles[phone].items.filter((i) => i.id !== post.itemId);
+      if (post && post.itemId && Array.isArray(profiles[phone].items)) {
+        const linked = profiles[phone].items.find((i) => i.id === post.itemId);
+        if (linked) gone.push(linked.src);
+        profiles[phone].items = profiles[phone].items.filter((i) => i.id !== post.itemId);
+      }
       saveData();
+      cleanupMedia(gone);
       notifyFriendsOfProfile(phone);
     }
     const pr = profiles[phone] || {};
