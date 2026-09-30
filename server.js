@@ -59,7 +59,7 @@ async function uploadVideoToCloudinary(dataUrl, name) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) return null;
   try {
     const raw = String(dataUrl || "");
-    if (!raw.startsWith("data:video/") || raw.length < 32) return null;
+    if (!(raw.startsWith("data:video/") || raw.startsWith("data:audio/")) || raw.length < 32) return null;
     const doFetch = await getFetch();
     if (!doFetch) return null;
     const form = new FormData();
@@ -189,13 +189,48 @@ let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
 let roomMessages = {};       // roomCode -> [ messages ]
 const STORY_TTL = 24 * 60 * 60 * 1000; // ২৪ ঘণ্টা
 let stories = [];            // [ { id, phone, name, pic, media, text, bg, time, expires, views:[phone] } ]
+// ---- পোস্ট ↔ ছবি/রিলস সংযোগ: যেভাবেই আপলোড হোক, সব জায়গায় দেখা যাবে ----
+// পোস্টে ছবি → Photos-এও, পোস্টে ভিডিও → Reels-এও; Photos/Reels-এ আপলোড → Posts-এও
+function syncMediaLinks(p) {
+  if (!p) return;
+  if (!Array.isArray(p.posts)) p.posts = [];
+  if (!Array.isArray(p.items)) p.items = [];
+  const itemIds = new Set(p.items.map((i) => i && i.id));
+  const postIds = new Set(p.posts.map((x) => x && x.id));
+  p.posts.forEach((post) => {
+    if (!post || post.itemId || !post.media || !post.media.src) return;
+    const src = String(post.media.src);
+    post.itemId = "lp_" + post.id;
+    if (src.startsWith("data:") || itemIds.has(post.itemId)) return;
+    const isVid = post.media.type === "video";
+    p.items.push({ id: post.itemId, kind: isVid ? "reel" : "photo", src, host: post.media.host, name: isVid ? "video" : "photo", caption: post.text || "", timestamp: post.timestamp || Date.now(), postId: post.id });
+    itemIds.add(post.itemId);
+  });
+  p.items.forEach((it) => {
+    if (!it || it.postId || (it.kind !== "photo" && it.kind !== "reel")) return;
+    const src = String(it.src || "");
+    it.postId = "pi_" + it.id;
+    if (!src || src.startsWith("data:") || postIds.has(it.postId)) return;
+    p.posts.push({ id: it.postId, text: it.caption || "", media: { type: it.kind === "reel" ? "video" : "image", src, host: it.host }, timestamp: it.timestamp || Date.now(), likes: [], comments: [], itemId: it.id });
+    postIds.add(it.postId);
+  });
+  const byTime = (a, b) => (b.timestamp || 0) - (a.timestamp || 0);
+  const photos = p.items.filter((i) => i && i.kind === "photo").sort(byTime).slice(0, 100);
+  const reels = p.items.filter((i) => i && i.kind === "reel").sort(byTime).slice(0, 30);
+  p.items = photos.concat(reels);
+  p.posts.sort(byTime);
+  p.posts = p.posts.slice(0, 100);
+}
+function syncAllMediaLinks() { Object.keys(profiles).forEach((ph) => syncMediaLinks(profiles[ph])); }
+
 function purgeExpiredStories() {
   const before = stories.length;
   const now = Date.now();
   stories = stories.filter((st) => st.expires > now);
   if (stories.length !== before) saveData();
 }
-setInterval(() => purgeExpiredStories(), 5 * 60 * 1000); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
+setInterval(() => purgeExpiredStories(), 5 * 60 * 1000);
+setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.warn("sync media links:", e.message); } }, 1500); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
 let bannedUsers = {};        // phone -> { reason, time }
 
@@ -529,7 +564,7 @@ io.on("connection", (socket) => {
     });
   }
 
-  socket.on("add-story", async ({ phone, text, bg, media }, callback) => {
+  socket.on("add-story", async ({ phone, text, bg, media, music, duration }, callback) => {
     const reply = (r) => { if (typeof callback === "function") callback(r); };
     const cleanText = String(text || "").slice(0, 300);
     if (!phone || (!cleanText && !media)) return reply({ success: false, message: "খালি স্টোরি দেওয়া যাবে না।" });
@@ -548,11 +583,20 @@ io.on("connection", (socket) => {
         mediaOut = { type: "image", src: resolved.src };
       }
     }
+    let musicOut = null;
+    if (music && music.src && !mediaOut || (music && music.src && mediaOut && mediaOut.type === "image")) {
+      const msrc = String(music.src);
+      if (!msrc.startsWith("data:audio/") || msrc.length > 14e6) return reply({ success: false, message: "গানের ফাইল ঠিক নেই বা অনেক বড়।" });
+      const remote = await uploadVideoToCloudinary(msrc, "story-music");
+      if (!remote) return reply({ success: false, message: "গান আপলোড হয়নি।" });
+      musicOut = { src: remote, name: String(music.name || "music").slice(0, 80) };
+    }
+    const dur = Math.max(3000, Math.min(15000, parseInt(duration, 10) || 5000)); // ছবি/লেখার স্টোরি সর্বোচ্চ ১৫ সেকেন্ড
     const now = Date.now();
     const story = {
       id: "st_" + now.toString(36) + Math.random().toString(36).slice(2, 6),
       phone, name: u.name || "User", pic: u.pic || "",
-      media: mediaOut, text: cleanText, bg: String(bg || "").slice(0, 20),
+      media: mediaOut, music: musicOut, duration: dur, text: cleanText, bg: String(bg || "").slice(0, 60),
       time: now, expires: now + STORY_TTL, views: [],
     };
     stories.push(story);
@@ -1123,6 +1167,7 @@ io.on("connection", (socket) => {
       const photos = [item].concat(profiles[phone].items.filter((it) => it && it.kind === "photo")).slice(0, 100);
       profiles[phone].items = photos.concat(keepReels);
     }
+    syncMediaLinks(profiles[phone]);
     saveData();
 
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
@@ -1130,7 +1175,7 @@ io.on("connection", (socket) => {
       if (sid) io.to(sid).emit("friend-profile-updated", { phone });
     });
 
-    if (typeof callback === "function") callback({ success: true, items: profiles[phone].items });
+    if (typeof callback === "function") callback({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
   });
 
   // ---------- Reels (শুধু ভিডিও) ----------
@@ -1161,21 +1206,26 @@ io.on("connection", (socket) => {
     const photos = profiles[phone].items.filter((it) => it && it.kind === "photo");
     const reels = [reel].concat(profiles[phone].items.filter((it) => it && it.kind === "reel")).slice(0, 30);
     profiles[phone].items = photos.concat(reels);
+    syncMediaLinks(profiles[phone]);
     saveData();
 
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
       const sid = phoneToSocket[friendPhone];
       if (sid) io.to(sid).emit("friend-profile-updated", { phone });
     });
-    reply({ success: true, items: profiles[phone].items });
+    reply({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
   });
 
   socket.on("delete-profile-item", ({ phone, itemId }, callback) => {
     if (profiles[phone] && Array.isArray(profiles[phone].items)) {
-      profiles[phone].items = profiles[phone].items.filter((it) => it.id !== itemId);
+      const it = profiles[phone].items.find((x) => x.id === itemId);
+      profiles[phone].items = profiles[phone].items.filter((x) => x.id !== itemId);
+      if (it && it.postId && Array.isArray(profiles[phone].posts)) profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== it.postId);
       saveData();
+      notifyFriendsOfProfile(phone);
     }
-    if (typeof callback === "function") callback({ success: true });
+    const pr = profiles[phone] || {};
+    if (typeof callback === "function") callback({ success: true, items: pr.items || [], posts: pr.posts || [] });
   });
 
   // ---------- FACEBOOK-স্টাইল টাইমলাইন পোস্ট (ছবি/ভিডিও/টেক্সট + লাইক + কমেন্ট) ----------
@@ -1234,20 +1284,24 @@ io.on("connection", (socket) => {
 
     profiles[phone].posts.unshift(post);
     // সর্বোচ্চ ৬০টি পোস্ট রাখা হয়, তার বেশি হলে পুরনোগুলো বাদ যাবে
-    profiles[phone].posts = profiles[phone].posts.slice(0, 60);
+    profiles[phone].posts = profiles[phone].posts.slice(0, 100);
+    syncMediaLinks(profiles[phone]);
     saveData();
     notifyFriendsOfProfile(phone);
 
-    if (typeof callback === "function") callback({ success: true, post });
+    if (typeof callback === "function") callback({ success: true, post, items: profiles[phone].items, posts: profiles[phone].posts });
   });
 
   socket.on("delete-post", ({ phone, postId }, callback) => {
     if (profiles[phone] && Array.isArray(profiles[phone].posts)) {
+      const post = profiles[phone].posts.find((p) => p.id === postId);
       profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== postId);
+      if (post && post.itemId && Array.isArray(profiles[phone].items)) profiles[phone].items = profiles[phone].items.filter((i) => i.id !== post.itemId);
       saveData();
       notifyFriendsOfProfile(phone);
     }
-    if (typeof callback === "function") callback({ success: true });
+    const pr = profiles[phone] || {};
+    if (typeof callback === "function") callback({ success: true, items: pr.items || [], posts: pr.posts || [] });
   });
 
   socket.on("toggle-like-post", ({ phone, postId, likerPhone }, callback) => {
