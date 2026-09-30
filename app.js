@@ -1099,7 +1099,7 @@ function openCropEditor({ file, aspect, outW, title, round }) {
       let z = 1, ox = 0, oy = 0;
 
       const ov = document.createElement("div");
-      ov.style.cssText = "position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);";
+      ov.style.cssText = "position:fixed;inset:0;z-index:700000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);";
       const card = document.createElement("div");
       card.style.cssText = "background:var(--surface,#1b1b2b);color:var(--text,#fff);border-radius:20px;padding:16px;width:" + (sw + 32) + "px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);";
       card.innerHTML =
@@ -1112,6 +1112,8 @@ function openCropEditor({ file, aspect, outW, title, round }) {
         '<button type="button" id="cropOk" style="padding:10px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#4f8cff,#7c5cff);color:#fff;font-weight:800;cursor:pointer;">Confirm</button>' +
         '</div>';
       ov.appendChild(card);
+      // ক্লিক/টাচ যেন নিচের প্রোফাইল ওভারলেতে না পৌঁছায় (নইলে প্রোফাইল বন্ধ হয়ে হোমে চলে যেত)
+      ["click", "pointerup", "touchstart", "touchend", "mousedown", "mouseup"].forEach((ev) => ov.addEventListener(ev, (e) => e.stopPropagation()));
       document.body.appendChild(ov);
       const stage = card.querySelector("#cropStage");
       const zoomEl = card.querySelector("#cropZoom");
