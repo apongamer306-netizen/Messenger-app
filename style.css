@@ -3005,3 +3005,8 @@ body.dashboard-active .profile-modal {
   background: var(--brand-grad); color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .2px;
   text-shadow: none; box-shadow: 0 3px 10px rgba(79, 140, 255, .45);
 }
+
+
+/* কভার ফ্রেম সবার জন্য একই অনুপাত (৩:১) — কারও স্ক্রিনে আলাদা অংশ কাটা পড়বে না */
+.profile-modal-cover { height: auto; aspect-ratio: 3 / 1; }
+.profile-cover-img { height: 100%; object-fit: cover; }
