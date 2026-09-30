@@ -934,7 +934,8 @@ function videoPosterUrl(src) {
 
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const bodyElement = document.body;
-const savedTheme = localStorage.getItem("appTheme") || "dark-theme";
+if (!localStorage.getItem("appThemeV2")) { localStorage.setItem("appTheme", "light-theme"); localStorage.setItem("appThemeV2", "1"); }
+const savedTheme = localStorage.getItem("appTheme") || "light-theme";
 bodyElement.className = savedTheme;
 updateThemeIcon(savedTheme);
 
@@ -1410,6 +1411,8 @@ function showDashboard() {
     if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
     socket.emit("set-user-socket", { phone: currentUser.phone });
     fetchFriendData();
+    if (typeof window.loadStoriesRow === "function") window.loadStoriesRow();
+    if (typeof window.__tabsOnDashboard === "function") window.__tabsOnDashboard();
   }
   updateDashboardPinUI();
 }
@@ -4304,6 +4307,9 @@ socket.on("direct-call-ended", endCallCleanup);
   var adminReportsList = document.getElementById("adminReportsList");
   var adminReportBadge = document.getElementById("adminReportBadge");
   var adminNotifBadge = document.getElementById("adminNotifBadge");
+  var adminTabStories = document.getElementById("adminTabStories");
+  var adminStoriesPanel = document.getElementById("adminStoriesPanel");
+  var adminStoriesList = document.getElementById("adminStoriesList");
 
   if (!reportModalOverlay || !adminPanelOverlay) return; // পুরনো পেজে থাকলে স্কিপ
 
@@ -4393,6 +4399,7 @@ socket.on("direct-call-ended", endCallCleanup);
           adminDashboardView.style.display = "block";
           renderAdminUsers(res.users || []);
           renderAdminReports(res.reports || []);
+          renderAdminStories(res.stories || []);
           clearBadge();
         } else {
           showCustomAlert("Access Denied", "ভুল অ্যাডমিন পাসওয়ার্ড!");
@@ -4402,18 +4409,50 @@ socket.on("direct-call-ended", endCallCleanup);
   }
 
   if (adminTabUsers && adminTabNotifications) {
-    adminTabUsers.addEventListener("click", function () {
-      adminTabUsers.classList.add("active");
-      adminTabNotifications.classList.remove("active");
-      adminUsersPanel.style.display = "block";
-      adminNotificationsPanel.style.display = "none";
-    });
-    adminTabNotifications.addEventListener("click", function () {
-      adminTabNotifications.classList.add("active");
-      adminTabUsers.classList.remove("active");
-      adminNotificationsPanel.style.display = "block";
-      adminUsersPanel.style.display = "none";
-      clearBadge();
+    var adminTabs = [
+      [adminTabUsers, adminUsersPanel], [adminTabStories, adminStoriesPanel], [adminTabNotifications, adminNotificationsPanel]
+    ];
+    var showAdminTab = function (btn) {
+      adminTabs.forEach(function (t) {
+        if (!t[0] || !t[1]) return;
+        t[0].classList.toggle("active", t[0] === btn);
+        t[1].style.display = t[0] === btn ? "block" : "none";
+      });
+      if (btn === adminTabNotifications) clearBadge();
+      if (btn === adminTabStories && adminSessionPassword) {
+        socket.emit("admin-login", { password: adminSessionPassword }, function (r) {
+          if (r && r.success) renderAdminStories(r.stories || []);
+        });
+      }
+    };
+    adminTabs.forEach(function (t) { if (t[0]) t[0].addEventListener("click", function () { showAdminTab(t[0]); }); });
+  }
+
+  function renderAdminStories(list) {
+    if (!adminStoriesList) return;
+    if (!list.length) { adminStoriesList.innerHTML = '<div class="admin-empty-note">এই মুহূর্তে কোনো স্টোরি নেই।</div>'; return; }
+    adminStoriesList.innerHTML = list.map(function (st) {
+      var left = Math.max(0, Math.floor((st.expires - Date.now()) / 3600000));
+      var thumb = st.media
+        ? (st.media.type === "video" ? '<video src="' + esc(st.media.src) + '#t=0.1" muted preload="metadata"></video>' : '<img src="' + esc(st.media.src) + '" alt="">')
+        : '<div class="as-text" style="background:' + esc(st.bg || "#1877f2") + '">' + esc((st.text || "").slice(0, 40)) + '</div>';
+      return '<div class="admin-report-row admin-story-row">' +
+        '<div class="as-thumb">' + thumb + '</div>' +
+        '<div class="as-info"><div class="ar-name">' + esc(st.name) + ' &middot; ' + esc(st.phone) + '</div>' +
+        '<div class="ar-msg">' + esc(st.text || "") + '</div>' +
+        '<div class="ar-time">' + timeAgoLabel(st.time) + ' &middot; ' + left + ' ঘণ্টা বাকি &middot; ' + (st.views || []).length + ' views</div>' +
+        '<button class="ar-dismiss-btn" data-story-del="' + esc(st.id) + '">Delete Story</button></div></div>';
+    }).join("");
+  }
+  if (adminStoriesList) {
+    adminStoriesList.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-story-del]");
+      if (!b || !adminSessionPassword) return;
+      b.disabled = true;
+      socket.emit("admin-delete-story", { password: adminSessionPassword, storyId: b.getAttribute("data-story-del") }, function (r) {
+        if (r && r.success) { renderAdminStories(r.stories || []); renderAdminReports(r.reports || []); }
+        else b.disabled = false;
+      });
     });
   }
 
@@ -4501,16 +4540,23 @@ socket.on("direct-call-ended", endCallCleanup);
         : r.status === "dismissed"
           ? '<span class="ar-status-tag dismissed">Dismissed</span>'
           : '<span class="ar-status-tag">Pending</span>';
+      var storyBox = "";
+      if (r.type === "story") {
+        var pv = r.storyPreview
+          ? (r.storyPreview.type === "video" ? '<video src="' + esc(r.storyPreview.src) + '#t=0.1" muted preload="metadata"></video>' : '<img src="' + esc(r.storyPreview.src) + '" alt="">')
+          : "";
+        storyBox = '<div class="ar-story"><div class="as-thumb">' + pv + '</div><div><b>' + esc(r.storyOwnerName || "") + '</b> (' + esc(r.storyOwner || "") + ')<br>' + esc(r.storyText || "") + '</div></div>';
+      }
       var actions = r.status === "pending"
         ? '<div class="ar-actions">' +
-          '<button class="ar-resolve-btn" data-id="' + esc(r.id) + '" data-action="resolve">Resolve</button>' +
+          (r.type === "story" ? '<button class="ar-resolve-btn" data-id="' + esc(r.id) + '" data-action="remove-story">Delete Story</button>' : '<button class="ar-resolve-btn" data-id="' + esc(r.id) + '" data-action="resolve">Resolve</button>') +
           '<button class="ar-dismiss-btn" data-id="' + esc(r.id) + '" data-action="dismiss">Dismiss</button>' +
           '</div>'
         : '';
       return '<div class="admin-report-row ' + (r.status === "pending" ? "pending" : "") + '">' +
         '<div class="ar-top"><span class="ar-name">' + esc(r.fromName) + ' &middot; ' + esc(r.fromPhone) + '</span>' +
         '<span class="ar-time">' + timeAgoLabel(r.time) + '</span></div>' +
-        '<div class="ar-msg">' + esc(r.message) + '</div>' +
+        '<div class="ar-msg">' + esc(r.message) + '</div>' + storyBox +
         statusTag + actions +
         '</div>';
     }).join("");
@@ -4630,3 +4676,548 @@ window.addEventListener("load", () => {
     if (typeof window.hideSplashScreen === "function") window.hideSplashScreen();
   }, 6500);
 });
+
+
+// =====================================================================
+// STORY — ২৪ ঘণ্টা পর অটো ডিলিট (সার্ভার মুছে দেয়), ফেসবুকের মতো বার + ভিউয়ার
+// =====================================================================
+(function storyModule() {
+  const $ = (id) => document.getElementById(id);
+  const row = $("storiesRow");
+  if (!row) return;
+  const BGS = ["linear-gradient(135deg,#1877f2,#6a11cb)", "linear-gradient(135deg,#f5576c,#f093fb)", "linear-gradient(135deg,#11998e,#38ef7d)", "linear-gradient(135deg,#f7971e,#ffd200)", "linear-gradient(135deg,#232526,#414345)"];
+  const STORY_VIDEO_MAX = 25 * 1024 * 1024;
+  let allStories = [];
+  let groups = [];        // [{phone,name,pic,items:[...]}]
+  let gi = 0, si = 0, timer = null;
+  let bgIndex = 0, pickedFile = null, pickedIsVideo = false;
+
+  const me = () => (typeof currentUser !== "undefined" ? currentUser : null);
+  const esc = (t) => (typeof escapeHtml === "function" ? escapeHtml(t) : String(t || ""));
+  const ago = (ts) => { const m = Math.floor((Date.now() - ts) / 60000); return m < 1 ? "এখনই" : m < 60 ? m + " মিনিট আগে" : Math.floor(m / 60) + " ঘণ্টা আগে"; };
+
+  function buildGroups() {
+    const map = {};
+    allStories.forEach((st) => { (map[st.phone] = map[st.phone] || { phone: st.phone, name: st.name, pic: st.pic, items: [] }).items.push(st); });
+    Object.values(map).forEach((g) => g.items.sort((a, b) => a.time - b.time));
+    const u = me();
+    groups = Object.values(map).sort((a, b) => (a.phone === (u && u.phone) ? -1 : b.phone === (u && u.phone) ? 1 : b.items[b.items.length - 1].time - a.items[a.items.length - 1].time));
+  }
+
+  function renderRow() {
+    const u = me();
+    if (!u) return;
+    $("storyAddAvatar").src = u.pic || "https://via.placeholder.com/100";
+    Array.from(row.querySelectorAll(".story-card:not(.story-add)")).forEach((n) => n.remove());
+    groups.forEach((g, idx) => {
+      const last = g.items[g.items.length - 1];
+      const seen = g.phone === u.phone || g.items.every((it) => (it.views || []).includes(u.phone));
+      const bg = last.media ? (last.media.type === "image" ? `<img src="${esc(last.media.src)}" alt="">` : `<video src="${esc(last.media.src)}#t=0.1" muted preload="metadata"></video>`) : `<div class="story-textbg" style="background:${esc(last.bg || BGS[0])}"></div>`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "story-card";
+      btn.innerHTML = `${bg}<img class="story-ring ${seen ? "seen" : ""}" src="${esc(g.pic || "https://via.placeholder.com/60")}" alt=""><span class="story-name">${esc(g.phone === u.phone ? "Your story" : g.name)}</span>`;
+      btn.onclick = () => openViewer(idx);
+      row.appendChild(btn);
+    });
+  }
+
+  window.loadStoriesRow = function () {
+    const u = me();
+    if (!u || typeof socket === "undefined") return;
+    socket.emit("get-stories", { phone: u.phone }, (res) => {
+      if (!res || !res.success) return;
+      allStories = res.stories || [];
+      buildGroups();
+      renderRow();
+    });
+  };
+  socket.on("stories-updated", () => window.loadStoriesRow());
+  setInterval(() => { if (document.body.classList.contains("dashboard-active")) window.loadStoriesRow(); }, 60000);
+
+  // ---------- তৈরি ----------
+  function resetCreate() {
+    pickedFile = null; pickedIsVideo = false; bgIndex = 0;
+    $("storyTextInput").value = "";
+    applyPreview();
+  }
+  function applyPreview() {
+    const box = $("storyCreatePreview");
+    box.querySelectorAll("img,video").forEach((n) => n.remove());
+    box.style.background = pickedFile ? "#000" : BGS[bgIndex];
+    if (pickedFile) {
+      const url = URL.createObjectURL(pickedFile);
+      const el = document.createElement(pickedIsVideo ? "video" : "img");
+      el.src = url; if (pickedIsVideo) { el.muted = true; el.controls = true; el.playsInline = true; }
+      box.insertBefore(el, box.firstChild);
+    }
+    $("storyTextInput").classList.toggle("over-media", !!pickedFile);
+  }
+  $("storyBgRow").innerHTML = BGS.map((g, i) => `<button type="button" class="story-bg-dot" data-i="${i}" style="background:${g}"></button>`).join("");
+  $("storyBgRow").onclick = (e) => { const b = e.target.closest("[data-i]"); if (!b) return; bgIndex = +b.dataset.i; pickedFile = null; applyPreview(); };
+  $("addStoryBtn").onclick = () => { resetCreate(); $("storyCreateOverlay").style.display = "flex"; };
+  $("storyCreateClose").onclick = () => { $("storyCreateOverlay").style.display = "none"; };
+  $("storyPickMediaBtn").onclick = () => $("storyFileInput").click();
+  $("storyFileInput").onchange = async () => {
+    const f = $("storyFileInput").files[0];
+    $("storyFileInput").value = "";
+    if (!f) return;
+    if (f.type.startsWith("video/") && f.size > STORY_VIDEO_MAX) { showCustomAlert("Too large", "স্টোরির ভিডিও সর্বোচ্চ ২৫ MB হতে পারবে।"); return; }
+    if (!f.type.startsWith("video/") && !f.type.startsWith("image/")) return;
+    pickedFile = f; pickedIsVideo = f.type.startsWith("video/");
+    applyPreview();
+  };
+  $("storyShareBtn").onclick = async () => {
+    const u = me();
+    const text = $("storyTextInput").value.trim();
+    if (!u || (!text && !pickedFile)) { showCustomAlert("Empty", "লেখা লিখুন অথবা ছবি/ভিডিও বেছে নিন।"); return; }
+    const btn = $("storyShareBtn");
+    btn.disabled = true; btn.textContent = "Sharing...";
+    let media = null;
+    try {
+      if (pickedFile) {
+        let src;
+        if (pickedIsVideo) src = await readFileAsDataUrl(pickedFile);
+        else { const c = await compressImageFile(pickedFile); src = c ? c.dataUrl : await readFileAsDataUrl(pickedFile); }
+        media = { type: pickedIsVideo ? "video" : "image", src };
+      }
+    } catch (e) { btn.disabled = false; btn.textContent = "Share to story"; showCustomAlert("Error", "ফাইলটি পড়া যায়নি।"); return; }
+    let done = false;
+    const fin = (res) => {
+      if (done) return; done = true;
+      btn.disabled = false; btn.textContent = "Share to story";
+      if (res && res.success) { $("storyCreateOverlay").style.display = "none"; window.loadStoriesRow(); }
+      else showCustomAlert("Failed", (res && res.message) || "স্টোরি আপলোড হয়নি।");
+    };
+    socket.emit("add-story", { phone: u.phone, text, bg: BGS[bgIndex], media }, fin);
+    setTimeout(() => fin(null), 120000);
+  };
+
+  // ---------- দেখা ----------
+  function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+  function closeViewer() { clearTimer(); $("storyViewerOverlay").style.display = "none"; $("storyBody").innerHTML = ""; $("storyMenuSheet").style.display = "none"; window.loadStoriesRow(); }
+  function openViewer(idx) {
+    gi = idx; si = 0;
+    const g = groups[gi];
+    const u = me();
+    const firstUnseen = g.items.findIndex((it) => !(it.views || []).includes(u.phone));
+    if (g.phone !== u.phone && firstUnseen > 0) si = firstUnseen;
+    $("storyViewerOverlay").style.display = "flex";
+    showStory();
+  }
+  function next() { const g = groups[gi]; if (si < g.items.length - 1) { si++; showStory(); } else if (gi < groups.length - 1) { gi++; si = 0; showStory(); } else closeViewer(); }
+  function prev() { if (si > 0) { si--; showStory(); } else if (gi > 0) { gi--; si = 0; showStory(); } else showStory(); }
+  function showStory() {
+    clearTimer();
+    $("storyMenuSheet").style.display = "none";
+    const g = groups[gi], st = g.items[si], u = me();
+    $("storyViewerAvatar").src = g.pic || "https://via.placeholder.com/60";
+    $("storyViewerName").textContent = g.phone === u.phone ? "Your story" : g.name;
+    $("storyViewerTime").textContent = ago(st.time);
+    $("storyBars").innerHTML = g.items.map((_, i) => `<div class="story-bar"><i class="${i < si ? "full" : ""}"></i></div>`).join("");
+    const body = $("storyBody");
+    const textHtml = st.text ? `<div class="story-text ${st.media ? "on-media" : ""}">${esc(st.text)}</div>` : "";
+    let dur = 5000;
+    if (st.media && st.media.type === "video") {
+      body.innerHTML = `<video src="${esc(st.media.src)}" autoplay playsinline></video>${textHtml}`;
+      const v = body.querySelector("video");
+      dur = 0;
+      v.onloadedmetadata = () => runBar(v.duration * 1000);
+      v.onended = next;
+      v.onerror = () => runBar(5000);
+      v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+    } else if (st.media) {
+      body.innerHTML = `<img src="${esc(st.media.src)}" alt="">${textHtml}`;
+    } else {
+      body.innerHTML = `<div class="story-textonly" style="background:${esc(st.bg || BGS[0])}">${textHtml}</div>`;
+    }
+    if (dur) runBar(dur);
+    const own = g.phone === u.phone;
+    $("storyFooter").textContent = own ? `👁 ${(st.views || []).length} views · ${Math.max(0, Math.ceil((st.expires - Date.now()) / 3600000))} ঘণ্টা বাকি` : "";
+    if (!own) socket.emit("view-story", { phone: u.phone, storyId: st.id });
+    if (!(st.views || []).includes(u.phone) && !own) st.views = (st.views || []).concat(u.phone);
+  }
+  function runBar(ms) {
+    clearTimer();
+    const bar = $("storyBars").querySelectorAll(".story-bar i")[si];
+    if (bar) { bar.style.transition = "none"; bar.style.width = "0"; void bar.offsetWidth; bar.style.transition = "width " + ms + "ms linear"; bar.style.width = "100%"; }
+    timer = setTimeout(next, ms);
+  }
+  $("storyTapRight").onclick = next;
+  $("storyTapLeft").onclick = prev;
+  $("storyViewerClose").onclick = closeViewer;
+
+  // ⋯ মেনু: নিজের হলে Delete, অন্যের হলে Report
+  $("storyMenuBtn").onclick = () => {
+    const sheet = $("storyMenuSheet");
+    if (sheet.style.display === "block") { sheet.style.display = "none"; return; }
+    const g = groups[gi], st = g.items[si], u = me();
+    if (g.phone === u.phone) {
+      sheet.innerHTML = `<button data-act="delete" class="danger"><i class="fa-solid fa-trash"></i> Delete story</button>`;
+    } else {
+      sheet.innerHTML = `<div class="sheet-title">Report story</div>` +
+        ["নগ্নতা / অশ্লীল কনটেন্ট", "হয়রানি বা হুমকি", "স্প্যাম বা প্রতারণা", "অন্য কারণ"].map((r) => `<button data-act="report" data-reason="${r}"><i class="fa-solid fa-flag"></i> ${r}</button>`).join("");
+    }
+    sheet.style.display = "block";
+    clearTimer();
+  };
+  $("storyMenuSheet").onclick = (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const g = groups[gi], st = g.items[si], u = me();
+    if (b.dataset.act === "delete") {
+      socket.emit("delete-story", { phone: u.phone, storyId: st.id }, () => { closeViewer(); });
+    } else {
+      socket.emit("report-story", { fromPhone: u.phone, fromName: u.name, storyId: st.id, reason: b.dataset.reason }, (res) => {
+        $("storyMenuSheet").style.display = "none";
+        if (typeof showMiniToast === "function") showMiniToast(res && res.success ? "রিপোর্ট অ্যাডমিনের কাছে পাঠানো হয়েছে ✅" : "রিপোর্ট পাঠানো যায়নি");
+        next();
+      });
+    }
+  };
+})();
+
+
+// =====================================================================
+// মেইন ট্যাব: Home · Friends · Profile · Messages · Reels · Menu
+// (পুরনো বাটন/মোডালগুলো লুকানো অবস্থায় আছে; নতুন ট্যাব সেগুলোই ব্যবহার করে)
+// =====================================================================
+(function tabsModule() {
+  const $ = (id) => document.getElementById(id);
+  const tabsEl = $("mainTabs");
+  if (!tabsEl) return;
+  const esc = (t) => escapeHtml(t == null ? "" : String(t));
+  const me = () => (typeof currentUser !== "undefined" ? currentUser : null);
+  const PANELS = ["Home", "Friends", "Messages", "Reels", "Menu"];
+  let current = "Home";
+  let lastFriends = { friends: [], requests: [] };
+  let feedPosts = [];
+  const openComments = new Set();
+  const isDesktop = () => window.matchMedia("(min-width: 900px)").matches;
+  const PH = "https://via.placeholder.com/48";
+
+  function openUserProfile(u) {
+    const m = me();
+    if (m && u.phone === m.phone) { $("myProfileBtn").click(); return; }
+    openProfile(u.phone, u);
+  }
+
+  // ---------- ট্যাব বদল ----------
+  function setTab(name) {
+    if (name === "Profile") { $("myProfileBtn").click(); return; }
+    if (current === "Messages" && name !== "Messages" && isDesktop() && directChatScreen.classList.contains("active")) {
+      try { ektNavGoBack("directChat"); } catch (e) { closeDirectChatScreen(); }
+    }
+    current = name;
+    tabsEl.querySelectorAll(".mt-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+    PANELS.forEach((p) => $("tab" + p).classList.toggle("active", p === name));
+    document.body.classList.toggle("tab-messages", name === "Messages");
+    document.body.classList.toggle("tab-reels", name === "Reels");
+    if (name === "Home") loadFeed();
+    if (name === "Friends") { fetchFriendData(); loadSuggest(); renderFriends(); }
+    if (name === "Messages") renderChats();
+    if (name === "Reels") loadReels(); else pauseReels();
+    if (name === "Menu") syncMenu();
+    window.scrollTo(0, 0);
+  }
+  tabsEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".mt-btn");
+    if (b) setTab(b.dataset.tab);
+  });
+
+  // ---------- ব্যাজ ----------
+  function refreshBadges() {
+    const fb = $("tabFriendsBadge"), mb = $("tabMsgBadge");
+    const req = (typeof pendingRequestCount === "number") ? pendingRequestCount : 0;
+    const unread = Object.values(typeof unreadDirectCounts === "object" ? unreadDirectCounts : {}).reduce((a, b) => a + b, 0);
+    fb.textContent = req > 99 ? "99+" : req; fb.style.display = req > 0 ? "flex" : "none";
+    mb.textContent = unread > 99 ? "99+" : unread; mb.style.display = unread > 0 ? "flex" : "none";
+  }
+  const _updateFriendBadge = updateFriendBadge;
+  updateFriendBadge = function () {
+    _updateFriendBadge();
+    refreshBadges();
+    if (current === "Messages") renderChats();
+  };
+  const _renderFriendData = renderFriendData;
+  renderFriendData = function (data) {
+    _renderFriendData(data);
+    lastFriends = { friends: data.friends || [], requests: data.requests || [] };
+    refreshBadges();
+    if (current === "Friends") renderFriends();
+    if (current === "Messages") renderChats();
+  };
+
+  // ---------- HOME: কম্পোজার + ফিড ----------
+  function openMyComposer(afterFn) {
+    $("myProfileBtn").click();
+    setTimeout(() => {
+      switchProfileTab("posts");
+      if (afterFn) afterFn();
+    }, 350);
+  }
+  $("homeComposerBtn").onclick = () => openMyComposer(() => { try { pmComposerText.focus(); } catch (e) {} });
+  $("homeComposerPhoto").onclick = () => openMyComposer(() => $("pmAddPhotoBtn").click());
+  $("homeComposerVideo").onclick = () => openMyComposer(() => $("pmAddVideoBtn").click());
+  $("pmCloseBtn").addEventListener("click", () => setTimeout(() => { if (current === "Home") loadFeed(); }, 350));
+
+  function loadFeed() {
+    const m = me();
+    if (!m) return;
+    $("homeComposerAvatar").src = m.pic || PH;
+    socket.emit("get-feed", { phone: m.phone }, (res) => {
+      if (!res || !res.success) return;
+      feedPosts = res.posts || [];
+      renderFeed();
+    });
+  }
+  socket.on("friend-profile-updated", () => { if (current === "Home") loadFeed(); });
+
+  function feedCardHtml(p) {
+    const likes = p.likes || [], comments = p.comments || [];
+    const m = me();
+    const liked = m && likes.includes(m.phone);
+    let media = "";
+    if (p.media && p.media.src) {
+      const src = esc(p.media.src);
+      media = p.media.type === "video"
+        ? `<div class="post-media-wrap feed-media" data-src="${src}" data-type="video"><video class="post-media" preload="metadata" muted playsinline ${videoPosterUrl(p.media.src) ? 'poster="' + videoPosterUrl(p.media.src) + '"' : ""} src="${src}#t=0.1"></video><span class="video-play-badge"><i class="fa-solid fa-play"></i></span></div>`
+        : `<div class="post-media-wrap feed-media" data-src="${src}" data-type="image"><img class="post-media" src="${src}" alt=""></div>`;
+    }
+    const cm = comments.map((c) => `<div class="post-comment"><img class="post-comment-avatar" src="${esc(c.authorPic || PH)}" alt=""><div class="post-comment-bubble"><span class="post-comment-name">${esc(c.authorName || "User")}</span><span class="post-comment-text">${esc(c.text)}</span></div></div>`).join("");
+    return `<div class="post-card" data-fid="${esc(p.id)}" data-owner="${esc(p.ownerPhone)}">
+      <div class="post-card-header">
+        <img class="post-avatar" data-open-owner src="${esc(p.ownerPic || PH)}" alt="">
+        <div class="post-header-text"><span class="post-author-name" data-open-owner>${esc(p.ownerName)}</span><span class="post-time">${timeAgo(p.timestamp)}</span></div>
+      </div>
+      ${p.text ? `<div class="post-text">${esc(p.text)}</div>` : ""}
+      ${media}
+      <div class="post-meta-row"><span>${likes.length ? "👍 " + likes.length : ""}</span><span>${comments.length ? comments.length + " comments" : ""}</span></div>
+      <div class="post-actions-row">
+        <button class="post-action-btn like-btn ${liked ? "liked" : ""}" data-flike><i class="fa-solid fa-thumbs-up"></i> Like</button>
+        <button class="post-action-btn" data-fcomment><i class="fa-regular fa-comment"></i> Comment</button>
+      </div>
+      <div class="post-comments-section" style="display:${openComments.has(p.id) ? "block" : "none"};">
+        <div class="post-comments-list">${cm}</div>
+        <div class="post-comment-input-row"><img class="post-comment-avatar" src="${esc((m && m.pic) || PH)}" alt=""><input type="text" class="post-comment-input" data-finput placeholder="Write a comment..."></div>
+      </div>
+    </div>`;
+  }
+
+  function renderFeed() {
+    const box = $("homeFeed");
+    if (!feedPosts.length) {
+      box.innerHTML = `<div class="tp-empty"><i class="fa-regular fa-newspaper"></i><p>এখনো কোনো পোস্ট নেই। প্রথম পোস্টটি আপনিই করুন, অথবা বন্ধু যোগ করুন।</p></div>`;
+      return;
+    }
+    box.innerHTML = feedPosts.map(feedCardHtml).join("");
+  }
+
+  $("homeFeed").addEventListener("click", (e) => {
+    const card = e.target.closest(".post-card");
+    if (!card) return;
+    const post = feedPosts.find((x) => x.id === card.dataset.fid);
+    if (!post) return;
+    if (e.target.closest("[data-open-owner]")) {
+      openUserProfile({ phone: post.ownerPhone, name: post.ownerName, pic: post.ownerPic });
+      return;
+    }
+    const mediaEl = e.target.closest(".feed-media");
+    if (mediaEl) { openMediaPreview(mediaEl.dataset.type, mediaEl.dataset.src, mediaEl.dataset.type === "video" ? "post-video" : "post-photo"); return; }
+    if (e.target.closest("[data-flike]")) {
+      socket.emit("toggle-like-post", { phone: post.ownerPhone, postId: post.id, likerPhone: me().phone }, (res) => {
+        if (res && res.success) { post.likes = res.likes; card.outerHTML = feedCardHtml(post); }
+      });
+      return;
+    }
+    if (e.target.closest("[data-fcomment]")) {
+      const sec = card.querySelector(".post-comments-section");
+      const open = sec.style.display === "none";
+      sec.style.display = open ? "block" : "none";
+      if (open) { openComments.add(post.id); const inp = sec.querySelector("input"); if (inp) inp.focus(); } else openComments.delete(post.id);
+    }
+  });
+  $("homeFeed").addEventListener("keypress", (e) => {
+    const inp = e.target.closest("[data-finput]");
+    if (!inp || e.key !== "Enter") return;
+    const card = inp.closest(".post-card");
+    const post = feedPosts.find((x) => x.id === card.dataset.fid);
+    const text = inp.value.trim();
+    const m = me();
+    if (!post || !text || !m) return;
+    inp.value = "";
+    socket.emit("add-comment", { phone: post.ownerPhone, postId: post.id, comment: { authorPhone: m.phone, authorName: m.name, authorPic: m.pic, text } }, (res) => {
+      if (res && res.success) { post.comments = (post.comments || []).concat(res.comment); openComments.add(post.id); card.outerHTML = feedCardHtml(post); }
+    });
+  });
+
+  // ---------- FRIENDS ----------
+  function personRow(u, actionHtml) {
+    return `<div class="tp-row" data-phone="${esc(u.phone)}"><img src="${esc(u.pic || PH)}" alt="" data-open><div class="tp-row-info" data-open><b>${esc(u.name || "User")}</b><span>${esc(u.sub || "")}</span></div>${actionHtml || ""}</div>`;
+  }
+  function personCard(u, actionHtml) {
+    return `<div class="tp-card" data-phone="${esc(u.phone)}"><img src="${esc(u.pic || PH)}" alt="" data-open><b data-open>${esc(u.name || "User")}</b>${actionHtml || `<button class="tp-btn tp-btn-soft" data-open type="button">View profile</button>`}</div>`;
+  }
+  const byPhone = (phone) => lastFriends.friends.concat(lastFriends.requests).concat(suggestCache).concat(searchCache).find((u) => u.phone === phone) || { phone };
+  let suggestCache = [], searchCache = [];
+
+  function renderFriends() {
+    const reqs = lastFriends.requests;
+    $("tfReqTitle").style.display = reqs.length ? "block" : "none";
+    $("tfRequests").innerHTML = reqs.map((u) => personRow({ ...u, sub: "Sent you a friend request" },
+      `<div class="tp-actions"><button class="tp-btn tp-btn-primary" data-accept type="button">Confirm</button><button class="tp-btn tp-btn-soft" data-reject type="button">Delete</button></div>`)).join("");
+    $("tfFriendsTitle").textContent = "Your friends (" + lastFriends.friends.length + ")";
+    $("tfFriends").innerHTML = lastFriends.friends.length
+      ? lastFriends.friends.map((u) => personCard(u)).join("")
+      : `<div class="tp-empty" style="grid-column:1/-1"><i class="fa-solid fa-user-group"></i><p>এখনো কোনো বন্ধু নেই। উপরে সার্চ করে ফ্রেন্ড রিকোয়েস্ট পাঠান।</p></div>`;
+    renderSuggest();
+  }
+  function loadSuggest() {
+    const m = me(); if (!m) return;
+    socket.emit("suggest-users", { phone: m.phone }, (list) => { suggestCache = list || []; renderSuggest(); });
+  }
+  function renderSuggest() {
+    const box = $("tfSuggest");
+    box.innerHTML = suggestCache.length
+      ? suggestCache.map((u) => personCard(u, `<button class="tp-btn tp-btn-primary" data-add type="button"><i class="fa-solid fa-user-plus"></i> Add friend</button>`)).join("")
+      : `<div class="tp-empty" style="grid-column:1/-1"><p>এই মুহূর্তে কোনো সাজেশন নেই।</p></div>`;
+  }
+
+  function friendsClick(e) {
+    const holder = e.target.closest("[data-phone]");
+    if (!holder) return;
+    const u = byPhone(holder.dataset.phone);
+    const m = me();
+    if (e.target.closest("[data-accept]")) { socket.emit("accept-friend-request", { currentUser: m, friendUser: u }); return; }
+    if (e.target.closest("[data-reject]")) { socket.emit("reject-friend-request", { currentUser: m, fromPhone: u.phone }); return; }
+    const add = e.target.closest("[data-add]");
+    if (add) {
+      socket.emit("send-friend-request", { fromUser: m, toUserPhone: u.phone });
+      add.outerHTML = `<button class="tp-btn tp-btn-soft" disabled type="button">Request sent</button>`;
+      if (typeof showMiniToast === "function") showMiniToast("ফ্রেন্ড রিকোয়েস্ট পাঠানো হয়েছে");
+      return;
+    }
+    if (e.target.closest("[data-open]")) openUserProfile(u);
+  }
+  $("tabFriends").addEventListener("click", friendsClick);
+
+  (function search() {
+    const input = $("tfSearchInput"), box = $("tfSearchResults");
+    let timer = null;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (!q) { box.style.display = "none"; box.innerHTML = ""; return; }
+      timer = setTimeout(() => {
+        const m = me(); if (!m) return;
+        socket.emit("search-users", { query: q, myPhone: m.phone }, (list) => {
+          searchCache = list || [];
+          box.style.display = "block";
+          box.innerHTML = searchCache.length ? searchCache.map((u) => personRow({ ...u, sub: u.phone },
+            u.isFriend ? `<span class="tp-tag">Friends</span>` : u.requestPending ? `<button class="tp-btn tp-btn-soft" disabled type="button">Sent</button>` : `<button class="tp-btn tp-btn-primary" data-add type="button"><i class="fa-solid fa-user-plus"></i> Add</button>`)).join("")
+            : `<div class="tp-empty"><p>কোনো ইউজার পাওয়া যায়নি</p></div>`;
+        });
+      }, 280);
+    });
+  })();
+
+  // ---------- MESSAGES ----------
+  function renderChats() {
+    const q = ($("tmSearchInput").value || "").trim().toLowerCase();
+    const unread = typeof unreadDirectCounts === "object" ? unreadDirectCounts : {};
+    const list = lastFriends.friends
+      .filter((f) => !q || (f.name || "").toLowerCase().includes(q))
+      .sort((a, b) => (unread[b.phone] || 0) - (unread[a.phone] || 0));
+    $("tmList").innerHTML = list.length ? list.map((f) => {
+      const n = unread[f.phone] || 0;
+      return `<div class="tp-row tp-chat ${n ? "unread" : ""} ${activeDirectChatFriend && activeDirectChatFriend.phone === f.phone ? "current" : ""}" data-phone="${esc(f.phone)}"><img src="${esc(f.pic || PH)}" alt=""><div class="tp-row-info"><b>${esc(f.name)}</b><span>${n ? n + " new message" + (n > 1 ? "s" : "") : "Tap to message"}</span></div>${n ? `<em class="tp-dot">${n > 99 ? "99+" : n}</em>` : ""}</div>`;
+    }).join("") : `<div class="tp-empty"><i class="fa-regular fa-message"></i><p>${q ? "কোনো চ্যাট পাওয়া যায়নি" : "চ্যাট করতে আগে বন্ধু যোগ করুন (Friends ট্যাব)।"}</p></div>`;
+  }
+  $("tmSearchInput").addEventListener("input", renderChats);
+  $("tmList").addEventListener("click", (e) => {
+    const row = e.target.closest("[data-phone]");
+    if (!row) return;
+    const f = lastFriends.friends.find((x) => x.phone === row.dataset.phone);
+    if (f) openDirectChat(f);
+  });
+  $("tmCreateRoom").onclick = () => $("createRoomBtn").click();
+  $("tmJoinRoom").onclick = () => $("joinRoomBtn").click();
+
+  // ---------- REELS ----------
+  let reelObserver = null, reelMuted = true;
+  function pauseReels() { document.querySelectorAll("#reelsList video").forEach((v) => v.pause()); }
+  function loadReels() {
+    socket.emit("get-reels", {}, (res) => {
+      if (!res || !res.success) return;
+      const box = $("reelsList");
+      if (!res.reels.length) {
+        box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-clapperboard"></i><p>এখনো কোনো Reel নেই। উপরের ভিডিও বাটনে চেপে প্রথম Reel আপলোড করুন।</p></div>`;
+        return;
+      }
+      box.innerHTML = res.reels.map((r) => `<div class="reel-item" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
+        <video src="${esc(r.src)}" ${videoPosterUrl(r.src) ? 'poster="' + videoPosterUrl(r.src) + '"' : ""} loop playsinline muted preload="metadata"></video>
+        <div class="reel-info"><div class="reel-owner" data-reel-owner><img src="${esc(r.ownerPic || PH)}" alt=""><b>${esc(r.ownerName)}</b></div>${r.caption ? `<p>${esc(r.caption)}</p>` : ""}</div>
+        <div class="reel-side"><button type="button" data-reel-sound title="Sound"><i class="fa-solid fa-volume-xmark"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
+      </div>`).join("");
+      if (reelObserver) reelObserver.disconnect();
+      reelObserver = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          const v = en.target.querySelector("video");
+          if (en.isIntersecting && en.intersectionRatio > 0.6) { v.muted = reelMuted; v.play().catch(() => {}); } else v.pause();
+        });
+      }, { threshold: [0, 0.6, 1] });
+      box.querySelectorAll(".reel-item").forEach((el) => reelObserver.observe(el));
+    });
+  }
+  $("reelsList").addEventListener("click", (e) => {
+    const item = e.target.closest(".reel-item");
+    if (!item) return;
+    const v = item.querySelector("video");
+    if (e.target.closest("[data-reel-owner]")) { openUserProfile({ phone: item.dataset.owner, name: item.dataset.name, pic: item.dataset.pic }); return; }
+    if (e.target.closest("[data-reel-sound]")) {
+      reelMuted = !reelMuted;
+      document.querySelectorAll("#reelsList video").forEach((x) => { x.muted = reelMuted; });
+      document.querySelectorAll("[data-reel-sound] i").forEach((i) => { i.className = reelMuted ? "fa-solid fa-volume-xmark" : "fa-solid fa-volume-high"; });
+      return;
+    }
+    if (e.target.closest("[data-reel-dl]")) { openMediaPreview("video", item.dataset.src, "reel"); document.getElementById("mediaDownloadBtn").click(); return; }
+    if (e.target.closest("[data-reel-full]")) { v.pause(); openMediaPreview("video", item.dataset.src, "reel"); return; }
+    if (v.paused) v.play().catch(() => {}); else v.pause();
+  });
+  $("trUpload").onclick = () => {
+    $("myProfileBtn").click();
+    setTimeout(() => { switchProfileTab("reels"); $("pmUploadBtn").click(); }, 350);
+  };
+
+  // ---------- MENU ----------
+  function syncMenu() {
+    const rm = document.querySelector('.menu-row[data-go="removePinBtn"]');
+    const setb = document.querySelector('.menu-row[data-go="setPinBtn"] span');
+    if (rm) rm.style.display = getComputedStyle($("removePinBtn")).display === "none" ? "none" : "";
+    if (setb && $("setPinBtnText")) setb.textContent = $("setPinBtnText").textContent;
+    const ab = $("adminReportBadge");
+    const mb = $("tabMenuBadge");
+    if (ab && mb) {
+      const on = ab.style.display !== "none" && ab.textContent.trim() && ab.textContent.trim() !== "0";
+      mb.textContent = ab.textContent; mb.style.display = on ? "flex" : "none";
+    }
+  }
+  $("tabMenu").addEventListener("click", (e) => {
+    const r = e.target.closest("[data-go]");
+    if (!r) return;
+    const target = $(r.dataset.go);
+    if (target) target.click();
+  });
+  setInterval(() => { if (current !== "Menu") syncMenu(); }, 4000);
+
+  // ---------- ড্যাশবোর্ড খুললে ----------
+  window.__tabsOnDashboard = function () {
+    const m = me();
+    if (m) $("homeComposerAvatar").src = m.pic || PH;
+    setTab("Home");
+    syncMenu();
+    refreshBadges();
+  };
+  // অন্য ডিভাইসে নতুন পোস্ট/স্টোরি হলে Home রিফ্রেশ
+  setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden) loadFeed(); }, 45000);
+})();
