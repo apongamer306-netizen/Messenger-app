@@ -187,6 +187,15 @@ let friendRequests = {};     // phone -> Set(phone)  (requests received BY this 
 let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
 let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
 let roomMessages = {};       // roomCode -> [ messages ]
+const STORY_TTL = 24 * 60 * 60 * 1000; // ২৪ ঘণ্টা
+let stories = [];            // [ { id, phone, name, pic, media, text, bg, time, expires, views:[phone] } ]
+function purgeExpiredStories() {
+  const before = stories.length;
+  const now = Date.now();
+  stories = stories.filter((st) => st.expires > now);
+  if (stories.length !== before) saveData();
+}
+setInterval(() => purgeExpiredStories(), 5 * 60 * 1000); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
 let bannedUsers = {};        // phone -> { reason, time }
 
@@ -272,6 +281,7 @@ async function loadData() {
   profiles = raw.profiles || {};
   directThemes = raw.directThemes || {};
   reports = raw.reports || [];
+  stories = raw.stories || [];
   bannedUsers = raw.bannedUsers || {};
   console.log("Saved data loaded successfully.");
 }
@@ -286,6 +296,7 @@ function buildPayload() {
     roomMessages: trimMessages(roomMessages),
     profiles,
     directThemes,
+    stories,
     reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
     bannedUsers,
   };
@@ -464,6 +475,140 @@ io.on("connection", (socket) => {
     if (typeof callback === "function") callback({ success: true });
   });
 
+  // ---------- HOME ফিড / REELS / সাজেশন ----------
+  function ownerInfo(p) {
+    const u = users[p] || {};
+    return { ownerPhone: p, ownerName: u.name || "User", ownerPic: u.pic || "" };
+  }
+
+  // আমার + বন্ধুদের পোস্ট, নতুন আগে
+  socket.on("get-feed", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const allowed = Array.from(ensureSet(friendships, phone)).concat([phone]);
+    let out = [];
+    allowed.forEach((p) => {
+      if (bannedUsers[p]) return;
+      const posts = (profiles[p] && profiles[p].posts) || [];
+      posts.forEach((post) => out.push({ ...post, ...ownerInfo(p) }));
+    });
+    out.sort((a, b) => b.timestamp - a.timestamp);
+    callback({ success: true, posts: out.slice(0, 40) });
+  });
+
+  // সবার Reels (কেউ আপলোড করলেই সবাই দেখবে)
+  socket.on("get-reels", (payload, callback) => {
+    if (typeof callback !== "function") return;
+    const out = [];
+    Object.keys(profiles).forEach((p) => {
+      if (bannedUsers[p]) return;
+      ((profiles[p] && profiles[p].items) || []).forEach((it) => {
+        if (it && it.kind === "reel" && it.src) out.push({ id: it.id, src: it.src, caption: it.caption || "", timestamp: it.timestamp || 0, ...ownerInfo(p) });
+      });
+    });
+    out.sort((a, b) => b.timestamp - a.timestamp);
+    callback({ success: true, reels: out.slice(0, 40) });
+  });
+
+  // "People you may know": যারা বন্ধু না, রিকোয়েস্টও পেন্ডিং না
+  socket.on("suggest-users", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const myFriends = ensureSet(friendships, phone);
+    const list = Object.values(users)
+      .filter((u) => u && u.phone && u.phone !== phone && !bannedUsers[u.phone] && !myFriends.has(u.phone)
+        && !ensureSet(friendRequests, u.phone).has(phone) && !ensureSet(friendRequests, phone).has(u.phone))
+      .slice(0, 12)
+      .map((u) => publicUser(u.phone));
+    callback(list);
+  });
+
+  // ---------- STORY (২৪ ঘণ্টা পর অটো ডিলিট) ----------
+  function notifyStoryChange(phone) {
+    Array.from(ensureSet(friendships, phone)).concat([phone]).forEach((p) => {
+      const sid = phoneToSocket[p];
+      if (sid) io.to(sid).emit("stories-updated");
+    });
+  }
+
+  socket.on("add-story", async ({ phone, text, bg, media }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const cleanText = String(text || "").slice(0, 300);
+    if (!phone || (!cleanText && !media)) return reply({ success: false, message: "খালি স্টোরি দেওয়া যাবে না।" });
+    const u = users[phone] || {};
+    let mediaOut = null;
+    if (media && media.src) {
+      const src = String(media.src);
+      if (media.type === "video") {
+        if (!src.startsWith("data:video/")) return reply({ success: false, message: "ভিডিও ঠিক নেই।" });
+        const remote = await uploadVideoToCloudinary(src, "story");
+        if (!remote) return reply({ success: false, message: "ভিডিও আপলোড হয়নি।" });
+        mediaOut = { type: "video", src: remote };
+      } else {
+        const resolved = src.startsWith("data:") ? await resolveImageSrc(src, "story") : { src };
+        if (!resolved || !resolved.src) return reply({ success: false, message: "ছবি আপলোড হয়নি।" });
+        mediaOut = { type: "image", src: resolved.src };
+      }
+    }
+    const now = Date.now();
+    const story = {
+      id: "st_" + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      phone, name: u.name || "User", pic: u.pic || "",
+      media: mediaOut, text: cleanText, bg: String(bg || "").slice(0, 20),
+      time: now, expires: now + STORY_TTL, views: [],
+    };
+    stories.push(story);
+    saveData();
+    notifyStoryChange(phone);
+    reply({ success: true, story });
+  });
+
+  // আমার + বন্ধুদের চলমান স্টোরি
+  socket.on("get-stories", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    purgeExpiredStories();
+    const allowed = new Set(Array.from(ensureSet(friendships, phone)).concat([phone]));
+    callback({ success: true, stories: stories.filter((st) => allowed.has(st.phone)) });
+  });
+
+  socket.on("view-story", ({ phone, storyId }) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (st && phone && st.phone !== phone && !st.views.includes(phone)) { st.views.push(phone); saveData(); }
+  });
+
+  socket.on("delete-story", ({ phone, storyId }, callback) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (st && st.phone === phone) { stories = stories.filter((x) => x.id !== storyId); saveData(); notifyStoryChange(phone); }
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // স্টোরি রিপোর্ট → সাধারণ রিপোর্ট লিস্টেই যায় (type: "story")
+  socket.on("report-story", ({ fromPhone, fromName, storyId, reason }, callback) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (!st) { if (typeof callback === "function") callback({ success: false }); return; }
+    const report = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      fromPhone: fromPhone || "unknown", fromName: fromName || "Unknown",
+      message: ("Story report: " + String(reason || "অনুপযুক্ত স্টোরি")).slice(0, 300),
+      type: "story", storyId: st.id, storyOwner: st.phone, storyOwnerName: st.name,
+      storyPreview: st.media ? { type: st.media.type, src: st.media.src } : null,
+      storyText: st.text || "",
+      time: Date.now(), status: "pending",
+    };
+    reports.push(report);
+    saveData();
+    io.emit("admin-new-report", report);
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  socket.on("admin-delete-story", ({ password, storyId }, callback) => {
+    if (password !== ADMIN_PASSWORD) { if (typeof callback === "function") callback({ success: false }); return; }
+    const st = stories.find((x) => x.id === storyId);
+    stories = stories.filter((x) => x.id !== storyId);
+    reports.forEach((r) => { if (r.storyId === storyId && r.status === "pending") r.status = "resolved"; });
+    saveData();
+    if (st) notifyStoryChange(st.phone);
+    if (typeof callback === "function") callback({ success: true, stories: stories.slice().reverse(), reports: reports.slice().reverse() });
+  });
+
   // ---------- অ্যাডমিন প্যানেল ----------
   socket.on("admin-login", ({ password }, callback) => {
     if (typeof callback !== "function") return;
@@ -491,7 +636,8 @@ io.on("connection", (socket) => {
         };
       });
       // banned users who were deleted from users map still show? only active users
-      callback({ success: true, users: userList, reports: reports.slice().reverse() });
+      purgeExpiredStories();
+      callback({ success: true, users: userList, reports: reports.slice().reverse(), stories: stories.slice().reverse() });
     } else {
       callback({ success: false });
     }
@@ -565,6 +711,12 @@ io.on("connection", (socket) => {
     if (!report) {
       if (typeof callback === "function") callback({ success: false, error: "Not found" });
       return;
+    }
+    if (action === "remove-story" && report.storyId) {
+      const st = stories.find((x) => x.id === report.storyId);
+      stories = stories.filter((x) => x.id !== report.storyId);
+      if (st) notifyStoryChange(st.phone);
+      action = "resolve";
     }
     report.status = action === "resolve" ? "resolved" : "dismissed";
     saveData();
