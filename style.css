@@ -3010,3 +3010,22 @@ body.dashboard-active .profile-modal {
 /* কভার ফ্রেম সবার জন্য একই অনুপাত (৩:১) — কারও স্ক্রিনে আলাদা অংশ কাটা পড়বে না */
 .profile-modal-cover { height: auto; aspect-ratio: 3 / 1; }
 .profile-cover-img { height: 100%; object-fit: cover; }
+
+
+/* ---------- কমেন্ট: এডিট / ডিলিট / হাইড ---------- */
+.post-comment-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.post-comment-bubble.cm-is-hidden { opacity: 0.55; border: 1px dashed var(--line-2); }
+.cm-hidden-tag, .cm-edited-tag {
+  display: inline-block; font-style: normal; font-size: 10px; font-weight: 700;
+  margin-left: 4px; padding: 1px 6px; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-3); vertical-align: middle;
+}
+.cm-hidden-tag { background: rgba(245, 158, 11, 0.18); color: var(--amber); }
+.cm-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 4px; }
+.cm-act {
+  border: none; background: transparent; color: var(--text-3);
+  font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  padding: 0 4px; border-radius: 6px;
+}
+.cm-act:hover { color: var(--brand); background: var(--input-bg); }
+.cm-act.cm-danger:hover { color: var(--red); background: rgba(239, 68, 68, 0.1); }
