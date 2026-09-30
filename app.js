@@ -1082,6 +1082,105 @@ function runUploadWithLockout(kind, emitFn, timeoutMs) {
     setTimeout(() => { if (!settled) finish(false, null); }, timeoutMs || 45000);
   });
 }
+
+// ================= ছবি ক্রপ এডিটর (প্রোফাইল ও কভার) =================
+// ইউজার ড্র্যাগ ও জুম করে যে অংশ দেখাতে চায় সেটা বেছে নেয়। Confirm করলে ঠিক সেই অংশটাই
+// কেটে আপলোড হয় — তাই বন্ধু/অন্যরাও সবখানে হুবহু একই অংশ দেখে।
+function openCropEditor({ file, aspect, outW, title, round }) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.onload = () => {
+      const nw = img.naturalWidth, nh = img.naturalHeight;
+      const sw = Math.round(Math.min(window.innerWidth * 0.9, aspect >= 2 ? 560 : 360));
+      const sh = Math.round(sw / aspect);
+      const base = Math.max(sw / nw, sh / nh);
+      let z = 1, ox = 0, oy = 0;
+
+      const ov = document.createElement("div");
+      ov.style.cssText = "position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);";
+      const card = document.createElement("div");
+      card.style.cssText = "background:var(--surface,#1b1b2b);color:var(--text,#fff);border-radius:20px;padding:16px;width:" + (sw + 32) + "px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);";
+      card.innerHTML =
+        '<div style="font-weight:800;font-size:16px;margin-bottom:4px;">' + title + '</div>' +
+        '<div style="font-size:12px;opacity:.7;margin-bottom:12px;">ড্র্যাগ করে সরান, স্লাইডার/পিঞ্চ করে জুম করুন</div>' +
+        '<div id="cropStage" style="position:relative;width:' + sw + 'px;height:' + sh + 'px;overflow:hidden;border-radius:' + (round ? "50%" : "12px") + ';background:#000;touch-action:none;cursor:grab;user-select:none;margin:0 auto;"></div>' +
+        '<input id="cropZoom" type="range" min="100" max="400" value="100" style="width:100%;margin:14px 0 6px;">' +
+        '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">' +
+        '<button type="button" id="cropCancel" style="padding:10px 18px;border-radius:12px;border:none;background:rgba(127,127,127,.25);color:inherit;font-weight:700;cursor:pointer;">Cancel</button>' +
+        '<button type="button" id="cropOk" style="padding:10px 20px;border-radius:12px;border:none;background:linear-gradient(135deg,#4f8cff,#7c5cff);color:#fff;font-weight:800;cursor:pointer;">Confirm</button>' +
+        '</div>';
+      ov.appendChild(card);
+      document.body.appendChild(ov);
+      const stage = card.querySelector("#cropStage");
+      const zoomEl = card.querySelector("#cropZoom");
+      img.style.cssText = "position:absolute;max-width:none;pointer-events:none;-webkit-user-drag:none;";
+      img.draggable = false;
+      stage.appendChild(img);
+      if (round) {
+        const g = document.createElement("div");
+        g.style.cssText = "position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.8);pointer-events:none;";
+        stage.appendChild(g);
+      }
+
+      function clamp() {
+        const scale = base * z;
+        const mx = Math.max(0, (nw * scale - sw) / 2), my = Math.max(0, (nh * scale - sh) / 2);
+        ox = Math.max(-mx, Math.min(mx, ox)); oy = Math.max(-my, Math.min(my, oy));
+      }
+      function render() {
+        clamp();
+        const scale = base * z;
+        img.style.width = nw * scale + "px"; img.style.height = nh * scale + "px";
+        img.style.left = (sw / 2 + ox - nw * scale / 2) + "px";
+        img.style.top = (sh / 2 + oy - nh * scale / 2) + "px";
+        zoomEl.value = String(Math.round(z * 100));
+      }
+      render();
+
+      // ড্র্যাগ + পিঞ্চ জুম
+      const ptrs = new Map();
+      let lastDist = 0;
+      stage.addEventListener("pointerdown", (e) => { stage.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); lastDist = 0; stage.style.cursor = "grabbing"; });
+      stage.addEventListener("pointermove", (e) => {
+        if (!ptrs.has(e.pointerId)) return;
+        const prev = ptrs.get(e.pointerId);
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (ptrs.size === 1) { ox += e.clientX - prev.x; oy += e.clientY - prev.y; }
+        else if (ptrs.size === 2) {
+          const [p1, p2] = Array.from(ptrs.values());
+          const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          if (lastDist) z = Math.max(1, Math.min(4, z * d / lastDist));
+          lastDist = d;
+        }
+        render();
+      });
+      const endPtr = (e) => { ptrs.delete(e.pointerId); lastDist = 0; if (!ptrs.size) stage.style.cursor = "grab"; };
+      stage.addEventListener("pointerup", endPtr); stage.addEventListener("pointercancel", endPtr);
+      stage.addEventListener("wheel", (e) => { e.preventDefault(); z = Math.max(1, Math.min(4, z * (e.deltaY < 0 ? 1.08 : 0.93))); render(); }, { passive: false });
+      zoomEl.addEventListener("input", () => { z = Number(zoomEl.value) / 100; render(); });
+
+      const close = (val) => { URL.revokeObjectURL(url); ov.remove(); resolve(val); };
+      card.querySelector("#cropCancel").onclick = () => close(null);
+      ov.addEventListener("pointerdown", (e) => { if (e.target === ov) close(null); });
+      card.querySelector("#cropOk").onclick = () => {
+        const scale = base * z;
+        const outH = Math.round(outW / aspect);
+        const cv = document.createElement("canvas");
+        cv.width = outW; cv.height = outH;
+        const ctx = cv.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        const sx = nw / 2 - (sw / 2 + ox) / scale;
+        const sy = nh / 2 - (sh / 2 + oy) / scale;
+        ctx.drawImage(img, sx, sy, sw / scale, sh / scale, 0, 0, outW, outH);
+        close(cv.toDataURL("image/jpeg", 0.9));
+      };
+    };
+    img.src = url;
+  });
+}
+
 function applyPmCover(coverUrl, coverY, showPosBar) {
   const coverEl = document.getElementById("pmCover");
   const img = document.getElementById("pmCoverImg");
@@ -1107,7 +1206,7 @@ function applyPmCover(coverUrl, coverY, showPosBar) {
 
 function saveCoverPosition(y) {
   if (!currentUser || !profileViewState.isMe) return;
-  const val = Math.max(0, Math.min(100, Number(y) || 30));
+  const val = Math.max(0, Math.min(100, isNaN(Number(y)) ? 50 : Number(y)));
   if (profileViewState.data) profileViewState.data.coverY = val;
   socket.emit("save-profile", {
     phone: currentUser.phone,
@@ -2723,9 +2822,9 @@ if (dashboardUserName) {
     const file = pmAvatarFileInput.files[0]; pmAvatarFileInput.value = "";
     if (!file || !currentUser || !profileViewState.isMe) return;
     if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
-    let dataUrl;
-    try { const c = await compressImageFile(file); dataUrl = c ? c.dataUrl : await readFileAsDataUrl(file); }
-    catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
+    // আগে সাইজ/অংশ ঠিক করা, Confirm করলে তবেই আপলোড
+    const dataUrl = await openCropEditor({ file, aspect: 1, outW: 640, title: "প্রোফাইল ছবি ঠিক করুন", round: true });
+    if (!dataUrl) return;
     const { ok, payload: res } = await runUploadWithLockout("picture", (done) => {
       socket.emit("update-avatar", { phone: currentUser.phone, dataUrl, name: file.name }, done);
     });
@@ -2765,14 +2864,19 @@ if (dashboardUserName) {
     const file = pmCoverFileInput.files[0]; pmCoverFileInput.value = "";
     if (!file || !currentUser || !profileViewState.isMe) return;
     if (!file.type || !file.type.startsWith("image/")) { await showCustomAlert("Photos only", "শুধু ছবি দিন।"); return; }
-    let dataUrl;
-    try { const c = await compressImageFile(file); dataUrl = c ? c.dataUrl : await readFileAsDataUrl(file); }
-    catch (err) { await showCustomAlert("Error", "ছবি পড়া যায়নি।"); return; }
-    // এখনই সার্ভারে পাঠানো হচ্ছে না — আগে লোকাল প্রিভিউ দেখিয়ে position ঠিক করার সুযোগ দেওয়া হচ্ছে
-    pendingCoverDataUrl = dataUrl;
-    pendingCoverFileName = file.name;
-    const currentY = (profileViewState.data && profileViewState.data.coverY) || 30;
-    applyPmCover(dataUrl, currentY, true);
+    // কভারের ফ্রেম ৩:১ — সবাই একই ফ্রেমে দেখে, তাই কেটে-ঠিক-করা অংশটাই সবার কাছে যায়
+    const dataUrl = await openCropEditor({ file, aspect: 3, outW: 1500, title: "কভার ছবি ঠিক করুন", round: false });
+    if (!dataUrl) return;
+    const { ok, payload: res } = await runUploadWithLockout("cover", (done) => {
+      socket.emit("update-cover", { phone: currentUser.phone, dataUrl, name: file.name }, done);
+    });
+    if (ok && res && res.cover) {
+      if (profileViewState.data) { profileViewState.data.cover = res.cover; profileViewState.data.coverY = 50; }
+      saveCoverPosition(50);
+      applyPmCover(res.cover, 50, false);
+    } else {
+      await showCustomAlert("Error", "ছবি আপলোড হয়নি, আবার চেষ্টা করুন।");
+    }
   };
   const coverSaveBtn = document.getElementById("pmCoverSaveBtn");
   const coverCancelBtn = document.getElementById("pmCoverCancelBtn");
@@ -5419,6 +5523,13 @@ window.EktReact = (function () {
   }
 
   // ---------- ট্যাব বদল ----------
+  // একসাথে শুধু একটা ভিডিও চলবে: যেকোনো ভিডিও প্লে হলে বাকি সব থেমে যাবে (Home ↔ Reels দুটো একসাথে বাজবে না)
+  document.addEventListener("play", (e) => {
+    const cur = e.target;
+    if (!cur || cur.tagName !== "VIDEO") return;
+    document.querySelectorAll("video").forEach((v) => { if (v !== cur && !v.paused) v.pause(); });
+  }, true);
+
   function setTab(name) {
     if (name === "Profile") { $("myProfileBtn").click(); return; }
     profileModalOverlay.classList.remove("active"); // অন্য ট্যাবে গেলে প্রোফাইল বন্ধ
@@ -5434,6 +5545,13 @@ window.EktReact = (function () {
     if (name === "Friends") { fetchFriendData(); loadSuggest(); renderFriends(); }
     if (name === "Messages") renderChats();
     if (name === "Reels") loadReels(); else pauseReels();
+    // ট্যাব বদলালে আগের ট্যাবের (যেমন Home-এর) চালু ভিডিও নিজে থেকে বন্ধ হবে
+    document.querySelectorAll("video").forEach((v) => {
+      const panel = v.closest(".tab-panel, [id^='tab']");
+      if (panel && panel.id === "tab" + name) return;
+      if (v.closest("#tab" + name)) return;
+      if (!v.paused && !v.closest(".overlay, .story-viewer, [id*='Overlay'], [id*='Viewer']")) v.pause();
+    });
     if (name === "Menu") syncMenu();
     window.scrollTo(0, 0);
   }
