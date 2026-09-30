@@ -394,12 +394,18 @@
           sp.classList.add("splash-hide");
           setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
         };
-        if (isResumeSession) {
-          var waited = Date.now() - splashStartTs;
-          var remaining = MIN_RESUME_SPLASH_MS - waited;
-          if (remaining > 0) { setTimeout(doHide, remaining); return; }
-        }
-        doHide();
+        var finish = function () {
+          if (isResumeSession) {
+            var waited = Date.now() - splashStartTs;
+            var remaining = MIN_RESUME_SPLASH_MS - waited;
+            if (remaining > 0) { setTimeout(doHide, remaining); return; }
+          }
+          doHide();
+        };
+        // Home-এর ডেটা/ছবি (app.js) পেছনে লোড হচ্ছে — সেটা শেষ হলে তবেই স্প্ল্যাশ সরবে,
+        // যাতে ইউজার আলাদা কোনো লোডিং স্ক্রিন না দেখে সরাসরি তৈরি Home দেখে
+        var hold = window.__ektSplashHold;
+        if (hold && typeof hold.then === "function") hold.then(finish, finish); else finish();
       };
 
       function tryFinish() {
