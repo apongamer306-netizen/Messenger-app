@@ -1929,18 +1929,18 @@ function renderPostCardHtml(post) {
         ${moreHtml}
       </div>
       ${post.text ? `<div class="post-text">${escapeHtml(post.text)}</div>` : ""}
+      ${EktReact.sharedHtml(post)}
       ${mediaHtml}
       <div class="post-meta-row">
-        <span class="post-like-count">${likeCount > 0 ? "👍 " + likeCount : ""}</span>
-        <span class="post-comment-count">${commentCount > 0 ? commentCount + " comments" : ""}</span>
+        ${EktReact.summaryHtml("post", profileViewState.phone, post.id, post)}
+        <span class="post-counts">${EktReact.countsHtml("post", post.id, post)}</span>
       </div>
       <div class="post-actions-row">
-        <button class="post-action-btn like-btn ${iLiked ? "liked" : ""}" data-like="${post.id}">
-          <i class="fa-solid fa-thumbs-up"></i> Like
-        </button>
+        ${EktReact.btnHtml("post", profileViewState.phone, post.id, post)}
         <button class="post-action-btn comment-toggle-btn" data-toggle-comments="${post.id}">
           <i class="fa-regular fa-comment"></i> Comment
         </button>
+        ${EktReact.shareBtnHtml("post", profileViewState.phone, post.id, post)}
       </div>
       <div class="post-comments-section" id="comments-${post.id}" style="display:none;">
         <div class="post-comments-list">${commentsHtml}</div>
@@ -2144,7 +2144,24 @@ document.getElementById("pmSubmitPostBtn").onclick = async () => {
   }
 };
 
-// অন্য কেউ লাইক/কমেন্ট করলে প্রোফাইল খোলা থাকলে সাথে সাথে আপডেট হবে
+// অন্য কেউ রিঅ্যাক্ট/কমেন্ট/শেয়ার করলে প্রোফাইলের ক্যাশ ঠিক রাখা (স্ক্রিনের সংখ্যা EktReact নিজেই বদলায়)
+document.addEventListener("ekt-item-updated", (e) => {
+  const d = e.detail;
+  if (!d || !d.postId || !profileViewState || !profileViewState.data) return;
+  const post = (profileViewState.data.posts || []).find((x) => x.id === d.postId);
+  if (!post) return;
+  post.reacts = d.reacts; post.likes = d.likes; post.shares = d.shares;
+  if (d.comments && d.comments.length !== (post.comments || []).length) {
+    post.comments = d.comments;
+    if (profileModalOverlay.classList.contains("active") && profileViewState.tab === "posts") {
+      const open = Array.from(document.querySelectorAll(".post-comments-section")).filter((x) => x.style.display === "block").map((x) => x.id);
+      renderPostsFeed();
+      open.forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = "block"; });
+    }
+  }
+});
+
+// (পুরনো ইভেন্ট — এখন সার্ভার আর পাঠায় না, তবু থাকল)
 socket.on("post-updated", ({ phone, postId, likes, comments }) => {
   if (profileViewState.phone !== phone) return;
   const posts = profileViewState.data.posts || [];
@@ -3194,6 +3211,21 @@ function formatMsgTime(ts) {
 
 function buildMessageContent(msg) {
   // ফেরত দেয়: { html, isMedia }
+  if (msg.shared) {
+    // বন্ধুর পাঠানো শেয়ার করা পোস্ট / Reel
+    const sh = msg.shared;
+    const label = sh.kind === "reel" ? "Reel" : "পোস্ট";
+    let thumb = "";
+    if (sh.mediaSrc && sh.mediaType === "video") {
+      thumb = `<div class="shared-thumb previewable-media" data-type="video" data-src="${escapeHtml(sh.mediaSrc)}" data-name="reel"><video preload="metadata" muted playsinline src="${escapeHtml(sh.mediaSrc)}#t=0.1"></video><span class="video-play-badge"><i class="fa-solid fa-play"></i></span></div>`;
+    } else if (sh.mediaSrc) {
+      thumb = `<div class="shared-thumb previewable-media" data-type="image" data-src="${escapeHtml(sh.mediaSrc)}" data-name="photo"><img src="${escapeHtml(sh.mediaSrc)}" alt=""></div>`;
+    }
+    return {
+      isMedia: false,
+      html: `${sh.note ? `<span class="msg-text">${escapeHtml(sh.note)}</span>` : ""}<div class="shared-card">${thumb}<div class="shared-meta"><b>${escapeHtml(sh.ownerName || "User")}</b> এর ${label}${sh.caption ? `<span>${escapeHtml(sh.caption)}</span>` : ""}</div></div>`
+    };
+  }
   if (msg.fileType) {
     const name = msg.fileName || "file";
     if (msg.fileType.startsWith("image/")) {
@@ -4683,6 +4715,340 @@ window.addEventListener("load", () => {
 
 
 // =====================================================================
+// REACTIONS (Facebook-স্টাইল: Like · Love · Care · Haha · Wow · Sad · Angry) + SHARE + কারা রিঅ্যাক্ট করেছে
+// পোস্ট, রিলস ও স্টোরি — তিন জায়গার জন্য একই কোড।
+//  • ছোট ট্যাপ = Like / আনলাইক · লং-প্রেস (ফোন) বা হোভার (ডেস্কটপ) = ইমোজি বাছাই
+// =====================================================================
+window.EktReact = (function () {
+  const TYPES = ["like", "love", "care", "haha", "wow", "sad", "angry"];
+  const EMOJI = { like: "👍", love: "❤️", care: "🥰", haha: "😆", wow: "😮", sad: "😢", angry: "😡" };
+  const LABEL = { like: "Like", love: "Love", care: "Care", haha: "Haha", wow: "Wow", sad: "Sad", angry: "Angry" };
+  const esc = (t) => escapeHtml(t == null ? "" : String(t));
+  const meP = () => (typeof currentUser !== "undefined" && currentUser ? currentUser.phone : null);
+  const toast = (t) => { if (typeof showMiniToast === "function") showMiniToast(t); };
+
+  // পুরনো পোস্টে শুধু likes[] থাকতে পারে — সেগুলোকে "like" ধরা হয়
+  function mapOf(o) {
+    const r = Object.assign({}, (o && o.reacts) || {});
+    ((o && o.likes) || []).forEach((p) => { if (!r[p]) r[p] = "like"; });
+    return r;
+  }
+  const myOf = (o) => mapOf(o)[meP()] || "";
+  const attrs = (kind, owner, id) => `data-kind="${esc(kind)}" data-owner="${esc(owner)}" data-id="${esc(id)}"`;
+
+  // ---------- বাটন / সামারি / কাউন্ট HTML ----------
+  function btnInner(my, style) {
+    if (style === "reel") return my ? `<span class="rb-emoji">${EMOJI[my]}</span>` : `<i class="fa-regular fa-thumbs-up"></i>`;
+    return `<span class="rb-emoji">${my ? EMOJI[my] : '<i class="fa-regular fa-thumbs-up"></i>'}</span><span class="rb-label">${my ? LABEL[my] : "Like"}</span>`;
+  }
+  function btnHtml(kind, owner, id, o, style) {
+    const my = myOf(o);
+    const cls = style === "reel" ? "react-btn reel-round" : "post-action-btn react-btn";
+    return `<button type="button" class="${cls}${my ? " reacted rc-" + my : ""}" data-react-btn ${attrs(kind, owner, id)} data-my="${my}" data-style="${style || "post"}">${btnInner(my, style)}</button>`;
+  }
+  function shareBtnHtml(kind, owner, id, o) {
+    const src = (o && o.media && o.media.src) || "";
+    const cap = ((o && (o.text || o.caption)) || "").slice(0, 200);
+    return `<button type="button" class="post-action-btn" data-share-btn ${attrs(kind, owner, id)} data-src="${esc(src)}" data-cap="${esc(cap)}"><i class="fa-solid fa-share"></i> Share</button>`;
+  }
+  function summaryInner(reacts) {
+    const counts = {};
+    Object.values(reacts).forEach((t) => { counts[t] = (counts[t] || 0) + 1; });
+    const n = Object.keys(reacts).length;
+    if (!n) return "";
+    const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
+    return `<span class="rs-emojis">${top.map((t) => `<span>${EMOJI[t] || "👍"}</span>`).join("")}</span><span class="rs-num">${n}</span>`;
+  }
+  function summaryHtml(kind, owner, id, o) {
+    return `<span class="react-sum" data-react-sum ${attrs(kind, owner, id)}>${summaryInner(mapOf(o))}</span>`;
+  }
+  const word = (n, w) => (n ? n + " " + w : "");
+  function countsHtml(kind, id, o) {
+    const c = (o.comments || []).length, s = o.shares || 0;
+    return `<span data-count-c data-kind="${esc(kind)}" data-id="${esc(id)}" data-word="comments">${word(c, "comments")}</span><span data-count-s data-kind="${esc(kind)}" data-id="${esc(id)}" data-word="shares">${word(s, "shares")}</span>`;
+  }
+  // রিলসের ছোট সংখ্যা (আইকনের নিচে)
+  function numHtml(field, kind, id, n, zero) {
+    return `<span class="reel-count" data-count-${field} data-kind="${esc(kind)}" data-id="${esc(id)}" data-fmt="num" data-zero="${esc(zero)}">${n || zero}</span>`;
+  }
+  function sharedHtml(p) {
+    const s = p && p.sharedFrom;
+    if (!s) return "";
+    return `<div class="shared-from"><div class="shared-from-head"><i class="fa-solid fa-share"></i> <b>${esc(s.ownerName || "User")}</b> এর ${s.kind === "reel" ? "Reel" : "পোস্ট"} শেয়ার করা হয়েছে</div>${s.text ? `<div class="shared-from-text">${esc(s.text)}</div>` : ""}</div>`;
+  }
+  // ফিড রিফ্রেশ দরকার কিনা বোঝার সিগনেচার
+  function sig(p) {
+    return Object.values(mapOf(p)).map((v) => v[0]).sort().join("") + ":" + (p.shares || 0);
+  }
+
+  // ---------- স্ক্রিনে বসানো সংখ্যা/বাটন আপডেট ----------
+  function applyBtn(el, my) {
+    el.dataset.my = my || "";
+    TYPES.forEach((t) => el.classList.remove("rc-" + t));
+    el.classList.toggle("reacted", !!my);
+    if (my) el.classList.add("rc-" + my);
+    el.innerHTML = btnInner(my, el.dataset.style);
+    if (my) { const em = el.querySelector(".rb-emoji"); if (em) { void em.offsetWidth; em.classList.add("pop"); } }
+  }
+  function fmt(el, n, defWord) {
+    if (el.dataset.fmt === "num") el.textContent = n ? String(n) : (el.dataset.zero || "");
+    else el.textContent = n ? n + " " + (el.dataset.word || defWord) : "";
+  }
+  function patch(kind, id, d) {
+    if (!id) return;
+    const reacts = d.reacts || {};
+    const mine = reacts[meP()] || "";
+    document.querySelectorAll(`[data-kind="${kind}"]`).forEach((el) => {
+      if (el.dataset.id !== id) return;
+      if (el.hasAttribute("data-react-btn")) applyBtn(el, mine);
+      else if (el.hasAttribute("data-react-sum")) el.innerHTML = summaryInner(reacts);
+      else if (el.hasAttribute("data-count-r")) fmt(el, Object.keys(reacts).length, "");
+      else if (el.hasAttribute("data-count-c")) { if (d.commentCount != null) fmt(el, d.commentCount, "comments"); }
+      else if (el.hasAttribute("data-count-s")) { if (d.shares != null) fmt(el, d.shares, "shares"); }
+    });
+  }
+  function handleUpdate(d) {
+    if (!d) return;
+    if (d.kind === "story") patch("story", d.id, d);
+    else {
+      if (d.postId) patch("post", d.postId, d);
+      if (d.reelId) patch("reel", d.reelId, d);
+    }
+    document.dispatchEvent(new CustomEvent("ekt-item-updated", { detail: d }));
+  }
+  socket.on("item-updated", handleUpdate);
+
+  // ---------- রিঅ্যাকশন পাঠানো ----------
+  function currentMy(kind, id) {
+    const b = Array.from(document.querySelectorAll("[data-react-btn]")).find((el) => el.dataset.kind === kind && el.dataset.id === id);
+    return b ? b.dataset.my : "";
+  }
+  function setMy(kind, id, type) {
+    document.querySelectorAll("[data-react-btn]").forEach((el) => { if (el.dataset.kind === kind && el.dataset.id === id) applyBtn(el, type); });
+  }
+  function send(kind, owner, id, type, cb) {
+    const m = meP();
+    if (!m || !kind || !id) return;
+    const prev = currentMy(kind, id);
+    setMy(kind, id, type || ""); // সাথে সাথে স্ক্রিনে দেখানো (সার্ভারের উত্তরের অপেক্ষা না করে)
+    socket.emit("react-item", { kind, ownerPhone: owner, id, reactorPhone: m, type: type || null }, (res) => {
+      if (res && res.success) { handleUpdate(res.payload); if (cb) cb(res); }
+      else { setMy(kind, id, prev); toast("রিঅ্যাকশন দেওয়া যায়নি"); }
+    });
+  }
+
+  // ---------- ইমোজি পিকার ----------
+  let picker = null, pickerFor = null, hideTimer = null, pressTimer = null, hoverTimer = null, longFired = false;
+  function ensurePicker() {
+    if (picker) return picker;
+    picker = document.createElement("div");
+    picker.className = "react-picker";
+    picker.innerHTML = TYPES.map((t) => `<button type="button" class="rp-item" data-rp="${t}" aria-label="${LABEL[t]}"><span class="rp-emoji">${EMOJI[t]}</span><span class="rp-tip">${LABEL[t]}</span></button>`).join("");
+    document.body.appendChild(picker);
+    picker.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-rp]");
+      if (!b || !pickerFor) return;
+      e.stopPropagation();
+      const el = pickerFor;
+      hidePicker();
+      const type = b.dataset.rp;
+      send(el.dataset.kind, el.dataset.owner, el.dataset.id, el.dataset.my === type ? null : type);
+    });
+    picker.addEventListener("mouseenter", () => clearTimeout(hideTimer));
+    picker.addEventListener("mouseleave", scheduleHide);
+    return picker;
+  }
+  function showPicker(btn) {
+    ensurePicker();
+    clearTimeout(hideTimer);
+    pickerFor = btn;
+    picker.style.display = "flex";
+    picker.classList.remove("show");
+    picker.querySelectorAll(".rp-item").forEach((x) => x.classList.toggle("on", x.dataset.rp === btn.dataset.my));
+    const r = btn.getBoundingClientRect();
+    const pw = picker.offsetWidth, ph = picker.offsetHeight;
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 8);
+    let top = r.top - ph - 10;
+    if (top < 8) top = r.bottom + 10;
+    picker.style.left = left + "px";
+    picker.style.top = top + "px";
+    requestAnimationFrame(() => picker.classList.add("show"));
+  }
+  function hidePicker() {
+    clearTimeout(hideTimer);
+    if (!picker) return;
+    picker.classList.remove("show");
+    picker.style.display = "none";
+    pickerFor = null;
+  }
+  function scheduleHide() { clearTimeout(hideTimer); hideTimer = setTimeout(hidePicker, 380); }
+
+  document.addEventListener("pointerdown", (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const b = t.closest("[data-react-btn]");
+    if (!b) { if (pickerFor && !t.closest(".react-picker")) hidePicker(); return; }
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    longFired = false;
+    clearTimeout(pressTimer);
+    pressTimer = setTimeout(() => { longFired = true; showPicker(b); }, 420);
+  });
+  ["pointerup", "pointercancel"].forEach((ev) => document.addEventListener(ev, () => clearTimeout(pressTimer)));
+  document.addEventListener("contextmenu", (e) => { if (e.target.closest && e.target.closest("[data-react-btn]")) e.preventDefault(); });
+  window.addEventListener("scroll", () => { clearTimeout(pressTimer); if (pickerFor) hidePicker(); }, true);
+
+  // ডেস্কটপে মাউস রাখলেই পিকার
+  document.addEventListener("mouseover", (e) => {
+    if (!window.matchMedia || !window.matchMedia("(hover: hover)").matches) return;
+    const b = e.target.closest && e.target.closest("[data-react-btn]");
+    if (!b || (e.relatedTarget && b.contains(e.relatedTarget))) return;
+    clearTimeout(hideTimer);
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => showPicker(b), 380);
+  });
+  document.addEventListener("mouseout", (e) => {
+    const b = e.target.closest && e.target.closest("[data-react-btn]");
+    if (!b || (e.relatedTarget && b.contains(e.relatedTarget))) return;
+    clearTimeout(hoverTimer);
+    if (pickerFor) scheduleHide();
+  });
+
+  // ক্লিক (ক্যাপচার ফেজে — যাতে রিলসের "প্লে/পজ" ক্লিক ট্রিগার না হয়)
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const rb = t.closest("[data-react-btn]");
+    if (rb) {
+      e.preventDefault(); e.stopPropagation();
+      if (longFired) { longFired = false; return; }
+      hidePicker();
+      send(rb.dataset.kind, rb.dataset.owner, rb.dataset.id, rb.dataset.my ? null : "like");
+      return;
+    }
+    const sb = t.closest("[data-share-btn]");
+    if (sb) { e.preventDefault(); e.stopPropagation(); openShare(sb); return; }
+    const rs = t.closest("[data-react-sum]");
+    if (rs && rs.textContent.trim()) { e.preventDefault(); e.stopPropagation(); openReactors(rs.dataset.kind, rs.dataset.owner, rs.dataset.id); }
+  }, true);
+
+  // ---------- বটম-শিট (রিঅ্যাক্টর লিস্ট, শেয়ার) ----------
+  let openSheetEl = null;
+  function makeSheet(title, opts) {
+    if (openSheetEl) { openSheetEl.remove(); openSheetEl = null; }
+    const ov = document.createElement("div");
+    ov.className = "ekt-sheet-overlay";
+    ov.innerHTML = `<div class="ekt-sheet"><div class="ekt-sheet-head"><b>${esc(title)}</b><button type="button" class="ekt-sheet-x" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div><div class="ekt-sheet-body"></div></div>`;
+    document.body.appendChild(ov);
+    openSheetEl = ov;
+    const sh = { ov, body: ov.querySelector(".ekt-sheet-body") };
+    sh.close = () => { if (!ov.parentNode) return; ov.remove(); if (openSheetEl === ov) openSheetEl = null; if (opts && opts.onClose) opts.onClose(); };
+    ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest(".ekt-sheet-x")) sh.close(); });
+    return sh;
+  }
+
+  // মানুষের লিস্ট + রিঅ্যাকশন ফিল্টার (রিঅ্যাক্টর ও স্টোরি-ভিউয়ার দুটোর জন্যই)
+  function renderPeople(sh, list, emptyText) {
+    const counts = {};
+    list.forEach((p) => { if (p.type) counts[p.type] = (counts[p.type] || 0) + 1; });
+    let filter = "all";
+    const draw = () => {
+      const chips = `<div class="ekt-chips"><button type="button" data-f="all" class="${filter === "all" ? "on" : ""}">All ${list.length}</button>${TYPES.filter((t) => counts[t]).map((t) => `<button type="button" data-f="${t}" class="${filter === t ? "on" : ""}">${EMOJI[t]} ${counts[t]}</button>`).join("")}</div>`;
+      const rows = list.filter((p) => filter === "all" || p.type === filter).map((p) => `<div class="ekt-person" data-phone="${esc(p.phone)}" data-name="${esc(p.name || "")}" data-pic="${esc(p.pic || "")}"><span class="ekt-pic"><img src="${esc(p.pic || "")}" alt="">${p.type ? `<em>${EMOJI[p.type]}</em>` : ""}</span><b>${esc(p.name || "User")}</b></div>`).join("");
+      sh.body.innerHTML = (list.length ? chips : "") + `<div class="ekt-people">${rows || `<div class="ekt-empty">${esc(emptyText || "কেউ নেই")}</div>`}</div>`;
+    };
+    draw();
+    sh.body.onclick = (e) => {
+      const chip = e.target.closest("[data-f]");
+      if (chip) { filter = chip.dataset.f; draw(); return; }
+      const row = e.target.closest(".ekt-person");
+      if (row && typeof openProfile === "function") {
+        const ph = row.dataset.phone;
+        sh.close();
+        if (currentUser && ph === currentUser.phone) { const b = document.getElementById("myProfileBtn"); if (b) b.click(); return; }
+        openProfile(ph, { phone: ph, name: row.dataset.name, pic: row.dataset.pic });
+      }
+    };
+  }
+  function openReactors(kind, owner, id) {
+    const sh = makeSheet("Reactions");
+    sh.body.innerHTML = '<div class="ekt-empty">Loading…</div>';
+    socket.emit("get-reactors", { kind, ownerPhone: owner, id }, (res) => {
+      if (!res || !res.success) { sh.body.innerHTML = '<div class="ekt-empty">লোড করা যায়নি।</div>'; return; }
+      renderPeople(sh, res.list || [], "এখনো কেউ রিঅ্যাক্ট করেনি");
+    });
+  }
+
+  // ---------- শেয়ার ----------
+  function openShare(sb) {
+    const m = typeof currentUser !== "undefined" ? currentUser : null;
+    if (!m) return;
+    const kind = sb.dataset.kind, owner = sb.dataset.owner, id = sb.dataset.id;
+    const src = sb.dataset.src || "", cap = sb.dataset.cap || "";
+    const base = { kind, ownerPhone: owner, id, sharerPhone: m.phone };
+    const sh = makeSheet("Share");
+    sh.body.innerHTML = `
+      <textarea class="ekt-share-text" maxlength="500" rows="2" placeholder="এ সম্পর্কে কিছু লিখুন… (ঐচ্ছিক)"></textarea>
+      <div class="ekt-share-opts">
+        <button type="button" data-sh="feed"><i class="fa-solid fa-share-nodes"></i><span>Share to feed</span></button>
+        <button type="button" data-sh="friend"><i class="fa-regular fa-paper-plane"></i><span>Send to friend</span></button>
+        <button type="button" data-sh="copy"><i class="fa-regular fa-copy"></i><span>Copy link</span></button>
+        ${navigator.share ? '<button type="button" data-sh="more"><i class="fa-solid fa-ellipsis"></i><span>More</span></button>' : ""}
+      </div>
+      <div class="ekt-share-friends" style="display:none;"></div>`;
+    const note = () => sh.body.querySelector(".ekt-share-text").value.trim();
+    const countOnly = () => socket.emit("share-item", Object.assign({ mode: "link" }, base), (r) => { if (r && r.success) handleUpdate(r.payload); });
+
+    sh.body.addEventListener("click", (e) => {
+      const opt = e.target.closest("[data-sh]");
+      if (opt) {
+        const act = opt.dataset.sh;
+        if (act === "feed") {
+          opt.disabled = true;
+          socket.emit("share-item", Object.assign({ mode: "feed", text: note() }, base), (res) => {
+            if (res && res.success) {
+              handleUpdate(res.payload);
+              toast("আপনার ফিডে শেয়ার হয়েছে ✅");
+              document.dispatchEvent(new CustomEvent("ekt-feed-refresh"));
+              sh.close();
+            } else { opt.disabled = false; toast((res && res.message) || "শেয়ার করা যায়নি"); }
+          });
+        } else if (act === "friend") {
+          let friends = [];
+          try { const c = loadFriendCache(); friends = (c && c.friends) || []; } catch (err) {}
+          const box = sh.body.querySelector(".ekt-share-friends");
+          box.style.display = "block";
+          box.innerHTML = friends.length
+            ? friends.map((f) => `<div class="ekt-person" data-send="${esc(f.phone)}"><span class="ekt-pic"><img src="${esc(f.pic || "")}" alt=""></span><b>${esc(f.name || "User")}</b><button type="button" class="ekt-send-btn">Send</button></div>`).join("")
+            : '<div class="ekt-empty">আগে বন্ধু যোগ করুন।</div>';
+        } else if (act === "copy") {
+          const link = src || cap;
+          if (!link) { toast("কপি করার মতো কিছু নেই"); return; }
+          copyText(link).then((ok) => toast(ok ? "Link copied" : "Couldn't copy"));
+          countOnly();
+        } else if (act === "more") {
+          const data = { title: "Share", text: cap || "" };
+          if (src) data.url = src;
+          navigator.share(data).then(countOnly).catch(() => {});
+        }
+        return;
+      }
+      const sendBtn = e.target.closest(".ekt-send-btn");
+      if (sendBtn) {
+        const row = sendBtn.closest("[data-send]");
+        sendBtn.disabled = true; sendBtn.textContent = "…";
+        socket.emit("share-item", Object.assign({ mode: "friend", toPhone: row.dataset.send, text: note() }, base), (res) => {
+          if (res && res.success) { handleUpdate(res.payload); sendBtn.textContent = "Sent ✓"; }
+          else { sendBtn.disabled = false; sendBtn.textContent = "Send"; toast((res && res.message) || "পাঠানো যায়নি"); }
+        });
+      }
+    });
+  }
+
+  return { TYPES, EMOJI, LABEL, mapOf, myOf, btnHtml, shareBtnHtml, summaryHtml, summaryInner, countsHtml, numHtml, sharedHtml, sig, send, handleUpdate, makeSheet, renderPeople, openReactors, openShare };
+})();
+
+
+// =====================================================================
 // STORY — ২৪ ঘণ্টা পর অটো ডিলিট (সার্ভার মুছে দেয়), ফেসবুকের মতো বার + ভিউয়ার
 // =====================================================================
 (function storyModule() {
@@ -4839,10 +5205,91 @@ window.addEventListener("load", () => {
     setTimeout(() => fin(null), 120000);
   };
 
+
+  // ---------- স্টোরিতে রিঅ্যাকশন ----------
+  const R = window.EktReact;
+  function stopMedia() { const v = $("storyBody").querySelector("video"); if (v) { try { v.pause(); } catch (e) {} } }
+  function renderFooter(st, own) {
+    const f = $("storyFooter");
+    if (!own) { f.innerHTML = ""; return; }
+    const reacts = R.mapOf(st), n = Object.keys(reacts).length;
+    const top = Object.keys(Object.values(reacts).reduce((a, t) => { a[t] = (a[t] || 0) + 1; return a; }, {})).slice(0, 3).map((t) => R.EMOJI[t]).join("");
+    const hrs = Math.max(0, Math.ceil((st.expires - Date.now()) / 3600000));
+    f.innerHTML = `<button type="button" class="story-foot-btn" id="storyViewersBtn">👁 ${(st.views || []).length} views${n ? " · " + top + " " + n : ""} · ${hrs} ঘণ্টা বাকি <i class="fa-solid fa-chevron-up"></i></button>`;
+  }
+  function renderReactBar(st) {
+    let bar = $("storyReactBar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "storyReactBar";
+      bar.className = "story-react-bar";
+      $("storyStage").appendChild(bar);
+      bar.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-sr]");
+        if (!b) return;
+        const g = groups[gi], cur = g && g.items[si];
+        if (!cur) return;
+        const type = b.dataset.sr;
+        const mine = R.mapOf(cur)[me().phone];
+        const next = mine === type ? null : type;
+        if (next) flyEmoji(R.EMOJI[next], b);
+        R.send("story", g.phone, cur.id, next);
+        // বারের হাইলাইট সাথে সাথে বদলানো
+        bar.querySelectorAll("[data-sr]").forEach((x) => x.classList.toggle("on", x.dataset.sr === next));
+      });
+    }
+    if (!st) { bar.style.display = "none"; bar.innerHTML = ""; return; }
+    const mine = R.mapOf(st)[me().phone] || "";
+    bar.style.display = "flex";
+    bar.innerHTML = R.TYPES.map((t) => `<button type="button" data-sr="${t}" class="${mine === t ? "on" : ""}" aria-label="${R.LABEL[t]}">${R.EMOJI[t]}</button>`).join("");
+  }
+  function flyEmoji(emoji, fromEl) {
+    const stage = $("storyStage"), sr = stage.getBoundingClientRect(), br = fromEl.getBoundingClientRect();
+    for (let i = 0; i < 6; i++) {
+      const s = document.createElement("span");
+      s.className = "story-fly";
+      s.textContent = emoji;
+      s.style.left = (br.left - sr.left + br.width / 2 + (Math.random() * 40 - 20)) + "px";
+      s.style.bottom = (sr.bottom - br.top) + "px";
+      s.style.animationDelay = (i * 70) + "ms";
+      s.style.setProperty("--dx", (Math.random() * 80 - 40) + "px");
+      stage.appendChild(s);
+      setTimeout(() => s.remove(), 1500 + i * 70);
+    }
+  }
+  // ভিউয়ার + রিঅ্যাকশন লিস্ট (শুধু নিজের স্টোরিতে)
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest("#storyViewersBtn");
+    if (!b) return;
+    const g = groups[gi], st = g && g.items[si], u = me();
+    if (!st || !u) return;
+    clearTimer(); stopMusic(); stopMedia();
+    const sh = R.makeSheet("Story viewers", { onClose: () => { if ($("storyViewerOverlay").style.display !== "none") showStory(); } });
+    sh.body.innerHTML = '<div class="ekt-empty">Loading…</div>';
+    socket.emit("get-story-viewers", { phone: u.phone, storyId: st.id }, (res) => {
+      if (!res || !res.success) { sh.body.innerHTML = '<div class="ekt-empty">লোড করা যায়নি।</div>'; return; }
+      R.renderPeople(sh, res.list || [], "এখনো কেউ দেখেনি");
+    });
+  });
+  // রিঅ্যাকশনের আপডেট (নিজের রিঅ্যাকশন বা অন্যের)
+  document.addEventListener("ekt-item-updated", (e) => {
+    const d = e.detail;
+    if (!d || d.kind !== "story") return;
+    const st = allStories.find((x) => x.id === d.id);
+    if (st) st.reacts = d.reacts;
+  });
+  socket.on("story-reacted", (d) => {
+    const st = allStories.find((x) => x.id === d.storyId);
+    if (st) st.reacts = d.reacts;
+    if (d.type && typeof showMiniToast === "function") showMiniToast(d.name + " আপনার স্টোরিতে " + R.EMOJI[d.type] + " দিয়েছে");
+    const g = groups[gi], cur = g && g.items[si];
+    if (cur && cur.id === d.storyId && $("storyViewerOverlay").style.display !== "none" && g.phone === (me() || {}).phone) renderFooter(cur, true);
+  });
+
   // ---------- দেখা ----------
   function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
   function stopMusic() { if (storyAudio) { try { storyAudio.pause(); } catch (e) {} storyAudio = null; } }
-  function closeViewer() { clearTimer(); stopMusic(); $("storyViewerOverlay").style.display = "none"; $("storyBody").innerHTML = ""; $("storyMenuSheet").style.display = "none"; window.loadStoriesRow(); }
+  function closeViewer() { clearTimer(); stopMusic(); const rb = $("storyReactBar"); if (rb) rb.style.display = "none"; $("storyViewerOverlay").style.display = "none"; $("storyBody").innerHTML = ""; $("storyMenuSheet").style.display = "none"; window.loadStoriesRow(); }
   function openViewer(idx) {
     gi = idx; si = 0;
     const g = groups[gi];
@@ -4885,7 +5332,8 @@ window.addEventListener("load", () => {
     if (dur) runBar(dur);
     const own = g.phone === u.phone;
     if (st.music && st.music.name) { const mn = document.createElement("div"); mn.className = "story-music-tag"; mn.innerHTML = '<i class="fa-solid fa-music"></i> ' + esc(st.music.name); body.appendChild(mn); }
-    $("storyFooter").textContent = own ? `👁 ${(st.views || []).length} views · ${Math.max(0, Math.ceil((st.expires - Date.now()) / 3600000))} ঘণ্টা বাকি` : "";
+    renderFooter(st, own);
+    renderReactBar(own ? null : st);
     if (!own) socket.emit("view-story", { phone: u.phone, storyId: st.id });
     if (!(st.views || []).includes(u.phone) && !own) st.views = (st.views || []).concat(u.phone);
   }
@@ -5084,7 +5532,7 @@ window.addEventListener("load", () => {
   };
   $("pmCloseBtn").addEventListener("click", () => setTimeout(() => { if (current === "Home") loadFeed(); }, 350));
 
-  const feedSig = (l) => l.map((p) => p.id + ":" + (p.likes || []).length + ":" + (p.comments || []).length).join("|");
+  const feedSig = (l) => l.map((p) => p.id + ":" + (p.likes || []).length + ":" + (p.comments || []).length + ":" + EktReact.sig(p)).join("|");
   function loadFeed(force) {
     const m = me();
     if (!m) return Promise.resolve();
@@ -5100,6 +5548,20 @@ window.addEventListener("load", () => {
     });
   }
   socket.on("friend-profile-updated", () => { if (current === "Home") loadFeed(); });
+  document.addEventListener("ekt-feed-refresh", () => loadFeed(true));
+  // রিঅ্যাকশন/কমেন্ট/শেয়ার আপডেট এলে ফিডের ক্যাশ ঠিক রাখা (সংখ্যা/বাটন EktReact নিজেই বদলায়)
+  document.addEventListener("ekt-item-updated", (e) => {
+    const d = e.detail;
+    if (!d || !d.postId) return;
+    const post = feedPosts.find((x) => x.id === d.postId);
+    if (!post) return;
+    post.reacts = d.reacts; post.likes = d.likes; post.shares = d.shares;
+    if (d.comments && d.comments.length !== (post.comments || []).length) {
+      post.comments = d.comments;
+      const card = document.querySelector('#homeFeed .post-card[data-fid="' + post.id.replace(/"/g, "") + '"]');
+      if (card) card.outerHTML = feedCardHtml(post);
+    }
+  });
 
   function feedCardHtml(p) {
     const likes = p.likes || [], comments = p.comments || [];
@@ -5119,11 +5581,16 @@ window.addEventListener("load", () => {
         <div class="post-header-text"><span class="post-author-name" data-open-owner>${esc(p.ownerName)}</span><span class="post-time">${timeAgo(p.timestamp)}</span></div>
       </div>
       ${p.text ? `<div class="post-text">${esc(p.text)}</div>` : ""}
+      ${EktReact.sharedHtml(p)}
       ${media}
-      <div class="post-meta-row"><span>${likes.length ? "👍 " + likes.length : ""}</span><span>${comments.length ? comments.length + " comments" : ""}</span></div>
+      <div class="post-meta-row">
+        ${EktReact.summaryHtml("post", p.ownerPhone, p.id, p)}
+        <span class="post-counts">${EktReact.countsHtml("post", p.id, p)}</span>
+      </div>
       <div class="post-actions-row">
-        <button class="post-action-btn like-btn ${liked ? "liked" : ""}" data-flike><i class="fa-solid fa-thumbs-up"></i> Like</button>
+        ${EktReact.btnHtml("post", p.ownerPhone, p.id, p)}
         <button class="post-action-btn" data-fcomment><i class="fa-regular fa-comment"></i> Comment</button>
+        ${EktReact.shareBtnHtml("post", p.ownerPhone, p.id, p)}
       </div>
       <div class="post-comments-section" style="display:${openComments.has(p.id) ? "block" : "none"};">
         <div class="post-comments-list">${cm}</div>
@@ -5152,12 +5619,6 @@ window.addEventListener("load", () => {
     }
     const mediaEl = e.target.closest(".feed-media");
     if (mediaEl) { openMediaPreview(mediaEl.dataset.type, mediaEl.dataset.src, mediaEl.dataset.type === "video" ? "post-video" : "post-photo"); return; }
-    if (e.target.closest("[data-flike]")) {
-      socket.emit("toggle-like-post", { phone: post.ownerPhone, postId: post.id, likerPhone: me().phone }, (res) => {
-        if (res && res.success) { post.likes = res.likes; card.outerHTML = feedCardHtml(post); }
-      });
-      return;
-    }
     if (e.target.closest("[data-fcomment]")) {
       const sec = card.querySelector(".post-comments-section");
       const open = sec.style.display === "none";
@@ -5281,10 +5742,14 @@ window.addEventListener("load", () => {
       box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-clapperboard"></i><p>এখনো কোনো Reel নেই। কেউ ভিডিও পোস্ট করলে বা Reel আপলোড করলে এখানে দেখা যাবে।</p></div>`;
       return;
     }
-    box.innerHTML = list.map((r, i) => `<div class="reel-item" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
+    box.innerHTML = list.map((r, i) => `<div class="reel-item" data-rid="${esc(r.id)}" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
       <video src="${esc(r.src)}" ${videoPosterUrl(r.src) ? 'poster="' + videoPosterUrl(r.src) + '"' : ""} loop playsinline muted preload="${i === 0 ? "auto" : "metadata"}"></video>
       <div class="reel-info"><div class="reel-owner" data-reel-owner><img src="${esc(oi(r.ownerPic, 96, true))}" alt=""><b>${esc(r.ownerName)}</b></div>${r.caption ? `<p>${esc(r.caption)}</p>` : ""}</div>
-      <div class="reel-side"><button type="button" data-reel-sound title="Sound"><i class="fa-solid ${reelMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
+      <div class="reel-side">
+        <div class="reel-act">${EktReact.btnHtml("reel", r.ownerPhone, r.id, r, "reel")}${EktReact.numHtml("r", "reel", r.id, Object.keys(EktReact.mapOf(r)).length, "Like")}</div>
+        <div class="reel-act"><button type="button" class="reel-round" data-reel-comment title="Comment"><i class="fa-regular fa-comment"></i></button>${EktReact.numHtml("c", "reel", r.id, r.commentCount || 0, "Comment")}</div>
+        <div class="reel-act"><button type="button" class="reel-round" data-share-btn data-kind="reel" data-owner="${esc(r.ownerPhone)}" data-id="${esc(r.id)}" data-src="${esc(r.src)}" data-cap="${esc((r.caption || "").slice(0, 200))}" title="Share"><i class="fa-solid fa-share"></i></button>${EktReact.numHtml("s", "reel", r.id, r.shares || 0, "Share")}</div>
+        <button type="button" data-reel-sound title="Sound"><i class="fa-solid ${reelMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
     </div>`).join("");
     if (reelObserver) reelObserver.disconnect();
     reelObserver = new IntersectionObserver((entries) => {
@@ -5306,10 +5771,73 @@ window.addEventListener("load", () => {
       });
     });
   }
+
+  // ---------- REEL COMMENTS (নিচ থেকে ওঠা শিট) ----------
+  const findReel = (id) => reelsCache.find((x) => x.id === id);
+  function reelCommentsListHtml(reel) {
+    const list = reel.comments || [];
+    return list.length
+      ? list.map((c) => `<div class="post-comment"><img class="post-comment-avatar" src="${esc(oi(c.authorPic, 64, true))}" alt=""><div class="post-comment-bubble"><span class="post-comment-name">${esc(c.authorName || "User")}</span><span class="post-comment-text">${esc(c.text)}</span></div></div>`).join("")
+      : `<div class="reel-cm-empty">এখনো কোনো কমেন্ট নেই। প্রথম কমেন্টটি আপনিই করুন।</div>`;
+  }
+  function drawReelComments(sheet, reel) {
+    const box = sheet.querySelector(".reel-cm-list");
+    box.innerHTML = reelCommentsListHtml(reel);
+    box.scrollTop = box.scrollHeight;
+    sheet.querySelector(".reel-cm-title").textContent = "Comments" + (reel.commentCount ? " (" + reel.commentCount + ")" : "");
+  }
+  function toggleReelComments(item) {
+    const existing = item.querySelector(".reel-comments");
+    if (existing) { existing.remove(); return; }
+    const reel = findReel(item.dataset.rid);
+    if (!reel) return;
+    const m = me();
+    const sheet = document.createElement("div");
+    sheet.className = "reel-comments";
+    sheet.innerHTML = `<div class="reel-cm-head"><b class="reel-cm-title">Comments</b><button type="button" class="reel-cm-x" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="reel-cm-list"></div>
+      <div class="reel-cm-input"><img class="post-comment-avatar" src="${esc(oi((m && m.pic) || "", 64, true))}" alt=""><input type="text" maxlength="500" placeholder="Write a comment..."><button type="button" class="reel-cm-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button></div>`;
+    item.appendChild(sheet);
+    drawReelComments(sheet, reel);
+    const input = sheet.querySelector("input");
+    const sendIt = () => {
+      const text = input.value.trim();
+      if (!text || !m) return;
+      input.value = "";
+      socket.emit("add-comment", { kind: "reel", phone: reel.ownerPhone, postId: reel.id, comment: { authorPhone: m.phone, authorName: m.name, authorPic: m.pic, text } }, (res) => {
+        if (res && res.success) {
+          reel.comments = reel.comments || [];
+          if (!reel.comments.some((c) => c.id === res.comment.id)) { reel.comments.push(res.comment); reel.commentCount = (reel.commentCount || 0) + 1; }
+          drawReelComments(sheet, reel);
+        } else if (typeof showMiniToast === "function") showMiniToast("কমেন্ট করা যায়নি");
+      });
+    };
+    sheet.querySelector(".reel-cm-send").onclick = sendIt;
+    input.onkeypress = (e) => { if (e.key === "Enter") sendIt(); };
+    sheet.querySelector(".reel-cm-x").onclick = () => sheet.remove();
+    setTimeout(() => input.focus(), 50);
+  }
+  // রিঅ্যাকশন/কমেন্ট/শেয়ার আপডেটে রিলসের ক্যাশ ঠিক রাখা
+  document.addEventListener("ekt-item-updated", (e) => {
+    const d = e.detail;
+    if (!d || !d.reelId) return;
+    const reel = findReel(d.reelId);
+    if (!reel) return;
+    reel.reacts = d.reacts; reel.likes = d.likes; reel.shares = d.shares;
+    if (d.commentCount != null) reel.commentCount = d.commentCount;
+    if (d.comments) {
+      reel.comments = d.comments;
+      const item = document.querySelector('#reelsList .reel-item[data-rid="' + String(d.reelId).replace(/"/g, "") + '"]');
+      const sheet = item && item.querySelector(".reel-comments");
+      if (sheet) drawReelComments(sheet, reel);
+    }
+  });
   $("reelsList").addEventListener("click", (e) => {
     const item = e.target.closest(".reel-item");
     if (!item) return;
     const v = item.querySelector("video");
+    if (e.target.closest(".reel-comments")) return; // কমেন্ট শিটের ভেতরের ক্লিকে ভিডিও থামবে না
+    if (e.target.closest("[data-reel-comment]")) { toggleReelComments(item); return; }
     if (e.target.closest("[data-reel-owner]")) { openUserProfile({ phone: item.dataset.owner, name: item.dataset.name, pic: item.dataset.pic }); return; }
     if (e.target.closest("[data-reel-sound]")) {
       reelMuted = !reelMuted;
