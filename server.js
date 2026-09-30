@@ -28,6 +28,12 @@ async function getFetch() {
   }
 }
 
+// প্রতিটি আপলোডের জন্য ইউনিক public_id — নাহলে একই নামের (story/post/photo) ফাইল একে অপরকে ওভাররাইট করে
+function uniquePublicId(name, fallback) {
+  const base = String(name || fallback || "file").replace(/\.[a-zA-Z0-9]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50) || "file";
+  return base + "_" + Date.now().toString(36) + "_" + nodeCrypto.randomBytes(4).toString("hex");
+}
+
 // ---- Cloudinary (unsigned upload) — এটাই প্রধান, imgbb-র চেয়ে server/automation-এর জন্য অনেক বেশি নির্ভরযোগ্য ----
 async function uploadToCloudinary(dataUrl, name) {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) return null;
@@ -39,7 +45,7 @@ async function uploadToCloudinary(dataUrl, name) {
     const form = new FormData();
     form.append("file", raw);
     form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    if (name) form.append("public_id", String(name).replace(/\.[a-zA-Z0-9]+$/, "").slice(0, 80));
+    form.append("public_id", uniquePublicId(name, "img"));
     const res = await doFetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
       method: "POST",
       body: form,
@@ -68,7 +74,7 @@ async function uploadVideoToCloudinary(dataUrl, name) {
     const form = new FormData();
     form.append("file", raw);
     form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    if (name) form.append("public_id", String(name).replace(/\.[a-zA-Z0-9]+$/, "").slice(0, 60) + "_" + Date.now().toString(36));
+    form.append("public_id", uniquePublicId(name, "vid"));
     const res = await doFetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, {
       method: "POST",
       body: form,
