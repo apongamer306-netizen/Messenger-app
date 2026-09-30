@@ -1115,7 +1115,7 @@ function saveCoverPosition(y) {
   }, () => {});
 }
 
-document.addEventListener("DOMContentLoaded", () => { checkActiveSession(); });
+document.addEventListener("DOMContentLoaded", () => { if (typeof window.__ektSetProgress === "function") window.__ektSetProgress(12); checkActiveSession(); });
 
 function updateMasterScreenUI() {
   const savedPin = localStorage.getItem("appMasterPin");
@@ -1202,6 +1202,8 @@ function checkActiveSession() {
     // এটা সত্যিকারের "রিলোড" হলেই (প্রথমবার ঢোকা নয়) আসল স্ক্রিন বসে যাওয়ার
     // সাথে সাথে স্প্ল্যাশ স্পিনারটা সরানো হয় — ফ্রেশ এন্ট্রির পুরো ব্র্যান্ডিং
     // অ্যানিমেশন যেন কখনো মাঝপথে কেটে না যায়
+    // ড্যাশবোর্ড না খুললে (লগইন/পিন স্ক্রিন) লোড করার কিছু নেই — স্প্ল্যাশ এখন সরতে পারে
+    if (!document.body.classList.contains("dashboard-active") && typeof window.__ektMarkReady === "function") window.__ektMarkReady();
     if (window.__ektSplashIsResume && typeof window.hideSplashScreen === "function") window.hideSplashScreen();
   }
 }
@@ -1257,7 +1259,9 @@ function grantAccess() {
   } else {
     authScreen.style.display = "block";
   }
-  if (window.__ektSplashIsResume && typeof window.hideSplashScreen === "function") window.hideSplashScreen();
+  // ড্যাশবোর্ড না খুললে (লগইন/পিন স্ক্রিন) লোড করার কিছু নেই — স্প্ল্যাশ এখন সরতে পারে
+    if (!document.body.classList.contains("dashboard-active") && typeof window.__ektMarkReady === "function") window.__ektMarkReady();
+    if (window.__ektSplashIsResume && typeof window.hideSplashScreen === "function") window.hideSplashScreen();
 }
 
 function updateDashboardPinUI() {
@@ -5433,9 +5437,18 @@ window.EktReact = (function () {
     if (name === "Menu") syncMenu();
     window.scrollTo(0, 0);
   }
+  // Menu (থ্রি-ডট/বার্স) বাটনে প্রথমবার চাপলে মেনু খোলে, আবার চাপলে আগের ট্যাবে ফিরে যায়
+  let prevTab = "Home";
   tabsEl.addEventListener("click", (e) => {
     const b = e.target.closest(".mt-btn");
-    if (b) setTab(b.dataset.tab);
+    if (!b) return;
+    const t = b.dataset.tab;
+    if (t === "Menu") {
+      const menuOpen = current === "Menu" && !profileModalOverlay.classList.contains("active");
+      if (menuOpen) { setTab(prevTab && prevTab !== "Menu" ? prevTab : "Home"); return; }
+      if (current !== "Menu") prevTab = current;
+    }
+    setTab(t);
   });
 
   // ---------- ব্যাজ ----------
@@ -5890,26 +5903,41 @@ window.EktReact = (function () {
     return el;
   }
   const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
-  function imagesReady(root, max) {
-    const imgs = Array.from(root.querySelectorAll("img")).filter((i) => i.src && !i.complete).slice(0, max);
-    return Promise.all(imgs.map((i) => new Promise((r) => { i.addEventListener("load", r, { once: true }); i.addEventListener("error", r, { once: true }); })));
+  const prog = (n) => { if (typeof window.__ektSetProgress === "function") window.__ektSetProgress(n); };
+  const stage = (p, n) => Promise.resolve(p).then(() => prog(n));
+  // ছবিগুলো কতটা লোড হলো সেই অনুযায়ী progress বাড়ে (বেশি ছবি = বেশি সময়)
+  function pendingImages(root, max) {
+    return Array.from(root.querySelectorAll("img")).filter((i) => i.src && !i.complete).slice(0, max);
+  }
+  function waitImages(list, onOne) {
+    return Promise.all(list.map((i) => new Promise((r) => {
+      const done = () => { if (onOne) onOne(); r(); };
+      i.addEventListener("load", done, { once: true });
+      i.addEventListener("error", done, { once: true });
+    })));
   }
   async function preloadEverything() {
     try {
+      prog(25);
       fetchFriendData();
       await withTimeout(Promise.all([
-        loadFeed(true),
-        new Promise((r) => window.loadStoriesRow(r)),
-        friendsReady,
-        loadReels(true),
+        stage(loadFeed(true), 52),
+        stage(new Promise((r) => window.loadStoriesRow(r)), 62),
+        stage(friendsReady, 70),
+        stage(loadReels(true), 78),
       ]), 9000);
+      prog(80);
       renderFriends(); renderChats();
       const first = document.querySelector("#reelsList video");
       const firstReady = first && first.readyState < 2 ? new Promise((r) => { first.addEventListener("loadeddata", r, { once: true }); first.addEventListener("error", r, { once: true }); }) : null;
-      await withTimeout(Promise.all([
-        imagesReady($("tabHome"), 40), imagesReady($("tabFriends"), 30), imagesReady($("tabMessages"), 20), imagesReady($("tabReels"), 10),
-        firstReady,
-      ]), 7000);
+      const imgs = [].concat(
+        pendingImages($("tabHome"), 40), pendingImages($("tabFriends"), 30),
+        pendingImages($("tabMessages"), 20), pendingImages($("tabReels"), 10)
+      );
+      let loaded = 0;
+      const tickImg = () => { loaded++; prog(80 + Math.round(16 * loaded / Math.max(1, imgs.length))); };
+      await withTimeout(Promise.all([waitImages(imgs, tickImg), firstReady]), 7000);
+      prog(97);
     } catch (e) {}
   }
 
@@ -5920,7 +5948,14 @@ window.EktReact = (function () {
     syncMenu();
     refreshBadges();
     // আলাদা লোডিং স্ক্রিন নেই: ইন্ট্রো স্প্ল্যাশের পেছনেই সব লোড হয়, শেষ হলে স্প্ল্যাশ সরে
-    if (!splashDone) { splashDone = true; window.__ektSplashHold = preloadEverything(); }
+    if (!splashDone) {
+      splashDone = true;
+      const p = preloadEverything();
+      window.__ektSplashHold = p;
+      // সব লোড শেষ হলে তবেই স্প্ল্যাশ 100% হয়ে সরবে
+      const mark = () => { if (typeof window.__ektMarkReady === "function") window.__ektMarkReady(); };
+      p.then(mark, mark);
+    }
   };
   // অন্য ডিভাইসে নতুন পোস্ট/স্টোরি হলে Home রিফ্রেশ
   setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden) loadFeed(); }, 45000);
