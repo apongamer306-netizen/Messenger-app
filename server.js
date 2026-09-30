@@ -292,6 +292,46 @@ function syncMediaLinks(p) {
 }
 function syncAllMediaLinks() { Object.keys(profiles).forEach((ph) => syncMediaLinks(profiles[ph])); }
 
+// প্রোফাইল/কভার ছবি আপলোড হলে Photos ট্যাব ও পোস্ট ফিডেও দেখানো
+function publishProfileMediaAsPost(phone, src, host, kindLabel) {
+  if (!phone || !src) return;
+  if (!profiles[phone]) profiles[phone] = {};
+  if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+  if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
+  const ts = Date.now();
+  const itemId = "pm_" + ts.toString(36) + Math.random().toString(36).slice(2, 6);
+  const postId = "pp_" + ts.toString(36) + Math.random().toString(36).slice(2, 6);
+  const caption = kindLabel === "cover" ? "আমার নতুন কভার ছবি" : "আমার নতুন প্রোফাইল ছবি";
+  const item = {
+    id: itemId,
+    kind: "photo",
+    src,
+    host: host || "cdn",
+    name: kindLabel === "cover" ? "cover" : "profile",
+    caption,
+    timestamp: ts,
+    postId,
+    fromProfile: kindLabel === "cover" ? "cover" : "avatar",
+  };
+  const post = {
+    id: postId,
+    text: caption,
+    media: { type: "image", src, host: host || "cdn" },
+    timestamp: ts,
+    likes: [],
+    comments: [],
+    itemId,
+    fromProfile: item.fromProfile,
+  };
+  const keepReels = profiles[phone].items.filter((it) => it && it.kind === "reel");
+  const photos = [item].concat(profiles[phone].items.filter((it) => it && it.kind === "photo")).slice(0, 100);
+  profiles[phone].items = photos.concat(keepReels);
+  profiles[phone].posts.unshift(post);
+  profiles[phone].posts = profiles[phone].posts.slice(0, 100);
+  syncMediaLinks(profiles[phone]);
+}
+
+
 function purgeExpiredStories() {
   const before = stories.length;
   const now = Date.now();
@@ -307,7 +347,49 @@ let bannedUsers = {};        // phone -> { reason, time }
 // ================= অ্যাডমিন প্যানেল =================
 // অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
 // ভ্যারিয়েবল ADMIN_PASSWORD সেট করে এটা পরিবর্তন করা যাবে (নিরাপত্তার জন্য উত্তম)।
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "tawsiya i love you";
+// ⚠️ আগে এখানে একটা ডিফল্ট পাসওয়ার্ড কোডে লেখা ছিল (GitHub-এ সবাই দেখতে পেত)। এখন ডিফল্ট নেই —
+// Render → Environment-এ ADMIN_PASSWORD সেট না করলে একটা এলোমেলো পাসওয়ার্ড তৈরি হয় যেটা কেউ অনুমান করতে পারবে না
+// (অর্থাৎ অ্যাডমিন প্যানেল কার্যত বন্ধ থাকবে)। অ্যাডমিন প্যানেল চালাতে ADMIN_PASSWORD সেট করুন।
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || nodeCrypto.randomBytes(24).toString("hex");
+if (!process.env.ADMIN_PASSWORD) console.warn("⚠️ ADMIN_PASSWORD সেট করা নেই — অ্যাডমিন প্যানেল বন্ধ। Render Environment-এ ADMIN_PASSWORD সেট করুন।");
+
+// ---------- পাসওয়ার্ড হ্যাশ (Node-এর নিজস্ব crypto.scrypt — নতুন কোনো প্যাকেজ লাগে না) ----------
+function hashPassword(pw) {
+  const salt = nodeCrypto.randomBytes(16);
+  const h = nodeCrypto.scryptSync(String(pw), salt, 32);
+  return "sc1$" + salt.toString("hex") + "$" + h.toString("hex");
+}
+function isHashedPassword(v) {
+  return typeof v === "string" && /^sc1\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(v);
+}
+function verifyPassword(pw, stored) {
+  if (typeof stored !== "string" || !stored || pw == null) return false;
+  if (isHashedPassword(stored)) {
+    const parts = stored.split("$");
+    const calc = nodeCrypto.scryptSync(String(pw), Buffer.from(parts[1], "hex"), 32);
+    return nodeCrypto.timingSafeEqual(calc, Buffer.from(parts[2], "hex"));
+  }
+  // পুরোনো (হ্যাশ হয়নি এমন) পাসওয়ার্ড — লগইনের সময় নিজে থেকেই হ্যাশে বদলে যাবে
+  const a = Buffer.from(String(pw));
+  const b = Buffer.from(stored);
+  return a.length === b.length && nodeCrypto.timingSafeEqual(a, b);
+}
+
+// ক্লায়েন্ট থেকে আসা ইউজার-ডেটা মার্জ করার নিরাপদ উপায়:
+// শুধু name/pic/phone নেওয়া হয়। পাসওয়ার্ড শুধু তখনই সেট হয় যখন ওই অ্যাকাউন্টে আগে থেকে পাসওয়ার্ড নেই
+// (নতুন রেজিস্ট্রেশন বা সার্ভার ডেটা হারালে রিকভারি)। আগে যে কেউ অন্যের ফোন নম্বর দিয়ে তার পাসওয়ার্ড বদলে দিতে পারত।
+function mergeClientUser(u) {
+  if (!u || typeof u.phone !== "string" || !u.phone) return null;
+  const existing = users[u.phone] || {};
+  const merged = { ...existing, phone: u.phone };
+  if (typeof u.name === "string") merged.name = u.name.slice(0, 80);
+  if (typeof u.pic === "string") merged.pic = u.pic;
+  if (!existing.password && typeof u.password === "string" && u.password) {
+    merged.password = hashPassword(u.password);
+  }
+  users[u.phone] = merged;
+  return merged;
+}
 
 const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
 const phoneToSocket = {};    // phone -> socket.id
@@ -378,6 +460,16 @@ async function loadData() {
   const raw = await readStoredData();
   if (!raw) return;
   users = raw.users || {};
+  // আগে সেভ হওয়া পুরোনো প্লেইন-টেক্সট পাসওয়ার্ডগুলো একবার হ্যাশে বদলে ফেলা
+  let migrated = 0;
+  Object.keys(users).forEach((p) => {
+    const u = users[p];
+    if (u && typeof u.password === "string" && u.password && !isHashedPassword(u.password)) {
+      u.password = hashPassword(u.password);
+      migrated++;
+    }
+  });
+  if (migrated) { console.log("Password hashed for " + migrated + " existing users."); setTimeout(saveData, 0); }
   friendships = arraysToSets(raw.friendships);
   friendRequests = arraysToSets(raw.friendRequests);
   blockedUsers = arraysToSets(raw.blockedUsers);
@@ -533,14 +625,15 @@ io.on("connection", (socket) => {
         if (typeof callback === "function") callback({ success: false, banned: true });
         return;
       }
-      users[newUser.phone] = { ...(users[newUser.phone] || {}), ...newUser };
+      mergeClientUser(newUser);
       saveData();
     }
     if (typeof callback === "function") callback({ success: true });
   });
 
-  socket.on("login-user", ({ phone, password }, callback) => {
+  socket.on("login-user", (payload, callback) => {
     if (typeof callback !== "function") return;
+    const { phone, password } = payload || {};
     if (bannedUsers[phone]) {
       callback({
         success: false,
@@ -549,9 +642,11 @@ io.on("connection", (socket) => {
       });
       return;
     }
-    const user = users[phone];
-    if (user && user.password === password) {
-      callback({ success: true, user });
+    const user = typeof phone === "string" ? users[phone] : null;
+    if (user && verifyPassword(password, user.password)) {
+      if (!isHashedPassword(user.password)) { user.password = hashPassword(password); saveData(); }
+      // ক্লায়েন্ট আগের মতোই পাসওয়ার্ড সহ ইউজার অবজেক্ট আশা করে (লোকাল ক্যাশের জন্য) — তাই যেটা টাইপ করা হয়েছে সেটাই ফেরত যায়
+      callback({ success: true, user: { ...user, password: String(password) } });
     } else {
       callback({ success: false });
     }
@@ -859,7 +954,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    users[user.phone] = { ...(users[user.phone] || {}), ...user };
+    mergeClientUser(user);
     socketToPhone[socket.id] = user.phone;
     phoneToSocket[user.phone] = socket.id;
 
@@ -902,7 +997,7 @@ io.on("connection", (socket) => {
 
   socket.on("send-friend-request", ({ fromUser, toUserPhone }) => {
     if (!fromUser || !toUserPhone || fromUser.phone === toUserPhone) return;
-    users[fromUser.phone] = { ...(users[fromUser.phone] || {}), ...fromUser };
+    mergeClientUser(fromUser);
     ensureSet(friendRequests, toUserPhone).add(fromUser.phone);
     saveData();
 
@@ -1086,7 +1181,7 @@ io.on("connection", (socket) => {
     socketToRoom[socket.id] = roomCode;
 
     if (user.phone) {
-      users[user.phone] = { ...(users[user.phone] || {}), ...user };
+      mergeClientUser(user);
       phoneToSocket[user.phone] = socket.id;
       socketToPhone[socket.id] = user.phone;
     }
@@ -1173,7 +1268,10 @@ io.on("connection", (socket) => {
     if (!users[phone]) users[phone] = { phone };
     const oldPic = users[phone].pic;
     users[phone].pic = resolved.src;
+    // প্রোফাইল ছবি Photos + পোস্ট ফিডেও দেখাবে
+    publishProfileMediaAsPost(phone, resolved.src, resolved.host, "avatar");
     saveData();
+    try { notifyFriendsOfProfile(phone); } catch (e) {}
     if (oldPic && oldPic !== resolved.src) cleanupMedia([oldPic]);
     if (typeof callback === "function") callback({ success: true, pic: resolved.src });
   });
@@ -1191,7 +1289,10 @@ io.on("connection", (socket) => {
     if (!profiles[phone]) profiles[phone] = {};
     const oldCover = profiles[phone].cover;
     profiles[phone].cover = resolved.src;
+    // কভার ছবি Photos + পোস্ট ফিডেও দেখাবে
+    publishProfileMediaAsPost(phone, resolved.src, resolved.host, "cover");
     saveData();
+    try { notifyFriendsOfProfile(phone); } catch (e) {}
     if (oldCover && oldCover !== resolved.src) cleanupMedia([oldCover]);
     if (typeof callback === "function") callback({ success: true, cover: resolved.src });
   });
@@ -1526,6 +1627,61 @@ io.on("connection", (socket) => {
     // মালিক, তার বন্ধুরা আর কমেন্টকারী — সবার স্ক্রিনে সাথে সাথে কমেন্ট দেখা যাবে
     broadcastItem(t, postId, { comments: o.comments.slice(-100) }, comment.authorPhone);
     reply({ success: true, comment: newComment });
+  });
+
+  // ---------- COMMENT: এডিট / ডিলিট / হাইড ----------
+  socket.on("edit-comment", ({ kind, ownerPhone, postId, commentId, editorPhone, text }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !editorPhone || bannedUsers[editorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const c = o.comments.find((x) => x && x.id === commentId);
+    if (!c || c.authorPhone !== editorPhone) return reply({ success: false, message: "শুধু নিজের কমেন্ট এডিট করা যায়।" });
+    const clean = String(text || "").trim().slice(0, 500);
+    if (!clean) return reply({ success: false, message: "খালি কমেন্ট রাখা যায় না।" });
+    c.text = clean;
+    c.edited = true;
+    c.editedAt = Date.now();
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, editorPhone);
+    reply({ success: true, comment: c, comments: o.comments });
+  });
+
+  socket.on("delete-comment", ({ kind, ownerPhone, postId, commentId, actorPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !actorPhone || bannedUsers[actorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const idx = o.comments.findIndex((x) => x && x.id === commentId);
+    if (idx < 0) return reply({ success: false });
+    const c = o.comments[idx];
+    // কমেন্টকারী নিজে ডিলিট করতে পারে, অথবা পোস্টের মালিক
+    if (c.authorPhone !== actorPhone && t.owner !== actorPhone) {
+      return reply({ success: false, message: "এই কমেন্ট ডিলিট করার অনুমতি নেই।" });
+    }
+    o.comments.splice(idx, 1);
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100), commentCount: o.comments.length }, actorPhone);
+    reply({ success: true, comments: o.comments });
+  });
+
+  socket.on("hide-comment", ({ kind, ownerPhone, postId, commentId, actorPhone, hide }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !actorPhone) return reply({ success: false });
+    // শুধু পোস্টের মালিক হাইড করতে পারে
+    if (t.owner !== actorPhone) return reply({ success: false, message: "শুধু পোস্টের মালিক কমেন্ট হাইড করতে পারে।" });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const c = o.comments.find((x) => x && x.id === commentId);
+    if (!c) return reply({ success: false });
+    c.hidden = hide !== false;
+    c.hiddenBy = actorPhone;
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, actorPhone);
+    reply({ success: true, comment: c, comments: o.comments });
   });
 
   // ---------- SHARE ----------
