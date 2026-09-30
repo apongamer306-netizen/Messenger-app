@@ -230,6 +230,14 @@
     @keyframes spCircleIn{
       to{ opacity:1; transform:scale(1); }
     }
+    /* লোড শেষ না হওয়া পর্যন্ত 99%-এ থেমে ঘুরতে থাকা স্পিনার */
+    .sp-circle{ position:relative; }
+    .sp-circle.waiting::after{
+      content:""; position:absolute; inset:-7px; border-radius:50%;
+      border:3px solid transparent; border-top-color:#22d3ee; border-right-color:#a855f7;
+      animation:spWaitSpin .9s linear infinite;
+    }
+    @keyframes spWaitSpin{ to{ transform:rotate(360deg); } }
     .sp-circle-inner{
       width:78%; height:78%;
       border-radius:50%;
@@ -329,7 +337,17 @@
         }
       };
 
+      // আসল লোড শেষ হওয়ার সিগন্যাল: app.js যখন Home-এর সব ডেটা/ছবি রেডি করে (অথবা লগইন
+      // স্ক্রিন দেখায়) তখন window.__ektMarkReady() কল করে। এর আগে স্প্ল্যাশ কখনো সরবে না।
+      var readyResolve;
+      window.__ektReady = new Promise(function (r) { readyResolve = r; });
+      window.__ektMarkReady = function () { readyResolve(); };
+      setTimeout(readyResolve, 20000); // সেফটি: কিছু আটকে গেলেও ২০ সেকেন্ডের বেশি আটকাবে না
+
       var splashDone = false;
+      var hideRequested = false;
+      var finishing = false;
+      var noTick = false;
       var hideScheduled = false;
       var rafId = 0;
       var titleDone = false;
@@ -381,7 +399,7 @@
       var creditEl = document.getElementById("splashCredit");
       var cursorEl = document.getElementById("splashCursor");
 
-      window.hideSplashScreen = function () {
+      function realHide() {
         if (splashDone) return;
         splashDone = true;
         if (rafId) cancelAnimationFrame(rafId);
@@ -389,7 +407,7 @@
         if (!sp) return;
         var doHide = function () {
           if (sp.classList.contains("splash-hide")) return;
-          if (circleEl) circleEl.style.setProperty("--p", 100);
+          if (circleEl) { circleEl.classList.remove("waiting"); circleEl.style.setProperty("--p", 100); }
           if (pctEl) pctEl.textContent = "100%";
           sp.classList.add("splash-hide");
           setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 900);
@@ -402,10 +420,19 @@
           }
           doHide();
         };
-        // Home-এর ডেটা/ছবি (app.js) পেছনে লোড হচ্ছে — সেটা শেষ হলে তবেই স্প্ল্যাশ সরবে,
-        // যাতে ইউজার আলাদা কোনো লোডিং স্ক্রিন না দেখে সরাসরি তৈরি Home দেখে
-        var hold = window.__ektSplashHold;
-        if (hold && typeof hold.then === "function") hold.then(finish, finish); else finish();
+        finish();
+      }
+
+      // Home-এর ডেটা/ছবি (app.js) পেছনে লোড হচ্ছে — সেটা শেষ হলে তবেই 100% হয়ে স্প্ল্যাশ সরবে,
+      // যাতে ইউজার আলাদা কোনো লোডিং স্ক্রিন না দেখে সরাসরি তৈরি Home দেখে
+      window.hideSplashScreen = function () {
+        if (splashDone || hideRequested) return;
+        hideRequested = true;
+        var go = function () {
+          // ফুল অ্যানিমেশন চলছে → % কে 100 পর্যন্ত মসৃণভাবে পৌঁছাতে দিয়ে তারপর সরাব
+          if (noTick || isResumeSession) realHide(); else finishing = true;
+        };
+        window.__ektReady.then(go, go);
       };
 
       function tryFinish() {
@@ -423,6 +450,7 @@
         if (pctEl) pctEl.textContent = "100%";
         if (creditEl) creditEl.textContent = "Developed by Eyamin";
         titleDone = creditDone = chargeDone = true;
+        noTick = true;
         setTimeout(window.hideSplashScreen, 400);
         return;
       }
@@ -468,37 +496,51 @@
       /* Circular % fill 0→100 */
       var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
       var et = conn && conn.effectiveType ? conn.effectiveType : "";
-      var duration = 4000;
+      var duration = 4000; // (আর ব্যবহৃত হয় না)
       if (et === "slow-2g" || et === "2g") duration = 5600;
       else if (et === "3g") duration = 4600;
       else if (et === "4g") duration = 3600;
 
-      var loadReady = document.readyState === "complete";
-      if (!loadReady) window.addEventListener("load", function () { loadReady = true; });
-      var startedAt = performance.now();
-      var lastPct = -1;
+      /* আসল লোডিং অনুযায়ী 0→100: প্রতিটা ধাপ (ফিড, স্টোরি, ফ্রেন্ড, রিল, ছবি) শেষ হলে
+         টার্গেট বাড়ে; বেশি ডেটা/ছবি থাকলে স্বাভাবিকভাবেই বেশি সময় লাগে। % কখনো এক জায়গায়
+         আটকে থাকে না — ধাপের মাঝেও ধীরে ধীরে এগোতে থাকে, আর 100 হয় শুধু সব লোড শেষে। */
+      var targetPct = 4, stageTs = performance.now(), shownPct = 0;
+      window.__ektSetProgress = function (n) {
+        if (n > targetPct && n < 100) { targetPct = n; stageTs = performance.now(); }
+      };
+      if (document.readyState === "complete") window.__ektSetProgress(18);
+      else window.addEventListener("load", function () { window.__ektSetProgress(18); });
 
-      function easeOut(t) { return 1 - Math.pow(1 - t, 2.5); }
+      var lastPct = -1, lastTs = performance.now();
 
       function tick(now) {
         if (splashDone) return;
-        var elapsed = now - startedAt;
-        var t = Math.min(1, elapsed / duration);
-        var p = easeOut(t) * 100;
-        var shown = Math.round(p);
+        var dt = Math.min(100, now - lastTs); lastTs = now;
+        var goal, rate;
+        if (finishing) { goal = 100; rate = 140; }
+        else {
+          // ধাপের ভেতরেও ধীরে এগোবে (সর্বোচ্চ ~9 পয়েন্ট), তবে 97-এর বেশি না
+          var creep = 9 * (1 - Math.exp(-(now - stageTs) / 5000));
+          goal = Math.min(97, targetPct + creep);
+          rate = 450;
+        }
+        shownPct += (goal - shownPct) * (1 - Math.exp(-dt / rate));
+        if (finishing && shownPct > 99.4) shownPct = 100;
+        var shown = Math.round(shownPct);
         if (shown !== lastPct) {
           lastPct = shown;
-          if (circleEl) circleEl.style.setProperty("--p", p);
+          if (circleEl) circleEl.style.setProperty("--p", shownPct);
           if (pctEl) pctEl.textContent = shown + "%";
         }
-        if (t >= 1 || elapsed > 7000) {
-          if (circleEl) circleEl.style.setProperty("--p", 100);
-          if (pctEl) pctEl.textContent = "100%";
-          chargeDone = true;
-          tryFinish();
+        if (finishing && shownPct >= 100) {
+          setTimeout(realHide, 220);
           return;
         }
         rafId = requestAnimationFrame(tick);
+      }
+      rafId = requestAnimationFrame(tick);
+      // ব্র্যান্ডিং অ্যানিমেশনের ন্যূনতম সময় (এর মধ্যে % চলতেই থাকে)
+      setTimeout(function () { chargeDone = true; tryFinish(); }, 3200);
       }
       rafId = requestAnimationFrame(tick);
 
@@ -652,6 +694,12 @@
       </div>
 
       <section id="tabHome" class="tab-panel active">
+        <div class="home-composer" id="homeComposer">
+          <img id="homeComposerAvatar" src="https://via.placeholder.com/40" alt="">
+          <button type="button" id="homeComposerBtn" class="hc-input">What's on your mind?</button>
+          <button type="button" class="hc-ico" id="homeComposerPhoto" style="color:#10b981" aria-label="Photo"><i class="fa-solid fa-image"></i></button>
+          <button type="button" class="hc-ico" id="homeComposerVideo" style="color:#f43f5e" aria-label="Video"><i class="fa-solid fa-video"></i></button>
+        </div>
       <div class="stories-row" id="storiesRow">
         <button type="button" class="story-card story-add" id="addStoryBtn">
           <img id="storyAddAvatar" src="https://via.placeholder.com/100" alt="">
@@ -660,12 +708,6 @@
         </button>
       </div>
 
-        <div class="home-composer" id="homeComposer">
-          <img id="homeComposerAvatar" src="https://via.placeholder.com/40" alt="">
-          <button type="button" id="homeComposerBtn" class="hc-input">What's on your mind?</button>
-          <button type="button" class="hc-ico" id="homeComposerPhoto" style="color:#10b981" aria-label="Photo"><i class="fa-solid fa-image"></i></button>
-          <button type="button" class="hc-ico" id="homeComposerVideo" style="color:#f43f5e" aria-label="Video"><i class="fa-solid fa-video"></i></button>
-        </div>
         <div id="homeFeed" class="home-feed"></div>
       </section>
 
