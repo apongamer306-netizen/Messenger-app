@@ -1602,6 +1602,11 @@ socket.on("connect", () => {
   socket.emit("register-user", currentUser, () => {});
   fetchFriendData();
   healMyProfileIfNeeded(); // সার্ভার ডেটা হারালে এই ডিভাইস থেকে "About" ফিরিয়ে আনা
+  if (window.__ektPreloadDone) {
+    // নেট কেটে/সার্ভার ঘুমিয়ে আবার কানেক্ট হলে Home-এর ডেটা নিজে থেকেই ফিরে আসবে
+    try { document.dispatchEvent(new Event("ekt-feed-refresh")); } catch (e) {}
+    try { if (typeof window.loadStoriesRow === "function") window.loadStoriesRow(); } catch (e) {}
+  }
   if (currentRoom) {
     socket.emit("join-room", { roomCode: currentRoom, user: currentUser, peerId: myPeerId });
   }
@@ -2841,12 +2846,13 @@ function openProfile(phone, fallback) {
   pmComposerText.style.height = "auto";
   pmComposerPreview.style.display = "none";
   pmComposerPreview.innerHTML = "";
-  profileViewState = { phone, isMe, data: fallback || {}, tab: "posts" };
+  profileViewState = { phone, isMe, data: (isMe && window.__ektMyProfile) || fallback || {}, tab: "posts" };
   profileModalOverlay.classList.add("active");
   renderProfileAbout();
   switchProfileTab("posts");
   socket.emit("get-profile", { phone, viewerPhone: currentUser.phone }, (data) => {
     if (!data) return;
+    if (isMe) window.__ektMyProfile = data;
     profileViewState.data = data;
     document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
     document.getElementById("pmName").textContent = data.name || "Profile";
@@ -5847,7 +5853,7 @@ window.EktReact = (function () {
           feedPosts = res.posts || [];
           renderFeed();
         }
-        resolve();
+        resolve(!!(res && res.success));
       });
     });
   }
@@ -6248,16 +6254,52 @@ window.EktReact = (function () {
       i.addEventListener("error", done, { once: true });
     })));
   }
+  // সকেট কানেক্ট না হওয়া পর্যন্ত অপেক্ষা (Render ঘুম থেকে উঠতে সময় নিলেও ডেটা ছাড়া 100% হবে না)
+  function waitSocket(ms) {
+    return new Promise((resolve) => {
+      if (socket.connected) return resolve(true);
+      const t = setTimeout(() => { socket.off("connect", on); resolve(false); }, ms);
+      const on = () => { clearTimeout(t); resolve(true); };
+      socket.once("connect", on);
+    });
+  }
+  const TIMED_OUT = Symbol("timeout");
+  const raceMs = (p, ms) => Promise.race([Promise.resolve(p), new Promise((r) => setTimeout(() => r(TIMED_OUT), ms))]);
+  // সার্ভার সাড়া না দিলে বা ব্যর্থ হলে আবার চেষ্টা করে — একবার ফেল করলেই খালি Home দেখানো হয় না
+  async function retryLoad(fn, ms, tries) {
+    for (let i = 0; i < tries; i++) {
+      if (!socket.connected) await waitSocket(15000);
+      const r = await raceMs(fn(), ms);
+      if (r !== TIMED_OUT && r !== false) return r;
+    }
+    return false;
+  }
+  function fetchMyProfile() {
+    const m = me();
+    if (!m) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      socket.emit("get-profile", { phone: m.phone, viewerPhone: m.phone }, (d) => {
+        if (d) window.__ektMyProfile = d; // প্রোফাইল খুললে সাথে সাথে এটাই দেখাবে
+        resolve(!!d);
+      });
+    });
+  }
+  window.__ektPreloadDone = false;
   async function preloadEverything() {
     try {
+      prog(20);
+      await waitSocket(45000);
       prog(25);
       fetchFriendData();
-      await withTimeout(Promise.all([
-        stage(loadFeed(true), 52),
-        stage(new Promise((r) => window.loadStoriesRow(r)), 62),
-        stage(friendsReady, 70),
-        stage(loadReels(true), 78),
-      ]), 9000);
+      // যার ডেটা আছে তার জন্য: সব ডেটা না আসা পর্যন্ত অপেক্ষা (প্রতিটা ধাপ ৩ বার পর্যন্ত চেষ্টা)
+      // যার ডেটা নেই তার জন্য: এগুলো দ্রুত শেষ হয়, আর index.html স্প্ল্যাশ নিজেই ৫ সেকেন্ড ধরে রাখে
+      await Promise.all([
+        stage(retryLoad(() => loadFeed(true), 12000, 3), 52),
+        stage(retryLoad(() => new Promise((r) => window.loadStoriesRow(() => r(true))), 12000, 2), 62),
+        stage(raceMs(friendsReady, 20000), 70),
+        stage(retryLoad(() => Promise.resolve(loadReels(true)).then(() => true), 15000, 2), 78),
+        stage(retryLoad(fetchMyProfile, 12000, 2), 80),
+      ]);
       prog(80);
       renderFriends(); renderChats();
       const first = document.querySelector("#reelsList video");
@@ -6268,9 +6310,10 @@ window.EktReact = (function () {
       );
       let loaded = 0;
       const tickImg = () => { loaded++; prog(80 + Math.round(16 * loaded / Math.max(1, imgs.length))); };
-      await withTimeout(Promise.all([waitImages(imgs, tickImg), firstReady]), 7000);
+      await raceMs(Promise.all([waitImages(imgs, tickImg), firstReady && raceMs(firstReady, 8000)]), 25000);
       prog(97);
     } catch (e) {}
+    window.__ektPreloadDone = true;
   }
 
   window.__tabsOnDashboard = function () {
