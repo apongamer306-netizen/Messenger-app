@@ -481,6 +481,11 @@ async function loadData() {
   stories = raw.stories || [];
   bannedUsers = raw.bannedUsers || {};
   console.log("Saved data loaded successfully.");
+  try {
+    const postCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).posts) || []).length, 0);
+    const itemCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).items) || []).length, 0);
+    console.log(`📊 Loaded: users=${Object.keys(users).length}, profiles=${Object.keys(profiles).length}, posts=${postCount}, photos=${itemCount}, stories=${stories.length}`);
+  } catch (e) {}
 }
 
 function buildPayload() {
@@ -519,6 +524,7 @@ async function persistPayload() {
     if (ops.length) {
       await mongoCol.bulkWrite(ops);
       Object.assign(lastSavedJson, pending);
+      console.log("💾 Saved to MongoDB:", Object.keys(pending).join(", "));
     }
     return;
   }
@@ -692,6 +698,7 @@ io.on("connection", (socket) => {
       posts.forEach((post) => out.push({ ...post, reacts: reactsOf(post), ...ownerInfo(p) }));
     });
     out.sort((a, b) => b.timestamp - a.timestamp);
+    if (!out.length) console.log(`get-feed: 0 posts for ${phone} (friends=${allowed.length - 1}, ownPosts=${(((profiles[phone] || {}).posts) || []).length}, userExists=${!!users[phone]})`);
     callback({ success: true, posts: out.slice(0, 40) });
   });
 
