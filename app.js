@@ -5370,14 +5370,28 @@ window.EktReact = (function () {
     });
   }
 
+  const storyCacheKey = () => { const u = me(); return u ? "ektStoriesCache_" + u.phone : null; };
+  let storiesConfirmed = false;
+  window.__primeStories = function () {
+    const k = storyCacheKey();
+    if (k && !storiesConfirmed && !allStories.length) {
+      try {
+        const c = JSON.parse(localStorage.getItem(k) || "[]");
+        if (Array.isArray(c)) { allStories = c.filter((st) => st && st.expires > Date.now()); buildGroups(); }
+      } catch (e) {}
+    }
+    renderRow(); // নিজের ছবিসহ "Create story" কার্ড সাথে সাথে দেখায়
+  };
   window.loadStoriesRow = function (cb) {
     const u = me();
     if (!u || typeof socket === "undefined") { if (cb) cb(); return; }
     socket.emit("get-stories", { phone: u.phone }, (res) => {
       if (!res || !res.success) { if (cb) cb(); return; }
+      storiesConfirmed = true;
       allStories = res.stories || [];
       buildGroups();
       renderRow();
+      try { const s = JSON.stringify(allStories); if (s.indexOf('"data:') === -1) localStorage.setItem(storyCacheKey(), s); } catch (e) {}
       if (cb) cb();
     });
   };
@@ -5842,6 +5856,24 @@ window.EktReact = (function () {
   };
   $("pmCloseBtn").addEventListener("click", () => setTimeout(() => { if (current === "Home") loadFeed(); }, 350));
 
+  // ---- ক্যাশ: শেষবার দেখা ফিড ফোনে রাখা হয়, অ্যাপ খুললেই সাথে সাথে দেখায় (সার্ভার ঘুমিয়ে থাকলেও) ----
+  let feedConfirmed = false; // সার্ভার একবার সত্যিকারের উত্তর দিলে true — তার আগে "কোনো পোস্ট নেই" লেখা দেখানো হয় না
+  const feedCacheKey = () => { const m = me(); return m ? "ektFeedCache_" + m.phone : null; };
+  function saveFeedCache() {
+    const k = feedCacheKey(); if (!k) return;
+    try {
+      const slim = JSON.stringify(feedPosts.slice(0, 20));
+      if (slim.indexOf('"data:') === -1) localStorage.setItem(k, slim);
+    } catch (e) {}
+  }
+  window.__primeFeed = function () {
+    const k = feedCacheKey(); if (!k || feedPosts.length || feedConfirmed) return;
+    try {
+      const c = JSON.parse(localStorage.getItem(k) || "[]");
+      if (Array.isArray(c) && c.length) { feedPosts = c; renderFeed(); }
+    } catch (e) {}
+    const m = me(); if (m && $("homeComposerAvatar")) $("homeComposerAvatar").src = oi(m.pic, 96, true);
+  };
   const feedSig = (l) => l.map((p) => p.id + ":" + (p.likes || []).length + ":" + (p.comments || []).length + ":" + EktReact.sig(p)).join("|");
   function loadFeed(force) {
     const m = me();
@@ -5849,9 +5881,14 @@ window.EktReact = (function () {
     $("homeComposerAvatar").src = oi(m.pic, 96, true);
     return new Promise((resolve) => {
       socket.emit("get-feed", { phone: m.phone }, (res) => {
-        if (res && res.success && (force || feedSig(res.posts || []) !== feedSig(feedPosts) || !$("homeFeed").children.length)) {
-          feedPosts = res.posts || [];
-          renderFeed();
+        if (res && res.success) {
+          const first = !feedConfirmed;
+          feedConfirmed = true;
+          if (force || first || feedSig(res.posts || []) !== feedSig(feedPosts) || !$("homeFeed").children.length) {
+            feedPosts = res.posts || [];
+            renderFeed();
+          }
+          saveFeedCache();
         }
         resolve(!!(res && res.success));
       });
@@ -5915,6 +5952,7 @@ window.EktReact = (function () {
   function renderFeed() {
     const box = $("homeFeed");
     if (!feedPosts.length) {
+      if (!feedConfirmed) { box.innerHTML = ""; return; } // সার্ভারের উত্তর আসার আগে ভুল করে "পোস্ট নেই" দেখাবে না
       box.innerHTML = `<div class="tp-empty"><i class="fa-regular fa-newspaper"></i><p>এখনো কোনো পোস্ট নেই। প্রথম পোস্টটি আপনিই করুন, অথবা বন্ধু যোগ করুন।</p></div>`;
       return;
     }
@@ -6279,7 +6317,14 @@ window.EktReact = (function () {
     if (!m) return Promise.resolve(true);
     return new Promise((resolve) => {
       socket.emit("get-profile", { phone: m.phone, viewerPhone: m.phone }, (d) => {
-        if (d) window.__ektMyProfile = d; // প্রোফাইল খুললে সাথে সাথে এটাই দেখাবে
+        if (d) {
+          window.__ektMyProfile = d; // প্রোফাইল খুললে সাথে সাথে এটাই দেখাবে
+          try {
+            const slim = Object.assign({}, d, { posts: (d.posts || []).slice(0, 30), items: (d.items || []).slice(0, 60) });
+            const s = JSON.stringify(slim);
+            if (s.indexOf('"data:') === -1) localStorage.setItem("ektMyProfileFull_" + m.phone, s);
+          } catch (e) {}
+        }
         resolve(!!d);
       });
     });
@@ -6288,6 +6333,13 @@ window.EktReact = (function () {
   async function preloadEverything() {
     try {
       prog(20);
+      // আগের সেভ করা ডেটা সাথে সাথে বসিয়ে দেওয়া (সার্ভারের জন্য অপেক্ষা না করেই)
+      try {
+        const m0 = me();
+        if (m0 && !window.__ektMyProfile) { const pc = localStorage.getItem("ektMyProfileFull_" + m0.phone); if (pc) window.__ektMyProfile = JSON.parse(pc); }
+      } catch (e) {}
+      try { window.__primeFeed && window.__primeFeed(); } catch (e) {}
+      try { window.__primeStories && window.__primeStories(); } catch (e) {}
       await waitSocket(45000);
       prog(25);
       fetchFriendData();
