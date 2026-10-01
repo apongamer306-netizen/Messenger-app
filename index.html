@@ -342,7 +342,7 @@
       var readyResolve;
       window.__ektReady = new Promise(function (r) { readyResolve = r; });
       window.__ektMarkReady = function () { readyResolve(); };
-      setTimeout(readyResolve, 20000); // সেফটি: কিছু আটকে গেলেও ২০ সেকেন্ডের বেশি আটকাবে না
+      setTimeout(readyResolve, 75000); // সেফটি: সার্ভার জাগতে/ডেটা আনতে দেরি হলেও অপেক্ষা করবে, শুধু একেবারে আটকে গেলে ৭৫ সেকেন্ডে ছাড়বে
 
       var splashDone = false;
       var hideRequested = false;
