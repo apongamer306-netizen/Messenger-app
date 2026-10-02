@@ -344,6 +344,8 @@ setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
 let bannedUsers = {};        // phone -> { reason, time }
 let deletedHashes = {};      // sha256(id) -> 1  (শুধু হ্যাশ — মুছে ফেলা অ্যাকাউন্ট যেন পুরোনো ডিভাইস থেকে আবার তৈরি না হয়; আর কোনো তথ্য রাখা হয় না)
+let shortsData = {};         // YouTube ভিডিও আইডি -> { t, c, likes:[phone], comments:[...] }  (শুধু যেগুলোতে লাইক/কমেন্ট পড়েছে)
+let shortsPrefs = {};        // phone -> { w:{শব্দ:স্কোর}, ch:{চ্যানেল:স্কোর} }  (কার কী পছন্দ — সাজেশনের জন্য)
 let phoneAliases = {};       // পুরোনো নম্বর -> নতুন নম্বর (নম্বর বদলালে পুরোনো ডিভাইস যেন নকল অ্যাকাউন্ট না বানায়)
 
 // ================= অ্যাডমিন প্যানেল =================
@@ -606,6 +608,8 @@ function purgeUserCompletely(phone) {
   Object.keys(directThemes).forEach((key) => { if (key.split("|").includes(phone)) delete directThemes[key]; });
 
   stories = stories.filter((st) => st.phone !== phone);
+  delete shortsPrefs[phone];
+  Object.keys(shortsData).forEach((id) => { const d = shortsData[id]; d.likes = (d.likes || []).filter((x) => x !== phone); d.comments = (d.comments || []).filter((c) => c.authorPhone !== phone); });
   stories.forEach((st) => {
     if (Array.isArray(st.views)) st.views = st.views.filter((x) => x !== phone);
     if (Array.isArray(st.likes)) st.likes = st.likes.filter((x) => x !== phone);
@@ -854,6 +858,8 @@ async function loadData() {
   bannedUsers = raw.bannedUsers || {};
   deletedHashes = raw.deletedIds || {};
   phoneAliases = raw.phoneAliases || {};
+  shortsData = raw.shortsData || {};
+  shortsPrefs = raw.shortsPrefs || {};
   try { rebuildPidMap(); setTimeout(saveData, 0); } catch (e) { console.warn("pid init:", e.message); }
   console.log("Saved data loaded successfully.");
   try {
@@ -878,6 +884,8 @@ function buildPayload() {
     bannedUsers,
     deletedIds: deletedHashes,
     phoneAliases,
+    shortsData,
+    shortsPrefs,
   };
 }
 
@@ -1035,14 +1043,16 @@ async function ytJson(url) {
   if (!r.ok) throw new Error((j.error && j.error.message) || "YouTube API status " + r.status);
   return j;
 }
-function refreshShorts() {
+function refreshShorts(extraTopics) {
   if (!YOUTUBE_API_KEY) return Promise.resolve();
   if (shortsBusy) return shortsBusy;
   if (Date.now() - shortsFailAt < 10 * 60 * 1000) return Promise.resolve();
   shortsBusy = (async () => {
     try {
       // প্রতিবার ৪টা আলাদা টপিক — সব ধরন ঘুরে ঘুরে মিশবে
-      const picks = SHORTS_TOPICS.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+      // কারো পছন্দের টপিক থাকলে (সর্বোচ্চ ২টা) সেগুলো আগে, বাকিটা এলোমেলো
+      const extra = Array.isArray(extraTopics) ? extraTopics.slice(0, 2) : [];
+      const picks = extra.concat(SHORTS_TOPICS.slice().sort(() => Math.random() - 0.5)).slice(0, 4);
       const found = new Map();
       for (const topic of picks) {
         const lm = /^(bn|hi|en|ur|ar):(.*)$/.exec(topic);
@@ -1095,6 +1105,70 @@ function refreshShorts() {
     }
   })();
   return shortsBusy;
+}
+
+// ---------- Shorts: পছন্দ শেখা (লাইক/কমেন্ট/বেশি দেখা) ----------
+const SHORT_STOP = new Set(["shorts", "short", "video", "videos", "viral", "new", "best", "the", "and", "for", "with", "you", "your", "this", "that", "from", "are", "not", "youtube", "ytshorts", "subscribe", "like", "comment", "share", "official", "full", "part", "reels", "trending"]);
+function shortWords(title) {
+  const out = new Set();
+  String(title || "").toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).forEach((w) => {
+    if (w.length >= 3 && w.length <= 24 && !SHORT_STOP.has(w) && !/^\d+$/.test(w)) out.add(w);
+  });
+  return Array.from(out).slice(0, 12);
+}
+function pruneMap(m, keep) {
+  const ks = Object.keys(m);
+  if (ks.length <= keep * 1.5) return;
+  ks.sort((a, b) => m[b] - m[a]).slice(keep).forEach((k) => { delete m[k]; });
+}
+function bumpShortPref(phone, title, channel, w) {
+  if (!phone || !users[phone]) return;
+  const p = shortsPrefs[phone] || (shortsPrefs[phone] = { w: {}, ch: {} });
+  shortWords(title).forEach((x) => { p.w[x] = Math.max(0, (p.w[x] || 0) + w); if (!p.w[x]) delete p.w[x]; });
+  const c = String(channel || "").slice(0, 60);
+  if (c) { p.ch[c] = Math.max(0, (p.ch[c] || 0) + w); if (!p.ch[c]) delete p.ch[c]; }
+  pruneMap(p.w, 80);
+  pruneMap(p.ch, 30);
+  saveData();
+}
+function shortScore(p, v) {
+  if (!p) return 0;
+  let sc = 0;
+  shortWords(v.title).forEach((x) => { sc += p.w[x] || 0; });
+  sc += (p.ch[v.channel] || 0) * 1.5;
+  return sc;
+}
+function topShortWords(p, n) {
+  if (!p) return [];
+  return Object.keys(p.w).filter((k) => p.w[k] >= 3).sort((a, b) => p.w[b] - p.w[a]).slice(0, n);
+}
+// কারো পছন্দের টপিক ধরে YouTube-এ নতুন সার্চ: প্রতিটা শব্দ ৩ ঘণ্টায় একবার, আর দিনে সর্বোচ্চ ৬ বার (কোটা বাঁচাতে)
+const interestFetchedAt = {};
+const interestBudget = { day: "", n: 0 };
+function interestTopicsFor(p) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (interestBudget.day !== today) { interestBudget.day = today; interestBudget.n = 0; }
+  if (interestBudget.n >= 6) return [];
+  const out = topShortWords(p, 2).filter((t) => Date.now() - (interestFetchedAt[t] || 0) > 3 * 60 * 60 * 1000);
+  if (!out.length) return [];
+  out.forEach((t) => { interestFetchedAt[t] = Date.now(); });
+  interestBudget.n++;
+  return out.map((t) => t + " shorts");
+}
+const YT_ID_OK = /^[\w-]{11}$/;
+function shortInfo(id, phone) {
+  const d = shortsData[id];
+  return { id, likes: d ? (d.likes || []).length : 0, comments: d ? (d.comments || []).length : 0, my: !!(d && phone && (d.likes || []).includes(phone)) };
+}
+function shortEntry(id, title, channel) {
+  const d = shortsData[id] || (shortsData[id] = { t: "", c: "", likes: [], comments: [] });
+  if (title && !d.t) d.t = String(title).slice(0, 150);
+  if (channel && !d.c) d.c = String(channel).slice(0, 60);
+  return d;
+}
+function shortCleanup(id) {
+  const d = shortsData[id];
+  if (d && !(d.likes || []).length && !(d.comments || []).length) delete shortsData[id];
 }
 
 io.on("connection", (socket) => {
@@ -1367,15 +1441,88 @@ io.on("connection", (socket) => {
     const reply = (r) => { if (typeof callback === "function") callback(r); };
     if (!YOUTUBE_API_KEY) return reply({ success: false, error: "no_key" });
     const seen = new Set(Array.isArray(data && data.seen) ? data.seen.slice(-300).map(String) : []);
+    const ph = String((data && data.phone) || "");
+    const pref = users[ph] ? shortsPrefs[ph] : null;
     const stale = Date.now() - shortsAt > 6 * 60 * 60 * 1000;
     let fresh = shortsPool.filter((v) => !seen.has(v.id));
-    if (!shortsPool.length || !fresh.length) await refreshShorts();
-    else if (stale || fresh.length < 12) refreshShorts(); // পেছনে চলবে, অপেক্ষা করাবে না
+    const mine = pref ? interestTopicsFor(pref) : [];
+    if (!shortsPool.length || !fresh.length) await refreshShorts(mine);
+    else if (stale || fresh.length < 12 || mine.length) refreshShorts(mine); // পেছনে চলবে, অপেক্ষা করাবে না
     fresh = shortsPool.filter((v) => !seen.has(v.id));
     if (!shortsPool.length) return reply({ success: false, error: shortsErr ? "api_error" : "empty", detail: shortsErr });
     const list = fresh.length ? fresh : shortsPool; // সব দেখা হয়ে গেলে আবার শুরু
-    const out = list.slice().sort(() => Math.random() - 0.5).slice(0, 12);
+    // পছন্দের সাথে মিললে আগে আসবে, তবে কিছুটা এলোমেলোও থাকবে যেন একঘেয়ে না হয়
+    const out = list
+      .map((v) => ({ v, k: Math.min(shortScore(pref, v), 12) + Math.random() * 6 }))
+      .sort((x, y) => y.k - x.k)
+      .slice(0, 12)
+      .map((x) => x.v);
     reply({ success: true, shorts: out });
+  });
+
+  // ---------- Shorts: লাইক / কমেন্ট / পছন্দ ----------
+  socket.on("short-state", ({ ids, phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const list = (Array.isArray(ids) ? ids : []).slice(0, 40).filter((id) => YT_ID_OK.test(String(id))).map((id) => shortInfo(String(id), String(phone || "")));
+    callback({ success: true, list });
+  });
+
+  socket.on("short-like", ({ id, phone, like, title, channel }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    if (!YT_ID_OK.test(id) || !users[phone] || bannedUsers[phone]) return reply({ success: false });
+    const d = shortEntry(id, title, channel);
+    const has = d.likes.includes(phone);
+    const want = like !== false;
+    if (want && !has) { d.likes.push(phone); bumpShortPref(phone, title || d.t, channel || d.c, 3); }
+    else if (!want && has) { d.likes = d.likes.filter((x) => x !== phone); bumpShortPref(phone, title || d.t, channel || d.c, -3); }
+    shortCleanup(id);
+    saveData();
+    reply(Object.assign({ success: true }, shortInfo(id, phone)));
+  });
+
+  socket.on("short-comments", ({ id }, callback) => {
+    if (typeof callback !== "function") return;
+    id = String(id || "");
+    if (!YT_ID_OK.test(id)) return callback({ success: false });
+    const d = shortsData[id];
+    callback({ success: true, comments: d ? (d.comments || []).filter((c) => !bannedUsers[c.authorPhone]).slice(-100) : [] });
+  });
+
+  socket.on("short-comment", ({ id, phone, text, title, channel }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    const clean = String(text || "").trim().slice(0, 500);
+    if (!YT_ID_OK.test(id) || !users[phone] || bannedUsers[phone] || !clean) return reply({ success: false });
+    const d = shortEntry(id, title, channel);
+    const u = users[phone];
+    const c = { id: "cm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), authorPhone: phone, authorName: u.name, authorPic: u.pic, text: clean, timestamp: Date.now() };
+    d.comments.push(c);
+    if (d.comments.length > 300) d.comments = d.comments.slice(-300);
+    bumpShortPref(phone, title || d.t, channel || d.c, 2);
+    saveData();
+    reply({ success: true, comment: c, count: d.comments.length });
+  });
+
+  socket.on("short-comment-delete", ({ id, commentId, phone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    const d = shortsData[id];
+    if (!d || !users[phone]) return reply({ success: false });
+    const i = d.comments.findIndex((c) => c && c.id === commentId && c.authorPhone === phone); // শুধু নিজের কমেন্ট
+    if (i < 0) return reply({ success: false });
+    d.comments.splice(i, 1);
+    const count = d.comments.length;
+    shortCleanup(id);
+    saveData();
+    reply({ success: true, count });
+  });
+
+  // কয়েক সেকেন্ড ধরে দেখলে ছোট সংকেত (লাইকের চেয়ে কম ওজন)
+  socket.on("short-signal", ({ phone, title, channel }) => {
+    phone = String(phone || "");
+    if (!users[phone] || bannedUsers[phone]) return;
+    bumpShortPref(phone, title, channel, 1);
   });
 
   // ---------- রিপোর্ট সিস্টেম ----------
