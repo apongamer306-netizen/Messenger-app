@@ -2345,6 +2345,14 @@ textarea.profile-edit-field { resize: vertical; min-height: 64px; font-family: i
   white-space: nowrap;
   line-height: 1.4;
 }
+/* মূল কারণ: ফাইলের শুরুর `* { font-family: Poppins; font-style: italic }` রুল ভেতরের span-গুলোতেও
+   সরাসরি লাগছিল, তাই Pacifico-র বদলে ইটালিক Poppins দেখাত। এখানে স্প্যানগুলোতে আলাদা করে ঠিক করা হলো। */
+.dev-credit, .dev-credit *,
+.sp-credit, .sp-credit * {
+  font-family: 'Pacifico', 'Hind Siliguri', cursive;
+  font-style: normal;
+  font-weight: 400;
+}
 .dev-credit-sizer { visibility: hidden; }
 .dev-credit-type {
   position: absolute;
@@ -3095,3 +3103,22 @@ body.dashboard-active .profile-modal {
 .pm-locked-box i { font-size: 30px; color: var(--text-3, #8a8d91); }
 .pm-locked-box b { font-size: 15px; }
 .pm-locked-box span { font-size: 12.5px; color: var(--text-3, #8a8d91); line-height: 1.5; max-width: 280px; }
+
+
+/* ===== প্রোফাইল ট্যাব সারির ⋯ মেনু (Copy link) ===== */
+.profile-tabs-row { display: flex; align-items: center; gap: 8px; margin: 16px 0 14px; }
+.profile-tabs-row .profile-tabs { margin: 0; flex: 1; min-width: 0; }
+.pm-more-wrap { position: relative; flex: none; }
+.pm-more-wrap .dots-btn { width: 38px; height: 38px; }
+.pm-more-wrap .direct-dropdown-menu { z-index: 200; min-width: 180px; }
+
+/* ===== Settings: Personal details / অপশন-শিট / ডিভাইস পপআপ ===== */
+.stg-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 14px; margin-bottom: 8px; border: 1.5px dashed var(--line-2, var(--line)); border-radius: 16px; background: transparent; color: var(--brand, #4f8cff); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.stg-add:hover { background: var(--surface-2, rgba(127,127,127,.1)); }
+.stg-add i { font-style: normal; }
+.stg-sheet { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 10px; }
+.stg-sheet-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2, var(--surface)); color: var(--text); font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; text-align: left; }
+.stg-sheet-btn i { width: 18px; text-align: center; color: var(--text-2); }
+.stg-sheet-btn.danger, .stg-sheet-btn.danger i { color: #ef4444; }
+.stg-dev-card { max-width: 440px; }
+.stg-dev-list { max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
