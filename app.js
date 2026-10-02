@@ -6378,6 +6378,7 @@ window.EktReact = (function () {
   const reelSig = (l) => l.map((r) => r.id).join("|");
   function pauseReels() {
     document.querySelectorAll("#reelsList video").forEach((v) => v.pause());
+    document.querySelectorAll("#shortsList .short-item").forEach((it) => { try { endWatch(it); } catch (er) {} it._active = false; it._pre = false; });
     document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); // Shorts-এর চালু প্লেয়ার বন্ধ
   }
   function renderReels(list) {
@@ -6423,23 +6424,28 @@ window.EktReact = (function () {
   function ytCmd(frame, func, args) {
     try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: args || [] }), "*"); } catch (e) {}
   }
-  // playlist প্যারামিটার দিলে YouTube মাঝখানে আগের/পরের বাটন দেখায় — তাই সেটা বাদ; লুপ নিজেরা করি (শেষ হলে আবার শুরু)
+  // লুপ নিজেরা করি (playlist প্যারামিটার দিলে YouTube মাঝখানে আগের/পরের বাটন দেখায়)
   window.addEventListener("message", (e) => {
     if (!e.origin || e.origin.indexOf("youtube") === -1) return;
     let d = e.data;
     if (typeof d === "string") { try { d = JSON.parse(d); } catch (er) { return; } }
-    if (d && d.event === "onStateChange" && d.info === 0) {
-      document.querySelectorAll("#shortsList iframe").forEach((f) => {
-        if (f.contentWindow === e.source) { ytCmd(f, "seekTo", [0, true]); ytCmd(f, "playVideo"); }
-      });
-    }
+    if (!d || d.event !== "onStateChange") return;
+    document.querySelectorAll("#shortsList iframe").forEach((f) => {
+      if (f.contentWindow !== e.source) return;
+      if (d.info === 1 && !f._playAt) f._playAt = Date.now();
+      if (d.info === 0) {
+        const it = f.closest(".short-item");
+        if (it && it._w) it._w.loops++;
+        ytCmd(f, "seekTo", [0, true]); ytCmd(f, "playVideo");
+      }
+    });
   });
   // লাইক/কমেন্টের গণনা (ভিডিও আইডি -> { likes, comments, my })
   const shortStates = {};
   function shortItemHtml(v) {
     const id = v.id;
     const st = shortStates[id] || { likes: 0, comments: 0, my: false };
-    return `<div class="reel-item short-item" data-yt="${esc(id)}" data-title="${esc((v.title || "").slice(0, 150))}" data-ch="${esc((v.channel || "").slice(0, 60))}">
+    return `<div class="reel-item short-item" data-yt="${esc(id)}" data-title="${esc((v.title || "").slice(0, 150))}" data-ch="${esc((v.channel || "").slice(0, 60))}" data-dur="${Number(v.d) || 0}">
       <img class="short-thumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy">
       <div class="short-shield" data-short-tap></div>
       <div class="short-pause"><i class="fa-solid fa-play"></i></div>
@@ -6545,49 +6551,117 @@ window.EktReact = (function () {
     };
     setTimeout(() => input.focus(), 50);
   }
-  function stopShortFrames(exceptItem) {
+  // ---------- Shorts প্লেয়ার: YouTube-এর নিজের বাটন/টাইটেল শুরুর কয়েক সেকেন্ড ভেসে ওঠে ----------
+  // তাই ভিডিও আগেই (পরেরটা আগেভাগে) লুকিয়ে চালু করে রাখা হয়; ওই সময় পেরোলে তবেই দেখানো হয় — ফলে ইউজার কোনো বাটন দেখে না।
+  const CHROME_HOLD_MS = 2000;
+  const NOBTN_MS = 3500; // ভিডিও দেখানো/চালু/শব্দ বদলের পর এতক্ষণ মাঝখানের ছোট অংশ ঢাকা থাকে — YouTube-এর বাটন যেন কোনোভাবেই না দেখা যায়
+  function coverCenter(item) {
+    const f = item && item.querySelector("iframe");
+    if (!f) return;
+    f.classList.add("nobtn");
+    clearTimeout(f._nbT);
+    f._nbT = setTimeout(() => { f.classList.remove("nobtn"); }, NOBTN_MS);
+  }
+  const POST_SEEK_HOLD_MS = 0; // রিওয়াইন্ডের পর এতক্ষণ লুকিয়ে রাখা হয় (বাটন পুরোপুরি মিলানোর জন্য)
+  function stopShortFrames(keepA, keepB) {
     document.querySelectorAll("#shortsList .short-item").forEach((it) => {
-      if (it === exceptItem) return;
+      if (it === keepA || it === keepB) return;
+      endWatch(it);
       const f = it.querySelector("iframe");
       if (f) f.remove();
+      it._pre = false; it._active = false;
       it.classList.remove("paused");
     });
   }
-  function activateShort(item) {
-    if (item.querySelector("iframe")) return;
-    stopShortFrames(item);
+  function buildFrame(item) {
+    let f = item.querySelector("iframe");
+    if (f) return f;
     const id = item.dataset.yt;
-    if (!YT_ID_RE.test(id)) return;
-    const f = document.createElement("iframe");
-    f.className = "short-frame";
+    if (!YT_ID_RE.test(id)) return null;
+    f = document.createElement("iframe");
+    f.className = "short-frame hold";
     f.setAttribute("tabindex", "-1");
     f.setAttribute("aria-hidden", "true");
     try { f.inert = true; } catch (er) {}
     f.title = "YouTube Short";
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.referrerPolicy = "strict-origin-when-cross-origin";
+    f._born = Date.now(); f._playAt = 0; f._shown = false;
     f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&controls=0&loop=0" +
-      "&playsinline=1&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+      "&playsinline=1&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1&cc_load_policy=0&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
     f.addEventListener("load", () => {
       try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"); } catch (er) {}
       ytCmd(f, "addEventListener", ["onStateChange"]);
     });
-    f.addEventListener("load", () => { if (!shortMuted) setTimeout(() => ytCmd(f, "unMute"), 600); });
     item.classList.remove("paused");
     item.insertBefore(f, item.querySelector(".short-shield"));
-    // কয়েক সেকেন্ড দেখলে সেটাও পছন্দের সংকেত — সার্ভার এখান থেকে টপিক শেখে
-    clearTimeout(item._wt);
-    item._wt = setTimeout(() => {
-      const m = me();
-      if (m && item.querySelector("iframe")) socket.emit("short-signal", { phone: m.phone, title: item.dataset.title, channel: item.dataset.ch });
-    }, 6000);
+    return f;
+  }
+  function tryReveal(item) {
+    const f = item.querySelector("iframe");
+    if (!f || !item._active || f._shown || item.classList.contains("paused")) return;
+    const now = Date.now();
+    const age = f._playAt ? now - f._playAt : 0;
+    const ready = (f._playAt && age >= CHROME_HOLD_MS) || (now - f._born > 4500);
+    if (!ready) {
+      clearTimeout(item._rt);
+      item._rt = setTimeout(() => tryReveal(item), f._playAt ? Math.max(100, CHROME_HOLD_MS - age) : 250);
+      return;
+    }
+    // শুরুতে রিওয়াইন্ড করলে YouTube নিজের বাটন আবার দেখায় — তাই রিওয়াইন্ড লুকানো অবস্থায় করি,
+    // তারপর বাটন মিলিয়ে যাওয়ার সময় (POST_SEEK_HOLD_MS) পার হলে তবেই দেখাই।
+    if (!f._rewoundAt) {
+      f._rewoundAt = now;
+      ytCmd(f, "seekTo", [0, true]); ytCmd(f, "playVideo");
+      if (!shortMuted) ytCmd(f, "unMute");
+      if (POST_SEEK_HOLD_MS > 0) { clearTimeout(item._rt); item._rt = setTimeout(() => tryReveal(item), POST_SEEK_HOLD_MS + 50); return; }
+    }
+    if (now - f._rewoundAt < POST_SEEK_HOLD_MS) {
+      clearTimeout(item._rt);
+      item._rt = setTimeout(() => tryReveal(item), Math.max(100, POST_SEEK_HOLD_MS - (now - f._rewoundAt)));
+      return;
+    }
+    f._shown = true;
+    f.classList.add("nobtn");
+    f.classList.remove("hold");
+    clearTimeout(f._nbT);
+    f._nbT = setTimeout(() => { f.classList.remove("nobtn"); }, NOBTN_MS);
+    item._w = { acc: 0, t0: Date.now(), loops: 0 };
+  }
+  function activateShort(item) {
+    item._active = true; item._pre = false;
+    const next = item.nextElementSibling && item.nextElementSibling.classList.contains("short-item") ? item.nextElementSibling : null;
+    stopShortFrames(item, next);
+    buildFrame(item);
+    tryReveal(item);
+    if (next) { next._pre = true; buildFrame(next); } // পরেরটা আগেভাগে লুকিয়ে তৈরি
+  }
+  // কতক্ষণ দেখল — সার্ভার এটা দেখে শেখে কে কোন ভিডিও পুরো দেখে, কোনটা স্কিপ করে
+  function pauseWatch(item) { const w = item._w; if (w && w.t0) { w.acc += Date.now() - w.t0; w.t0 = 0; } }
+  function resumeWatch(item) { const w = item._w; if (w && !w.t0) w.t0 = Date.now(); }
+  function endWatch(item) {
+    clearTimeout(item._rt);
+    const w = item._w;
+    if (!w) return;
+    pauseWatch(item);
+    item._w = null;
+    const m = me();
+    if (!m) return;
+    socket.emit("short-watch", { phone: m.phone, title: item.dataset.title, channel: item.dataset.ch, watched: Math.round(w.acc / 100) / 10, dur: Number(item.dataset.dur) || 0, loops: w.loops });
   }
   function observeShorts(root) {
     if (!shortsObserver) {
       shortsObserver = new IntersectionObserver((entries) => {
         entries.forEach((en) => {
           if (en.isIntersecting && en.intersectionRatio > 0.6) activateShort(en.target);
-          else if (!en.isIntersecting) { const f = en.target.querySelector("iframe"); if (f) f.remove(); en.target.classList.remove("paused"); }
+          else if (!en.isIntersecting) {
+            const it = en.target;
+            it._active = false;
+            endWatch(it);
+            if (it._pre) return; // আগেভাগে তৈরি করা পরের ভিডিও — রেখে দিই
+            const f = it.querySelector("iframe"); if (f) f.remove();
+            it.classList.remove("paused");
+          }
         });
       }, { threshold: [0, 0.6, 1] });
     }
@@ -6630,7 +6704,7 @@ window.EktReact = (function () {
     $("trUpload").style.display = shortsMode ? "none" : "";
     requestAnimationFrame(fitReels);
     if (shortsMode) { pauseReels(); loadShorts(); }
-    else { document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); loadReels(); }
+    else { document.querySelectorAll("#shortsList .short-item").forEach((it) => { endWatch(it); it._active = false; it._pre = false; }); document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); loadReels(); }
   }
   $("reelSwitch").addEventListener("click", (e) => {
     const b = e.target.closest("[data-rs]");
@@ -6650,7 +6724,7 @@ window.EktReact = (function () {
     if (e.target.closest("[data-short-sound]")) {
       shortMuted = !shortMuted;
       const f = item.querySelector("iframe");
-      if (f) ytCmd(f, shortMuted ? "mute" : "unMute");
+      if (f) { coverCenter(item); ytCmd(f, shortMuted ? "mute" : "unMute"); }
       $("shortsList").querySelectorAll("[data-short-sound] i").forEach((i) => { i.className = "fa-solid " + (shortMuted ? "fa-volume-xmark" : "fa-volume-high"); });
       return;
     }
@@ -6666,9 +6740,10 @@ window.EktReact = (function () {
       // ট্যাপ করলে থামা/চলা
       const f = item.querySelector("iframe");
       if (!f) { activateShort(item); return; }
+      if (!f._shown) return; // এখনো তৈরি হচ্ছে
       const nowPaused = !item.classList.contains("paused");
       item.classList.toggle("paused", nowPaused);
-      ytCmd(f, nowPaused ? "pauseVideo" : "playVideo");
+      if (nowPaused) { pauseWatch(item); ytCmd(f, "pauseVideo"); } else { coverCenter(item); resumeWatch(item); ytCmd(f, "playVideo"); }
     }
   });
 
