@@ -1017,6 +1017,7 @@ const SHORTS_TOPICS = (process.env.SHORTS_TOPICS
     // শায়ারি / স্ট্যাটাস
     "hi:shayari shorts", "hi:love shayari status shorts", "hi:sad shayari shorts", "bn:bangla shayari status shorts", "bn:bangla sad status shorts",
   ]);
+console.log(YOUTUBE_API_KEY ? "▶️ YOUTUBE_API_KEY পাওয়া গেছে — Shorts চালু" : "⚠️ YOUTUBE_API_KEY সেট করা নেই — Shorts বন্ধ");
 let shortsPool = [];       // { id, title, channel }
 let shortsAt = 0;          // শেষ সফল রিফ্রেশ
 let shortsFailAt = 0;      // শেষ ব্যর্থ চেষ্টা (বারবার চেষ্টা ঠেকাতে)
@@ -1084,6 +1085,7 @@ function refreshShorts() {
       shortsPool = good.filter((x) => x && !have.has(x.id)).concat(shortsPool).slice(0, 500);
       shortsAt = Date.now();
       shortsErr = "";
+      console.log("✅ YouTube Shorts রিফ্রেশ সফল: নতুন " + good.length + "টা, মোট পুল " + shortsPool.length + "টা");
     } catch (e) {
       shortsFailAt = Date.now();
       shortsErr = String((e && e.message) || e).slice(0, 200);
