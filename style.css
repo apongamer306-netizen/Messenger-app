@@ -3225,8 +3225,3 @@ body.tab-reels { overflow: hidden; }
 /* Shorts: শুরুর কয়েক সেকেন্ড (YouTube-এর নিজের বাটন/টাইটেল ভেসে থাকার সময়) প্লেয়ার লুকানো, থাম্বনেইল দেখা যায় */
 .short-item .short-frame.hold { opacity: 0; }
 .short-item .short-frame { transition: opacity .25s ease; }
-
-/* Shorts: লাইকের ওপরে নিজস্ব প্লে/পজ বাটন */
-.short-item .pp-play { display: none; }
-.short-item.paused .pp-play { display: inline; }
-.short-item.paused .pp-pause { display: none; }
