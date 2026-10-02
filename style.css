@@ -3171,15 +3171,43 @@ body.dashboard-active .profile-modal {
 .short-item.paused .short-pause { display: flex; }
 
 
-/* ===== Shorts স্ক্রিন: সবসময় ৯:১৬ বক্স — ব্রাউজার জুম-আউট বা বড় স্ক্রিনেও ভিডিও লম্বা কালো ফাঁকা হয়ে যাবে না ===== */
-#shortsList {
-  --rh: min(calc(100dvh - 190px), 760px);
-  height: var(--rh);
-  width: min(100%, calc(var(--rh) * 0.5625));
-  max-width: 100%;
-}
-#shortsList .short-item { background: #000; }
+/* ===== Reels / Shorts: ফোন ও ল্যাপটপে ঠিকঠাক ফিট (app.js --rh সেট করে; স্ক্রল করে নামাতে হবে না) ===== */
+#tabReels { --rh: min(calc(100dvh - 200px), 760px); }
+body.tab-reels { overflow: hidden; }
+.reel-stage { position: relative; }
+#tabReels .reels-list { height: var(--rh); width: min(100%, calc(var(--rh) * 0.5625)); max-width: 100%; margin: 0 auto; overscroll-behavior: contain; }
+#shortsList .short-item, #reelsList .reel-item { background: #000; }
 #shortsList .tp-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-@media (min-width: 900px) {
-  #shortsList { --rh: min(calc(100dvh - 130px), 760px); height: var(--rh); }
+
+/* YouTube প্লেয়ার: মাঝের বাটন/টাইটেল বার/লোগো লুকানো + দুই পাশের কালো দাগ ছাড়া পুরো কার্ড ভরা */
+.short-item { container-type: size; }
+.short-item .short-frame { pointer-events: none; transition: opacity .15s ease; }
+.short-item.paused .short-frame { opacity: 0; }
+@supports (container-type: size) {
+  .short-item .short-frame {
+    inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: max(calc((100cqh + 140px) * 0.5625), 100cqw);
+    height: calc(max(calc((100cqh + 140px) * 0.5625), 100cqw) * 1.7778);
+  }
+}
+
+/* উপর / নিচ অ্যারো বাটন */
+.reel-nav { position: absolute; z-index: 9; display: flex; flex-direction: column; gap: 10px; }
+.reel-nav button { width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; font-size: 16px; background: var(--surface-3); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.reel-nav button:disabled { opacity: .35; cursor: default; }
+@media (max-width: 899px) {
+  .reel-nav button { width: 38px; height: 38px; background: rgba(0,0,0,.38); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: none; }
+}
+
+/* Shorts: লাইক / কমেন্ট */
+.reel-round.reacted i { color: #f97316; }
+.reel-cm-list { overscroll-behavior: contain; }
+.sh-cm { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; }
+.sh-cm-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; }
+.sh-cm-b { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.4; word-break: break-word; }
+.sh-cm-b b { display: block; font-size: 12.5px; }
+.sh-cm-del { flex: none; border: none; background: transparent; color: var(--text-3); cursor: pointer; padding: 4px 6px; }
+@media (max-height: 560px) {
+  #tabReels .reel-side { gap: 5px; bottom: 10px; }
+  #tabReels .reel-side button { width: 34px; height: 34px; font-size: 14px; }
 }
