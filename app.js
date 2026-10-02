@@ -1615,6 +1615,18 @@ socket.on("account-banned", async (data) => {
   location.reload();
 });
 socket.on("account-deleted", () => { ektHandleAccountGone("deleted"); });
+// অন্য ডিভাইস থেকে "Log out" দিলে এই ডিভাইস থেকে বের করে দেওয়া হয়
+socket.on("force-logout", async () => {
+  if (window.__ektForceOut) return;
+  window.__ektForceOut = true;
+  try {
+    localStorage.removeItem("appUser");
+    ["activeRoom", "activeDirectChat", "masterUnlocked", "ektOpenProfile"].forEach((k) => sessionStorage.removeItem(k));
+  } catch (e) {}
+  currentUser = null;
+  try { await showCustomAlert("Logged out", "অন্য ডিভাইস থেকে আপনাকে এই ডিভাইসে লগআউট করা হয়েছে। আবার লগইন করুন।"); } catch (e) {}
+  location.reload();
+});
 // অন্য ডিভাইস থেকে নম্বর বদলানো হলে এই সকেটেই নতুন নম্বর জানানো হয়
 socket.on("account-phone-changed", ({ phone }) => {
   if (!phone || !currentUser || currentUser.phone === phone) return;
@@ -7064,8 +7076,37 @@ window.EktReact = (function () {
       '<div class="stg-dev-ico"><i class="fa-solid ' + (/Android|iOS/.test(e.device || "") ? "fa-mobile-screen" : "fa-laptop") + '"></i></div>' +
       '<div class="stg-dev-main"><div class="stg-dev-name">' + esc(e.device || "Unknown device") + (e.current ? ' <em class="stg-badge">This device</em>' : "") + "</div>" +
       '<div class="stg-dev-sub">IP ' + esc(e.ip || "—") + " · Last login " + esc(fmtTime(e.lastLogin)) + "</div>" +
-      '<div class="stg-dev-sub">Last active ' + esc(agoLabel(e.lastSeen)) + "</div></div></div>"
+      '<div class="stg-dev-sub">Last active ' + esc(agoLabel(e.lastSeen)) + "</div></div>" +
+      '<button type="button" class="stg-dev-out" data-ref="' + esc(e.ref || "") + '" data-cur="' + (e.current ? "1" : "") + '" data-name="' + esc(e.device || "Unknown device") + '"><i class="fa-solid fa-right-from-bracket"></i> Log out</button></div>'
     ).join("");
+  }
+
+  // ---------- ডিভাইস থেকে লগআউট ----------
+  async function logoutDevice(btn, box) {
+    const ref = btn.dataset.ref, isCur = !!btn.dataset.cur, name = btn.dataset.name || "এই ডিভাইস";
+    if (isCur) {
+      const pick = await openSheet("এই ডিভাইস থেকে লগআউট করবেন?", [{ key: "yes", icon: "fa-right-from-bracket", label: "Log out", danger: true }]);
+      if (pick !== "yes") return;
+      // সার্ভারের তালিকা থেকে এই ডিভাইস সরিয়ে তারপর স্বাভাবিক লগআউট
+      await call("device-signout", { phone: currentUser.phone, deviceId: getDeviceId() }, 4000);
+      logoutBtn.click();
+      return;
+    }
+    let ok = false;
+    await openForm({
+      title: "Log out device",
+      sub: name + " থেকে লগআউট করতে আপনার পাসওয়ার্ড দিন।",
+      fields: [{ label: "Your password", type: "password", placeholder: "Password" }],
+      submitText: "Log out",
+      onSubmit: async ([pw]) => {
+        if (!pw) return ERR.wrong_password;
+        const r = await call("logout-device", { phone: currentUser.phone, password: pw, ref });
+        if (!r || !r.success) return errText(r);
+        ok = true;
+        return null;
+      },
+    });
+    if (ok) { showMiniToast("লগআউট করা হয়েছে"); loadDevices(box); }
   }
 
   function openDevicesPopup() {
@@ -7077,8 +7118,13 @@ window.EktReact = (function () {
       '<div class="stg-dev-list"></div>' +
       '<div class="ekt-form-actions"><button type="button" class="btn btn-secondary" data-act="close">Close</button></div></div>';
     document.body.appendChild(ov);
-    ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest('[data-act="close"]')) ov.remove(); });
-    loadDevices(ov.querySelector(".stg-dev-list"));
+    const listBox = ov.querySelector(".stg-dev-list");
+    ov.addEventListener("click", (e) => {
+      const out = e.target.closest(".stg-dev-out");
+      if (out) { logoutDevice(out, listBox); return; }
+      if (e.target === ov || e.target.closest('[data-act="close"]')) ov.remove();
+    });
+    loadDevices(listBox);
   }
 
   // ---------- সেটিংস স্ক্রিন ----------
