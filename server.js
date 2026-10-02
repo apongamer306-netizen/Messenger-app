@@ -397,12 +397,24 @@ function resolveLoginPhone(idf) {
   const s = String(idf || "").trim();
   if (!s) return null;
   if (users[s]) return s;
+  // দ্বিতীয় (অতিরিক্ত) নম্বর দিয়েও লগইন চলবে
+  const compact = s.replace(/[\s-]/g, "");
+  if (/^\+?[0-9]{6,18}$/.test(compact)) {
+    if (users[compact]) return compact;
+    const ua = Object.values(users).find((x) => x && x.altNum === compact);
+    if (ua) return ua.phone;
+  }
   const em = s.toLowerCase();
   if (em.indexOf("@") > 0) {
     const u = Object.values(users).find((x) => x && x.email === em);
     if (u) return u.phone;
   }
   return null;
+}
+// কোনো অ্যাকাউন্টের দ্বিতীয় নম্বর হিসেবে এই নম্বর আছে কি না (exceptPhone-এর নিজেরটা বাদে)
+function altTaken(num, exceptPhone) {
+  if (!num) return false;
+  return Object.values(users).some((x) => x && x.altNum === num && x.phone !== exceptPhone);
 }
 function emailTaken(em, exceptPhone) {
   if (!em) return false;
@@ -597,6 +609,7 @@ function purgeUserCompletely(phone) {
   // শুধু একটা এক-মুখী হ্যাশ — যাতে মুছে ফেলা অ্যাকাউন্ট পুরোনো ডিভাইস থেকে আবার জীবিত না হয়
   deletedHashes[idHash(phone)] = 1;
   if (u.email) deletedHashes[idHash(u.email)] = 1;
+  if (u.altNum) deletedHashes[idHash(u.altNum)] = 1;
 
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   enqueueSave();
@@ -695,7 +708,7 @@ function scrubWalk(v, key, self, depth) {
   const out = {};
   Object.keys(v).forEach((k) => {
     if (EMAIL_KEY_RE.test(k) && !selfObj) return; // অন্যের ইমেইল কখনোই না
-    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
+    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId" || k === "altNum") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
     const nk = hasOwn(users, k) && k !== self ? pidOf(k) : k; // reacts ইত্যাদি map-এর key
     out[nk] = scrubWalk(v[k], k, self, depth + 1);
   });
@@ -989,7 +1002,7 @@ io.on("connection", (socket) => {
       if (newUser.fresh) {
         // নতুন সাইনআপ: আগে থেকে থাকা নম্বর/ইমেইলে সাইনআপ করা যাবে না
         const key = String(newUser.phone).trim();
-        if (users[key] && users[key].password) return reply({ success: false, error: "exists" });
+        if ((users[key] && users[key].password) || altTaken(key, key)) return reply({ success: false, error: "exists" });
         const em = normalizeEmail(newUser.email);
         if (newUser.email && !em) return reply({ success: false, error: "bad_email" });
         if (em && emailTaken(em, key)) return reply({ success: false, error: "email_taken" });
@@ -1091,13 +1104,97 @@ io.on("connection", (socket) => {
     const np = normalizePhoneInput(newPhone);
     if (!np) return reply({ success: false, error: "bad_phone" });
     if (np === phone) return reply({ success: false, error: "same" });
-    if (users[np] || bannedUsers[np]) return reply({ success: false, error: "phone_taken" });
+    if (u.altNum && np === u.altNum) return reply({ success: false, error: "dup_own" });
+    if (users[np] || bannedUsers[np] || altTaken(np, phone)) return reply({ success: false, error: "phone_taken" });
     renamePhoneEverywhere(phone, np);
     saveData();
     setSelf(socket, np);
     socket.emit("account-phone-changed", { phone: np });
     Array.from(ensureSet(friendships, np)).forEach((fp) => sendFriendData(fp));
     reply({ success: true, phone: np, user: selfUserPayload(users[np], password) });
+  });
+
+  // ---------- সেটিংস: পার্সোনাল ডিটেইলস (পাসওয়ার্ড যাচাই, দ্বিতীয় নম্বর, নম্বর/ইমেইল রিমুভ) ----------
+  // ভুল পাসওয়ার্ড বারবার দিলে এই সকেটে কিছুক্ষণ আটকে দেওয়া হয় (পাসওয়ার্ড আন্দাজ ঠেকাতে)
+  let pwFails = 0, pwBlockedUntil = 0;
+  const pwGate = (u, password) => {
+    const now = Date.now();
+    if (now < pwBlockedUntil) return "too_many";
+    if (u && verifyPassword(password, u.password)) { pwFails = 0; return ""; }
+    pwFails++;
+    if (pwFails >= 6) { pwBlockedUntil = now + 60 * 1000; pwFails = 0; return "too_many"; }
+    return "wrong_password";
+  };
+  const contactInfo = (u) => ({
+    phone: EMAIL_KEY_ONLY(u) ? "" : u.phone,
+    altNum: u.altNum || "",
+    email: u.email || (EMAIL_KEY_ONLY(u) ? u.phone : ""),
+    key: u.phone,
+  });
+  const EMAIL_KEY_ONLY = (u) => String(u.phone || "").indexOf("@") > 0;
+
+  socket.on("verify-password", ({ phone, password }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  socket.on("set-alt-phone", ({ phone, password, newPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "need_primary" }); // আগে মূল নম্বর যোগ করতে হবে
+    const np = normalizePhoneInput(newPhone);
+    if (!np) return reply({ success: false, error: "bad_phone" });
+    if (np === u.phone || np === u.altNum) return reply({ success: false, error: "dup_own" });
+    if (users[np] || bannedUsers[np] || altTaken(np, u.phone)) return reply({ success: false, error: "phone_taken" });
+    u.altNum = np;
+    saveData();
+    reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  // which: "primary" | "alt"
+  socket.on("remove-phone", ({ phone, password, which }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (which === "alt") {
+      if (!u.altNum) return reply({ success: false, error: "not_found" });
+      delete u.altNum;
+      saveData();
+      return reply(Object.assign({ success: true }, contactInfo(u)));
+    }
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "not_found" });
+    // মূল নম্বর সরালে: দ্বিতীয় নম্বর থাকলে সেটাই মূল হয়, না থাকলে ইমেইল থাকতে হবে
+    let nextKey = "";
+    if (u.altNum) nextKey = u.altNum;
+    else if (u.email) nextKey = u.email;
+    else return reply({ success: false, error: "last_id" });
+    if (users[nextKey] && nextKey !== u.altNum) return reply({ success: false, error: "phone_taken" });
+    const oldKey = u.phone;
+    if (nextKey === u.altNum) delete u.altNum;
+    renamePhoneEverywhere(oldKey, nextKey);
+    saveData();
+    setSelf(socket, nextKey);
+    socket.emit("account-phone-changed", { phone: nextKey });
+    Array.from(ensureSet(friendships, nextKey)).forEach((fp) => sendFriendData(fp));
+    reply(Object.assign({ success: true, renamed: true, newKey: nextKey }, contactInfo(users[nextKey]), { user: selfUserPayload(users[nextKey], password) }));
+  });
+
+  socket.on("remove-email", ({ phone, password }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "last_id" }); // ইমেইলই লগইন-আইডি
+    if (!u.email) return reply({ success: false, error: "not_found" });
+    delete u.email;
+    saveData();
+    reply(Object.assign({ success: true }, contactInfo(u)));
   });
 
   // ---------- রিপোর্ট সিস্টেম ----------
