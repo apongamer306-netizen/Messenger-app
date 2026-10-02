@@ -413,6 +413,7 @@ function selfUserPayload(user, password) {
   const copy = { ...user };
   delete copy.loginHistory;
   copy.password = String(password);
+  copy.pid = pidOf(user.phone); // নিজের প্রোফাইল লিংক বানাতে
   return copy;
 }
 
@@ -546,6 +547,7 @@ function renamePhoneEverywhere(oldP, newP) {
 
 // ---------- অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলা (কোনো হিস্ট্রি/ডেটা রাখা হয় না) ----------
 function purgeUserCompletely(phone) {
+  const delPid = pidOf(phone); // মুছে ফেলার আগেই pid নিয়ে রাখা — বন্ধুদের ক্লায়েন্ট এটা দিয়েই চিনবে
   const u = users[phone] || {};
   const p = profiles[phone] || {};
   const urls = [u.pic, p.cover];
@@ -602,7 +604,7 @@ function purgeUserCompletely(phone) {
   formerFriends.forEach((fp) => {
     sendFriendData(fp);
     const fs2 = phoneToSocket[fp];
-    if (fs2) { io.to(fs2).emit("friend-profile-updated", { phone }); io.to(fs2).emit("stories-updated"); }
+    if (fs2) { sendTo(fs2, "friend-profile-updated", { phone: delPid }); sendTo(fs2, "stories-updated"); }
   });
   return sid;
 }
@@ -632,6 +634,99 @@ const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
 const phoneToSocket = {};    // phone -> socket.id
 const socketToPhone = {};    // socket.id -> phone
 const socketToRoom = {};     // socket.id -> roomCode
+
+// ================= গোপনীয়তা: ফোন নম্বর / ইমেইল অন্য ইউজারকে দেখানো হয় না =================
+// প্রতিটা ইউজারের একটা এলোমেলো পাবলিক আইডি (pid) থাকে। সার্ভার যা-ই পাঠাক, প্রাপকের নিজের
+// নম্বর/ইমেইল ছাড়া বাকি সব নম্বর-ইমেইল pid দিয়ে বদলে যায় (শুধু অ্যাডমিন আসল তথ্য দেখে)।
+// ক্লায়েন্ট থেকে pid এলে সার্ভার আবার আসল নম্বরে ফিরিয়ে নেয় — তাই ফ্রেন্ড/চ্যাট/কল আগের মতোই চলে।
+const PID_RE = /^u[0-9a-f]{16}$/;
+const PHONE_KEY_RE = /phone/i;
+const EMAIL_KEY_RE = /^e-?mail/i;
+const FREE_TEXT_KEYS = new Set(["text", "message", "caption", "content", "bio", "about", "reason", "fileContent"]);
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+let pidToPhone = {};
+const selfPhoneBySocket = {};   // socket.id -> এই সকেটের নিজের ফোন/ইমেইল-আইডি
+const adminSockets = new Set(); // সফলভাবে অ্যাডমিন-লগইন করা সকেট
+
+function pidOf(id) {
+  const s = String(id);
+  if (PID_RE.test(s)) return s;
+  const u = hasOwn(users, s) ? users[s] : null;
+  if (u) {
+    if (!u.pid || !PID_RE.test(u.pid)) u.pid = "u" + nodeCrypto.randomBytes(8).toString("hex");
+    pidToPhone[u.pid] = s;
+    return u.pid;
+  }
+  return "x" + idHash(s).slice(0, 16); // মুছে ফেলা/অজানা — আর ফেরত যায় না
+}
+function rebuildPidMap() {
+  pidToPhone = {};
+  Object.keys(users).forEach((k) => { if (users[k]) pidOf(k); });
+}
+function phoneFromPid(pid) {
+  let p = pidToPhone[pid];
+  if (!(p && hasOwn(users, p) && users[p].pid === pid)) {
+    rebuildPidMap();
+    p = pidToPhone[pid];
+  }
+  return p && hasOwn(users, p) && users[p].pid === pid ? p : null;
+}
+
+// ক্লায়েন্ট → সার্ভার: pid থাকলে আসল ফোনে ফিরিয়ে নেওয়া (জায়গাতেই বদলায়)
+function unscrubIn(v, depth) {
+  if (typeof v === "string") return v.length === 17 && PID_RE.test(v) ? (phoneFromPid(v) || v) : v;
+  if (!v || typeof v !== "object" || depth > 10 || Buffer.isBuffer(v)) return v;
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = unscrubIn(v[i], depth + 1); return v; }
+  Object.keys(v).forEach((k) => { v[k] = unscrubIn(v[k], depth + 1); });
+  return v;
+}
+
+// সার্ভার → ক্লায়েন্ট: প্রাপকের নিজেরটা ছাড়া সব নম্বর/ইমেইল সরানো
+function scrubWalk(v, key, self, depth) {
+  if (typeof v === "string") {
+    if (v.length > 128 || v === self || PID_RE.test(v)) return v;
+    if (hasOwn(users, v) && !FREE_TEXT_KEYS.has(key)) return pidOf(v);
+    if (key && PHONE_KEY_RE.test(key) && v && v !== "unknown") return pidOf(v);
+    return v;
+  }
+  if (!v || typeof v !== "object" || depth > 12 || Buffer.isBuffer(v)) return v;
+  if (Array.isArray(v)) return v.map((x) => scrubWalk(x, key, self, depth + 1));
+  const selfObj = !!self && v.phone === self;
+  const out = {};
+  Object.keys(v).forEach((k) => {
+    if (EMAIL_KEY_RE.test(k) && !selfObj) return; // অন্যের ইমেইল কখনোই না
+    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
+    const nk = hasOwn(users, k) && k !== self ? pidOf(k) : k; // reacts ইত্যাদি map-এর key
+    out[nk] = scrubWalk(v[k], k, self, depth + 1);
+  });
+  return out;
+}
+// এই সকেটের আসল ইউজার (ক্লায়েন্টের পাঠানো viewerPhone বিশ্বাস করা হয় না — নকল করা যায়)
+function viewerOf(sock) { return selfPhoneBySocket[sock.id] || socketToPhone[sock.id] || ""; }
+function areFriends(a, b) { return !!a && !!b && ensureSet(friendships, a).has(b); }
+function canSeeContent(sock, ownerPhone) {
+  if (adminSockets.has(sock.id)) return true;
+  const v = viewerOf(sock);
+  return !!v && (v === ownerPhone || areFriends(v, ownerPhone));
+}
+function recipientPhone(sid) { return selfPhoneBySocket[sid] || socketToPhone[sid] || ""; }
+function outboundFor(sid, data, forceRaw) {
+  if (forceRaw || adminSockets.has(sid)) return data;
+  return scrubWalk(data, "", recipientPhone(sid), 0);
+}
+function setSelf(sock, phone) { if (phone) selfPhoneBySocket[sock.id] = phone; }
+function sendTo(sid, ev, data) {
+  if (data === undefined) io.to(sid).emit(ev);
+  else io.to(sid).emit(ev, outboundFor(sid, data));
+}
+function emitRoom(roomCode, ev, data, exceptSid) {
+  const room = io.sockets.adapter.rooms.get(roomCode);
+  if (!room) return;
+  Array.from(room).forEach((sid) => { if (sid !== exceptSid) sendTo(sid, ev, data); });
+}
+function emitAdmins(ev, data) {
+  adminSockets.forEach((sid) => io.to(sid).emit(ev, data));
+}
 
 function setsToArrays(obj) {
   const out = {};
@@ -719,6 +814,7 @@ async function loadData() {
   bannedUsers = raw.bannedUsers || {};
   deletedHashes = raw.deletedIds || {};
   phoneAliases = raw.phoneAliases || {};
+  try { rebuildPidMap(); setTimeout(saveData, 0); } catch (e) { console.warn("pid init:", e.message); }
   console.log("Saved data loaded successfully.");
   try {
     const postCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).posts) || []).length, 0);
@@ -843,7 +939,7 @@ function getFriendPayload(phone) {
 function sendFriendData(phone) {
   const socketId = phoneToSocket[phone];
   if (!socketId) return;
-  io.to(socketId).emit("friend-list-updated", getFriendPayload(phone));
+  sendTo(socketId, "friend-list-updated", getFriendPayload(phone));
 }
 
 function broadcastRoomMembers(roomCode) {
@@ -855,14 +951,33 @@ function broadcastRoomMembers(roomCode) {
         pic: m.user.pic,
       }))
     : [];
-  io.to(roomCode).emit("room-members-update", members);
+  emitRoom(roomCode, "room-members-update", members);
 }
 
 io.on("connection", (socket) => {
+  // প্রতিটা ইভেন্টে: ইনকামিং pid → আসল ফোন, আর ack/callback-এর উত্তর থেকে অন্যের নম্বর-ইমেইল সরানো
+  socket.use((packet, next) => {
+    try {
+      const ev = String(packet[0] || "");
+      const first = packet[1];
+      const adminCall = ev.indexOf("admin-") === 0 && first && typeof first === "object" && first.password === ADMIN_PASSWORD;
+      for (let i = 1; i < packet.length; i++) {
+        if (typeof packet[i] === "function") {
+          const cb = packet[i];
+          packet[i] = (...a) => cb(...a.map((x) => outboundFor(socket.id, x, adminCall)));
+        } else {
+          packet[i] = unscrubIn(packet[i], 0);
+        }
+      }
+    } catch (e) { console.warn("privacy middleware:", e.message); }
+    next();
+  });
+
   // ---------- USER / SESSION ----------
   socket.on("set-user-socket", ({ phone, deviceId }) => {
     if (!phone) return;
     socketToPhone[socket.id] = phone;
+    setSelf(socket, phone);
     phoneToSocket[phone] = socket.id;
     touchDevice(phone, deviceId);
   });
@@ -884,7 +999,7 @@ io.on("connection", (socket) => {
         newUser.phone = key;
         if (em) newUser.email = em; else delete newUser.email;
         const merged = mergeClientUser(newUser);
-        if (merged) recordDevice(merged, socket, newUser.deviceId, "signup");
+        if (merged) { recordDevice(merged, socket, newUser.deviceId, "signup"); setSelf(socket, merged.phone); }
         saveData();
         return reply({ success: true });
       }
@@ -912,6 +1027,7 @@ io.on("connection", (socket) => {
     if (user && verifyPassword(password, user.password)) {
       if (!isHashedPassword(user.password)) user.password = hashPassword(password);
       recordDevice(user, socket, deviceId, String(loginId).indexOf("@") > 0 ? "email" : "phone");
+      setSelf(socket, user.phone);
       saveData();
       // ক্লায়েন্ট আগের মতোই পাসওয়ার্ড সহ ইউজার অবজেক্ট আশা করে (লোকাল ক্যাশের জন্য) — তাই যেটা টাইপ করা হয়েছে সেটাই ফেরত যায়
       callback({ success: true, user: selfUserPayload(user, password) });
@@ -978,6 +1094,7 @@ io.on("connection", (socket) => {
     if (users[np] || bannedUsers[np]) return reply({ success: false, error: "phone_taken" });
     renamePhoneEverywhere(phone, np);
     saveData();
+    setSelf(socket, np);
     socket.emit("account-phone-changed", { phone: np });
     Array.from(ensureSet(friendships, np)).forEach((fp) => sendFriendData(fp));
     reply({ success: true, phone: np, user: selfUserPayload(users[np], password) });
@@ -1002,7 +1119,7 @@ io.on("connection", (socket) => {
     };
     reports.push(report);
     saveData();
-    io.emit("admin-new-report", report); // অ্যাডমিন প্যানেল খোলা থাকলে সে-ই কেবল দেখাবে
+    emitAdmins("admin-new-report", report); // অ্যাডমিন প্যানেল খোলা থাকলে সে-ই কেবল দেখাবে
     if (typeof callback === "function") callback({ success: true });
   });
 
@@ -1033,6 +1150,7 @@ io.on("connection", (socket) => {
     const out = [];
     Object.keys(profiles).forEach((p) => {
       if (bannedUsers[p]) return;
+      if (!canSeeContent(socket, p)) return; // বন্ধু না হলে রিলসও দেখা যাবে না
       ((profiles[p] && profiles[p].items) || []).forEach((it) => {
         if (it && it.kind === "reel" && it.src) {
           // রিলস সাধারণত একটা পোস্টের সাথে যুক্ত — রিঅ্যাকশন/কমেন্ট/শেয়ার সেই পোস্টেই জমা হয়
@@ -1062,7 +1180,7 @@ io.on("connection", (socket) => {
   function notifyStoryChange(phone) {
     Array.from(ensureSet(friendships, phone)).concat([phone]).forEach((p) => {
       const sid = phoneToSocket[p];
-      if (sid) io.to(sid).emit("stories-updated");
+      if (sid) sendTo(sid, "stories-updated");
     });
   }
 
@@ -1141,7 +1259,7 @@ io.on("connection", (socket) => {
     };
     reports.push(report);
     saveData();
-    io.emit("admin-new-report", report);
+    emitAdmins("admin-new-report", report);
     if (typeof callback === "function") callback({ success: true });
   });
 
@@ -1160,6 +1278,7 @@ io.on("connection", (socket) => {
   socket.on("admin-login", ({ password }, callback) => {
     if (typeof callback !== "function") return;
     if (password === ADMIN_PASSWORD) {
+      adminSockets.add(socket.id);
       const userList = Object.values(users).map((u) => {
         const p = profiles[u.phone] || {};
         const ban = bannedUsers[u.phone] || null;
@@ -1201,7 +1320,7 @@ io.on("connection", (socket) => {
     saveData();
     const sid = phoneToSocket[phone];
     if (sid) {
-      io.to(sid).emit("account-banned", { reason: bannedUsers[phone].reason });
+      sendTo(sid, "account-banned", { reason: bannedUsers[phone].reason });
     }
     if (typeof callback === "function") callback({ success: true, banned: true });
   });
@@ -1223,7 +1342,7 @@ io.on("connection", (socket) => {
     }
     const sid = purgeUserCompletely(phone);
     if (sid) {
-      io.to(sid).emit("account-deleted");
+      sendTo(sid, "account-deleted");
       try { io.sockets.sockets.get(sid)?.disconnect(true); } catch (e) {}
     }
     if (typeof callback === "function") callback({ success: true });
@@ -1251,7 +1370,7 @@ io.on("connection", (socket) => {
     // যে ইউজার রিপোর্ট করেছিল, তাকে জানিয়ে দেওয়া (সে অনলাইনে থাকলে)
     const reporterSocket = phoneToSocket[report.fromPhone];
     if (reporterSocket) {
-      io.to(reporterSocket).emit("report-status-update", { reportId: report.id, status: report.status });
+      sendTo(reporterSocket, "report-status-update", { reportId: report.id, status: report.status });
     }
 
     if (typeof callback === "function") callback({ success: true, report });
@@ -1277,6 +1396,7 @@ io.on("connection", (socket) => {
     const hadAccount = !!(users[user.phone] && users[user.phone].password);
     mergeClientUser(user);
     socketToPhone[socket.id] = user.phone;
+    setSelf(socket, user.phone);
     phoneToSocket[user.phone] = socket.id;
     // এই ডিভাইস আগে লগইন-হিস্ট্রিতে না থাকলে (পুরোনো সেশন) পাসওয়ার্ড মিললে যোগ করা
     if (hadAccount && users[user.phone]) {
@@ -1311,7 +1431,7 @@ io.on("connection", (socket) => {
         if (phoneAliases[fp]) fp = phoneAliases[fp]; // বন্ধু নম্বর বদলালে নতুন নম্বরে মিলিয়ে নেওয়া
         if (fp === user.phone || isDeletedId(fp)) return; // মুছে ফেলা অ্যাকাউন্ট আর ফিরবে না
         if (!users[fp]) {
-          if (fp !== f.phone) return;
+          if (fp !== f.phone || PID_RE.test(fp)) return;
           users[fp] = { name: f.name, phone: fp, pic: f.pic };
         }
         ensureSet(friendships, user.phone).add(fp);
@@ -1335,7 +1455,7 @@ io.on("connection", (socket) => {
     saveData();
 
     const targetSocket = phoneToSocket[toUserPhone];
-    if (targetSocket) io.to(targetSocket).emit("receive-friend-request");
+    if (targetSocket) sendTo(targetSocket, "receive-friend-request");
   });
 
   socket.on("accept-friend-request", ({ currentUser, friendUser }) => {
@@ -1377,6 +1497,18 @@ io.on("connection", (socket) => {
       callback([]);
       return;
     }
+    myPhone = viewerOf(socket) || myPhone;
+    // প্রোফাইল লিংক (…/u/<id>) বা শুধু আইডি পেস্ট করলে সরাসরি সেই ইউজার
+    const pm = q.match(/(?:^|[\/=#])(u[0-9a-f]{16})(?:[\/?#]|$)/);
+    if (pm) {
+      const lp = phoneFromPid(pm[1]);
+      if (!lp || lp === myPhone || bannedUsers[lp]) return callback([]);
+      return callback([{
+        ...publicUser(lp),
+        isFriend: ensureSet(friendships, myPhone).has(lp),
+        requestPending: ensureSet(friendRequests, lp).has(myPhone),
+      }]);
+    }
     const myFriends = ensureSet(friendships, myPhone);
     const myOutgoing = []; // optional: track pending outbound — skip for now
     const results = Object.values(users)
@@ -1385,7 +1517,9 @@ io.on("connection", (socket) => {
         if (bannedUsers[u.phone]) return false;
         const name = (u.name || "").toLowerCase();
         const phone = (u.phone || "").toLowerCase();
-        return name.includes(q) || phone.includes(q);
+        const qCompact = q.replace(/[\s-]/g, "");
+        // নাম দিয়ে আংশিক সার্চ চলবে; নম্বর/ইমেইল শুধু হুবহু মিললে (আংশিক মিলিয়ে নম্বর খুঁজে বের করা যাবে না)
+        return name.includes(q) || phone === q || phone === qCompact || (!!u.email && u.email === q);
       })
       .slice(0, 25)
       .map((u) => ({
@@ -1458,7 +1592,7 @@ io.on("connection", (socket) => {
     saveData();
 
     const targetSocket = phoneToSocket[receiverPhone];
-    if (targetSocket) io.to(targetSocket).emit("receive-direct-message", msgData);
+    if (targetSocket) sendTo(targetSocket, "receive-direct-message", msgData);
 
     // Messenger-এর মতো স্ট্যাটাস: রিসিভার অনলাইনে থাকলে "Delivered"
     if (typeof callback === "function") {
@@ -1482,7 +1616,7 @@ io.on("connection", (socket) => {
 
     const senderSocket = phoneToSocket[friendPhone];
     if (senderSocket) {
-      io.to(senderSocket).emit("direct-messages-seen", { byPhone: viewerPhone });
+      sendTo(senderSocket, "direct-messages-seen", { byPhone: viewerPhone });
     }
   });
 
@@ -1517,12 +1651,13 @@ io.on("connection", (socket) => {
       mergeClientUser(user);
       phoneToSocket[user.phone] = socket.id;
       socketToPhone[socket.id] = user.phone;
+      setSelf(socket, user.phone);
     }
 
     if (!roomMembers[roomCode]) roomMembers[roomCode] = new Map();
     roomMembers[roomCode].set(socket.id, { user, peerId });
 
-    socket.to(roomCode).emit("user-joined-notify", { user });
+    emitRoom(roomCode, "user-joined-notify", { user }, socket.id);
     broadcastRoomMembers(roomCode);
   });
 
@@ -1547,13 +1682,13 @@ io.on("connection", (socket) => {
     roomMessages[roomCode].push(msgData);
     saveData();
 
-    socket.to(roomCode).emit("receive-message", msgData);
+    emitRoom(roomCode, "receive-message", msgData, socket.id);
     if (typeof callback === "function") callback();
   });
 
   socket.on("set-room-theme", ({ roomCode, themeData }) => {
     if (!roomCode) return;
-    socket.to(roomCode).emit("room-theme-update", themeData);
+    emitRoom(roomCode, "room-theme-update", themeData, socket.id);
   });
 
   // ---------- DIRECT CHAT THEME (দুই পাশেই একসাথে বদলাবে) ----------
@@ -1563,7 +1698,7 @@ io.on("connection", (socket) => {
     saveData();
     const targetSocket = phoneToSocket[toPhone];
     if (targetSocket) {
-      io.to(targetSocket).emit("direct-theme-update", { fromPhone, themeData });
+      sendTo(targetSocket, "direct-theme-update", { fromPhone, themeData });
     }
   });
 
@@ -1574,10 +1709,12 @@ io.on("connection", (socket) => {
   });
 
   // ---------- USER PROFILE (তথ্য + ছবি/ভিডিও/অডিও) ----------
-  socket.on("get-profile", ({ phone, viewerPhone }, callback) => {
+  socket.on("get-profile", ({ phone }, callback) => {
     if (typeof callback !== "function") return;
+    if (typeof phone !== "string" || !hasOwn(users, phone) || bannedUsers[phone]) return callback(null);
+    const viewerPhone = viewerOf(socket);
+    const isAdmin = adminSockets.has(socket.id);
     const base = publicUser(phone);
-    const p = profiles[phone] || {};
     let relation = "none"; // none | friends | outgoing | incoming | self
     if (viewerPhone && viewerPhone === phone) relation = "self";
     else if (viewerPhone && phone) {
@@ -1585,7 +1722,20 @@ io.on("connection", (socket) => {
       else if (ensureSet(friendRequests, phone).has(viewerPhone)) relation = "outgoing";
       else if (ensureSet(friendRequests, viewerPhone).has(phone)) relation = "incoming";
     }
+    // বন্ধু (বা নিজে/অ্যাডমিন) না হলে কিছুই দেখা যাবে না — শুধু নাম আর প্রোফাইল ছবি, যাতে চিনে ফ্রেন্ড রিকোয়েস্ট পাঠানো যায়
+    if (relation !== "self" && relation !== "friends" && !isAdmin) {
+      return callback({ name: base.name, phone: base.phone, pic: base.pic, relation, locked: true });
+    }
+    const p = profiles[phone] || {};
     callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
+  });
+
+  // নিজের প্রোফাইল লিংকের আইডি (শুধু নিজেরটাই পাওয়া যায়)
+  socket.on("get-my-link", (_p, callback) => {
+    if (typeof callback !== "function") return;
+    const me = viewerOf(socket);
+    if (!me || !hasOwn(users, me)) return callback({ success: false });
+    callback({ success: true, linkId: pidOf(me) });
   });
 
   socket.on("update-avatar", async ({ phone, dataUrl, name }, callback) => {
@@ -1686,7 +1836,7 @@ io.on("connection", (socket) => {
 
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
       const sid = phoneToSocket[friendPhone];
-      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
     });
 
     if (typeof callback === "function") callback({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
@@ -1725,7 +1875,7 @@ io.on("connection", (socket) => {
 
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
       const sid = phoneToSocket[friendPhone];
-      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
     });
     reply({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
   });
@@ -1752,7 +1902,7 @@ io.on("connection", (socket) => {
   function notifyFriendsOfProfile(phone) {
     Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
       const sid = phoneToSocket[friendPhone];
-      if (sid) io.to(sid).emit("friend-profile-updated", { phone });
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
     });
   }
 
@@ -1877,7 +2027,7 @@ io.on("connection", (socket) => {
     if (t.kind === "story") return payload;
     const targets = new Set(Array.from(ensureSet(friendships, t.owner)).concat([t.owner]));
     if (alsoPhone) targets.add(alsoPhone);
-    targets.forEach((ph) => { const sid = phoneToSocket[ph]; if (sid) io.to(sid).emit("item-updated", payload); });
+    targets.forEach((ph) => { const sid = phoneToSocket[ph]; if (sid) sendTo(sid, "item-updated", payload); });
     return payload;
   }
 
@@ -1901,7 +2051,7 @@ io.on("connection", (socket) => {
     if (t.kind === "story" && t.owner !== reactorPhone) {
       const u = users[reactorPhone] || {};
       const sid = phoneToSocket[t.owner];
-      if (sid) io.to(sid).emit("story-reacted", { storyId: id, phone: reactorPhone, name: u.name || "Someone", type: reacts[reactorPhone] || null, reacts });
+      if (sid) sendTo(sid, "story-reacted", { storyId: id, phone: reactorPhone, name: u.name || "Someone", type: reacts[reactorPhone] || null, reacts });
     }
     reply({ success: true, reacts, likes: t.obj.likes, my: reacts[reactorPhone] || null, payload });
   }
@@ -2068,7 +2218,7 @@ io.on("connection", (socket) => {
       t.obj.shares = (t.obj.shares || 0) + 1;
       saveData();
       const targetSocket = phoneToSocket[toPhone];
-      if (targetSocket) io.to(targetSocket).emit("receive-direct-message", msg);
+      if (targetSocket) sendTo(targetSocket, "receive-direct-message", msg);
       const payload = broadcastItem(t, id, {}, sharerPhone);
       return reply({ success: true, delivered: !!targetSocket, shares: t.obj.shares, payload });
     }
@@ -2083,28 +2233,28 @@ io.on("connection", (socket) => {
   // ---------- CALL: অডিও থেকে ভিডিওতে সুইচ ----------
   socket.on("direct-call-upgrade", ({ toPhone }) => {
     const targetSocket = phoneToSocket[toPhone];
-    if (targetSocket) io.to(targetSocket).emit("direct-call-upgraded");
+    if (targetSocket) sendTo(targetSocket, "direct-call-upgraded");
   });
 
   socket.on("direct-call-reject", ({ toPhone }) => {
     const targetSocket = phoneToSocket[toPhone];
-    if (targetSocket) io.to(targetSocket).emit("direct-call-rejected");
+    if (targetSocket) sendTo(targetSocket, "direct-call-rejected");
   });
 
   // ---------- ROOM CALL SIGNALING ----------
   socket.on("call-user", (data) => {
     if (!data || !data.roomCode) return;
-    socket.to(data.roomCode).emit("incoming-call", data);
+    emitRoom(data.roomCode, "incoming-call", data, socket.id);
   });
 
   socket.on("accept-call-notify", ({ roomCode }) => {
     if (!roomCode) return;
-    socket.to(roomCode).emit("call-accepted-by-receiver");
+    emitRoom(roomCode, "call-accepted-by-receiver", undefined, socket.id);
   });
 
   socket.on("end-call", ({ roomCode }) => {
     if (!roomCode) return;
-    socket.to(roomCode).emit("call-ended");
+    emitRoom(roomCode, "call-ended", undefined, socket.id);
   });
 
   // ---------- DIRECT (FRIEND) CALL SIGNALING ----------
@@ -2113,20 +2263,20 @@ io.on("connection", (socket) => {
     if (!data || !data.toPhone) return;
     const targetSocket = phoneToSocket[data.toPhone];
     if (targetSocket) {
-      io.to(targetSocket).emit("direct-incoming-call", data);
+      sendTo(targetSocket, "direct-incoming-call", data);
     } else {
-      io.to(socket.id).emit("direct-call-unavailable", { toPhone: data.toPhone });
+      sendTo(socket.id, "direct-call-unavailable", { toPhone: data.toPhone });
     }
   });
 
   socket.on("direct-call-accept", ({ toPhone }) => {
     const targetSocket = phoneToSocket[toPhone];
-    if (targetSocket) io.to(targetSocket).emit("direct-call-accepted");
+    if (targetSocket) sendTo(targetSocket, "direct-call-accepted");
   });
 
   socket.on("direct-call-end", ({ toPhone }) => {
     const targetSocket = phoneToSocket[toPhone];
-    if (targetSocket) io.to(targetSocket).emit("direct-call-ended");
+    if (targetSocket) sendTo(targetSocket, "direct-call-ended");
   });
 
   // ---------- DISCONNECT CLEANUP ----------
@@ -2136,6 +2286,8 @@ io.on("connection", (socket) => {
       delete phoneToSocket[phone];
     }
     delete socketToPhone[socket.id];
+    delete selfPhoneBySocket[socket.id];
+    adminSockets.delete(socket.id);
 
     const roomCode = socketToRoom[socket.id];
     if (roomCode && roomMembers[roomCode]) {
