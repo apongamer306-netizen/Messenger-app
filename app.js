@@ -6010,7 +6010,7 @@ window.EktReact = (function () {
     if (name === "Home") loadFeed();
     if (name === "Friends") { fetchFriendData(); loadSuggest(); renderFriends(); }
     if (name === "Messages") renderChats();
-    if (name === "Reels") loadReels(); else pauseReels();
+    if (name === "Reels") { loadReels(); requestAnimationFrame(fitReels); setTimeout(fitReels, 300); } else pauseReels();
     // ট্যাব বদলালে আগের ট্যাবের (যেমন Home-এর) চালু ভিডিও নিজে থেকে বন্ধ হবে
     document.querySelectorAll("video").forEach((v) => {
       const panel = v.closest(".tab-panel, [id^='tab']");
@@ -6422,19 +6422,117 @@ window.EktReact = (function () {
   function ytCmd(frame, func) {
     try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*"); } catch (e) {}
   }
+  // লাইক/কমেন্টের গণনা (ভিডিও আইডি -> { likes, comments, my })
+  const shortStates = {};
   function shortItemHtml(v) {
     const id = v.id;
-    return `<div class="reel-item short-item" data-yt="${esc(id)}">
+    const st = shortStates[id] || { likes: 0, comments: 0, my: false };
+    return `<div class="reel-item short-item" data-yt="${esc(id)}" data-title="${esc((v.title || "").slice(0, 150))}" data-ch="${esc((v.channel || "").slice(0, 60))}">
       <img class="short-thumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy">
       <div class="short-shield" data-short-tap></div>
       <div class="short-pause"><i class="fa-solid fa-play"></i></div>
       <div class="reel-info short-info"><div class="reel-owner"><i class="fa-brands fa-youtube short-yt"></i><b>${esc(v.channel || "YouTube")}</b></div>${v.title ? `<p>${esc(v.title)}</p>` : ""}</div>
       <div class="reel-side">
+        <div class="reel-act"><button type="button" class="reel-round${st.my ? " reacted" : ""}" data-short-like title="Like"><i class="${st.my ? "fa-solid" : "fa-regular"} fa-thumbs-up"></i></button><span class="reel-count" data-short-like-n>${st.likes || "Like"}</span></div>
+        <div class="reel-act"><button type="button" class="reel-round" data-short-comment title="Comment"><i class="fa-regular fa-comment"></i></button><span class="reel-count" data-short-cm-n>${st.comments || "Comment"}</span></div>
         <button type="button" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
         <button type="button" data-short-share title="Share"><i class="fa-solid fa-share"></i></button>
         <button type="button" data-short-open title="Open in YouTube"><i class="fa-brands fa-youtube"></i></button>
       </div>
     </div>`;
+  }
+  function paintShort(id) {
+    const st = shortStates[id];
+    if (!st) return;
+    document.querySelectorAll('#shortsList .short-item[data-yt="' + id + '"]').forEach((it) => {
+      const b = it.querySelector("[data-short-like]");
+      if (b) { b.classList.toggle("reacted", !!st.my); const ic = b.querySelector("i"); if (ic) ic.className = (st.my ? "fa-solid" : "fa-regular") + " fa-thumbs-up"; }
+      const ln = it.querySelector("[data-short-like-n]"); if (ln) ln.textContent = st.likes || "Like";
+      const cn = it.querySelector("[data-short-cm-n]"); if (cn) cn.textContent = st.comments || "Comment";
+    });
+  }
+  function hydrateShorts(ids) {
+    if (!ids.length) return;
+    const m = me();
+    socket.emit("short-state", { ids, phone: m ? m.phone : "" }, (res) => {
+      if (!res || !res.success) return;
+      (res.list || []).forEach((s) => { shortStates[s.id] = { likes: s.likes, comments: s.comments, my: !!s.my }; paintShort(s.id); });
+    });
+  }
+  function toggleShortLike(item) {
+    const m = me();
+    if (!m) return;
+    const id = item.dataset.yt;
+    const st = shortStates[id] || (shortStates[id] = { likes: 0, comments: 0, my: false });
+    st.my = !st.my;
+    st.likes = Math.max(0, (st.likes || 0) + (st.my ? 1 : -1));
+    paintShort(id);
+    socket.emit("short-like", { id, phone: m.phone, like: st.my, title: item.dataset.title, channel: item.dataset.ch }, (res) => {
+      if (res && res.success) { st.my = !!res.my; st.likes = res.likes; }
+      else { st.my = !st.my; st.likes = Math.max(0, st.likes + (st.my ? 1 : -1)); }
+      paintShort(id);
+    });
+  }
+  function drawShortComments(sheet, list) {
+    const m = me();
+    const box = sheet.querySelector(".reel-cm-list");
+    box.innerHTML = list.length
+      ? list.map((c) => `<div class="sh-cm" data-cid="${esc(c.id)}"><img class="sh-cm-av" src="${esc(oi(c.authorPic, 64, true))}" alt=""><div class="sh-cm-b"><b>${esc(c.authorName || "User")}</b><span>${esc(c.text)}</span></div>${m && c.authorPhone === m.phone ? `<button type="button" class="sh-cm-del" data-cdel title="Delete"><i class="fa-regular fa-trash-can"></i></button>` : ""}</div>`).join("")
+      : `<div class="reel-cm-empty">এখনো কোনো কমেন্ট নেই। প্রথম কমেন্টটি আপনিই করুন।</div>`;
+    sheet.querySelector(".reel-cm-title").textContent = "Comments" + (list.length ? " (" + list.length + ")" : "");
+    box.scrollTop = box.scrollHeight;
+  }
+  function toggleShortComments(item) {
+    const existing = item.querySelector(".reel-comments");
+    if (existing) { existing.remove(); return; }
+    const m = me();
+    if (!m) return;
+    const id = item.dataset.yt;
+    let list = [];
+    const sheet = document.createElement("div");
+    sheet.className = "reel-comments";
+    sheet.innerHTML = `<div class="reel-cm-head"><b class="reel-cm-title">Comments</b><button type="button" class="reel-cm-x" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="reel-cm-list"></div>
+      <div class="reel-cm-input"><img class="post-comment-avatar" src="${esc(oi(m.pic || "", 64, true))}" alt=""><input type="text" maxlength="500" placeholder="Write a comment..."><button type="button" class="reel-cm-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button></div>`;
+    item.appendChild(sheet);
+    drawShortComments(sheet, list);
+    socket.emit("short-comments", { id }, (res) => {
+      if (res && res.success) { list = res.comments || []; drawShortComments(sheet, list); }
+    });
+    const input = sheet.querySelector("input");
+    const sendIt = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      socket.emit("short-comment", { id, phone: m.phone, text, title: item.dataset.title, channel: item.dataset.ch }, (res) => {
+        if (res && res.success) {
+          if (!list.some((c) => c.id === res.comment.id)) list.push(res.comment);
+          const st = shortStates[id] || (shortStates[id] = { likes: 0, comments: 0, my: false });
+          st.comments = res.count;
+          paintShort(id);
+          drawShortComments(sheet, list);
+        } else if (typeof showMiniToast === "function") showMiniToast("কমেন্ট করা যায়নি");
+      });
+    };
+    sheet.querySelector(".reel-cm-send").onclick = sendIt;
+    input.onkeypress = (e) => { if (e.key === "Enter") sendIt(); };
+    sheet.querySelector(".reel-cm-x").onclick = () => sheet.remove();
+    sheet.querySelector(".reel-cm-list").onclick = (e) => {
+      const del = e.target.closest("[data-cdel]");
+      if (!del) return;
+      const row = del.closest(".sh-cm");
+      if (!row) return;
+      socket.emit("short-comment-delete", { id, commentId: row.dataset.cid, phone: m.phone }, (res) => {
+        if (res && res.success) {
+          list = list.filter((c) => c.id !== row.dataset.cid);
+          const st = shortStates[id] || (shortStates[id] = { likes: 0, comments: 0, my: false });
+          st.comments = res.count;
+          paintShort(id);
+          drawShortComments(sheet, list);
+        }
+      });
+    };
+    setTimeout(() => input.focus(), 50);
   }
   function stopShortFrames(exceptItem) {
     document.querySelectorAll("#shortsList .short-item").forEach((it) => {
@@ -6459,6 +6557,12 @@ window.EktReact = (function () {
     f.addEventListener("load", () => { if (!shortMuted) setTimeout(() => ytCmd(f, "unMute"), 600); });
     item.classList.remove("paused");
     item.insertBefore(f, item.querySelector(".short-shield"));
+    // কয়েক সেকেন্ড দেখলে সেটাও পছন্দের সংকেত — সার্ভার এখান থেকে টপিক শেখে
+    clearTimeout(item._wt);
+    item._wt = setTimeout(() => {
+      const m = me();
+      if (m && item.querySelector("iframe")) socket.emit("short-signal", { phone: m.phone, title: item.dataset.title, channel: item.dataset.ch });
+    }, 6000);
   }
   function observeShorts(root) {
     if (!shortsObserver) {
@@ -6480,7 +6584,7 @@ window.EktReact = (function () {
     shortsLoading = true;
     const box = $("shortsList");
     if (!box.children.length) box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-spinner fa-spin"></i><p>Shorts লোড হচ্ছে…</p></div>`;
-    socket.emit("get-shorts", { seen: shortsSeen.slice(-200) }, (res) => {
+    socket.emit("get-shorts", { seen: shortsSeen.slice(-200), phone: (me() || {}).phone || "" }, (res) => {
       shortsLoading = false;
       const first = !box.querySelector(".short-item");
       if (!res || !res.success) {
@@ -6497,6 +6601,7 @@ window.EktReact = (function () {
       if (shortsSeen.length > 400) shortsSeen = shortsSeen.slice(-300);
       box.insertAdjacentHTML("beforeend", list.map(shortItemHtml).join(""));
       observeShorts(box);
+      hydrateShorts(list.map((v) => v.id));
     });
   }
   function setReelMode(mode) {
@@ -6505,6 +6610,7 @@ window.EktReact = (function () {
     $("reelsList").style.display = shortsMode ? "none" : "";
     $("shortsList").style.display = shortsMode ? "" : "none";
     $("trUpload").style.display = shortsMode ? "none" : "";
+    requestAnimationFrame(fitReels);
     if (shortsMode) { pauseReels(); loadShorts(); }
     else { document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); loadReels(); }
   }
@@ -6521,6 +6627,8 @@ window.EktReact = (function () {
     const item = e.target.closest(".short-item");
     if (!item) return;
     const id = item.dataset.yt;
+    if (e.target.closest("[data-short-like]")) { toggleShortLike(item); return; }
+    if (e.target.closest("[data-short-comment]")) { toggleShortComments(item); return; }
     if (e.target.closest("[data-short-sound]")) {
       shortMuted = !shortMuted;
       const f = item.querySelector("iframe");
@@ -6545,6 +6653,53 @@ window.EktReact = (function () {
       ytCmd(f, nowPaused ? "pauseVideo" : "playVideo");
     }
   });
+
+  // ---------- স্ক্রিনে ফিট + উপর/নিচ অ্যারো ----------
+  const activeReelList = () => (shortsMode ? $("shortsList") : $("reelsList"));
+  function updateReelNav() {
+    const list = activeReelList(), up = $("reelNavUp"), dn = $("reelNavDown");
+    if (!list || !up || !dn) return;
+    up.disabled = list.scrollTop < 8;
+    dn.disabled = !shortsMode && list.scrollTop + list.clientHeight >= list.scrollHeight - 8;
+  }
+  function positionReelNav() {
+    const nav = $("reelNav"), list = activeReelList();
+    if (!nav || !list || !list.offsetHeight) return;
+    // ল্যাপটপে কার্ডের ডানে বাইরে, ফোনে কার্ডের বাম পাশে ভেতরে
+    nav.style.left = (isDesktop() ? list.offsetLeft + list.offsetWidth + 14 : list.offsetLeft + 8) + "px";
+    nav.style.top = Math.max(0, list.offsetTop + list.offsetHeight / 2 - nav.offsetHeight / 2) + "px";
+    updateReelNav();
+  }
+  function fitReels() {
+    const panel = $("tabReels"), stage = $("reelStage");
+    if (!panel || !stage || !panel.classList.contains("active")) return;
+    const top = stage.getBoundingClientRect().top + window.scrollY;
+    const h = Math.max(260, Math.min(window.innerHeight - top - 10, 820));
+    panel.style.setProperty("--rh", Math.floor(h) + "px");
+    positionReelNav();
+  }
+  function reelStep(dir) {
+    const list = activeReelList();
+    if (list) list.scrollBy({ top: dir * list.clientHeight, behavior: "smooth" });
+  }
+  $("reelNavUp").addEventListener("click", () => reelStep(-1));
+  $("reelNavDown").addEventListener("click", () => reelStep(1));
+  $("reelsList").addEventListener("scroll", updateReelNav, { passive: true });
+  $("shortsList").addEventListener("scroll", updateReelNav, { passive: true });
+  window.addEventListener("resize", fitReels);
+  window.addEventListener("orientationchange", () => setTimeout(fitReels, 250));
+  document.addEventListener("keydown", (e) => {
+    if (current !== "Reels" || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    e.preventDefault();
+    reelStep(e.key === "ArrowUp" ? -1 : 1);
+  });
+  // পোর্ট্রেট ভিডিও হলে কালো দাগ ছাড়া পুরো কার্ড ভরবে
+  $("reelsList").addEventListener("loadedmetadata", (e) => {
+    const v = e.target;
+    if (v && v.tagName === "VIDEO" && v.videoWidth && v.videoWidth / v.videoHeight < 0.95) v.style.objectFit = "cover";
+  }, true);
 
   // ---------- REEL COMMENTS (নিচ থেকে ওঠা শিট) ----------
   const findReel = (id) => reelsCache.find((x) => x.id === id);
