@@ -136,13 +136,17 @@ img { -webkit-user-drag: none; }
 .icon-btn:active { transform: scale(0.94); }
 
 /* লোগো — অক্ষর একটা একটা করে হালকা ফেড-ইন হয়ে বসে, তারপর লেখাজুড়ে নরম রঙিন ঝিলিক বয়ে যায় */
+.logo, .logo * {
+  font-family: 'Pacifico', 'Hind Siliguri', cursive;
+  font-style: normal;
+  font-weight: 400;
+}
 .logo {
   position: relative;
   display: inline-block;
-  font-weight: 800;
-  font-size: clamp(1.3rem, 5vw, 1.9rem);
-  line-height: 1.15;
-  letter-spacing: 2px;
+  font-size: clamp(1.2rem, 4.8vw, 1.75rem);
+  line-height: 1.35;
+  letter-spacing: 1px;
   color: #4f8cff;
   white-space: nowrap;
   filter: drop-shadow(0 0 12px rgba(79, 140, 255, 0.35));
@@ -2872,7 +2876,7 @@ body.dashboard-active .profile-modal {
 
 
 /* ড্যাশবোর্ড লোগো: আগের মতো বড় হাতের EKT CHATTER + টাইপ/মোছা অ্যানিমেশন + রঙিন গ্রেডিয়েন্ট */
-.dash-topbar .dash-logo { font-size: clamp(1.15rem, 4.6vw, 1.55rem); letter-spacing: 2px; }
+.dash-topbar .dash-logo { font-size: clamp(1.05rem, 4.2vw, 1.4rem); letter-spacing: 1px; }
 
 
 /* =====================================================================
@@ -3147,3 +3151,21 @@ body.dashboard-active .profile-modal {
 .stg-dev-out { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid rgba(239,68,68,.35); border-radius: 12px; background: rgba(239,68,68,.1); color: #ef4444; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .stg-dev-out:hover { background: rgba(239,68,68,.18); }
 .stg-dev-out i { font-size: 12px; }
+
+
+/* ===== Reels | Shorts সুইচ ===== */
+.reel-switch { display: flex; gap: 6px; max-width: 420px; margin: 0 auto 10px; padding: 4px; background: var(--surface-3, var(--surface)); border-radius: 999px; }
+.reel-switch button { flex: 1; padding: 8px 12px; border: none; border-radius: 999px; background: transparent; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s ease, color .2s ease; }
+.reel-switch button.active { background: linear-gradient(135deg, #f97316, #ef4444); color: #fff; box-shadow: 0 4px 14px rgba(249,115,22,.35); }
+
+/* ===== YouTube Shorts আইটেম ===== */
+.short-item .short-thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(0); background: #000; }
+.short-item .short-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.short-item .short-shield { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 2; cursor: pointer; }
+.short-item .reel-info, .short-item .reel-side { z-index: 3; }
+.short-item .reel-info { pointer-events: none; }
+.short-yt { color: #ff0000; font-size: 26px; }
+.short-info .reel-owner { cursor: default; }
+.short-info p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.short-pause { position: absolute; z-index: 3; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center; font-size: 24px; pointer-events: none; }
+.short-item.paused .short-pause { display: flex; }
