@@ -6452,7 +6452,7 @@ window.EktReact = (function () {
       <div class="reel-info short-info"><div class="reel-owner"><i class="fa-brands fa-youtube short-yt"></i><b>${esc(v.channel || "YouTube")}</b></div>${v.title ? `<p>${esc(v.title)}</p>` : ""}</div>
       <button type="button" class="reel-sound-top" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
       <div class="reel-side">
-        <button type="button" class="reel-round short-pp" data-short-pp title="Play / Pause"><i class="fa-solid fa-pause pp-pause"></i><i class="fa-solid fa-play pp-play"></i></button>
+        <button type="button" class="reel-round short-pp" data-short-pp title="Play / Pause"><i class="fa-solid fa-pause"></i></button>
         <div class="reel-act"><button type="button" class="reel-round${st.my ? " reacted" : ""}" data-short-like title="Like"><i class="${st.my ? "fa-solid" : "fa-regular"} fa-thumbs-up"></i></button><span class="reel-count" data-short-like-n>${st.likes || "Like"}</span></div>
         <div class="reel-act"><button type="button" class="reel-round" data-short-comment title="Comment"><i class="fa-regular fa-comment"></i></button><span class="reel-count" data-short-cm-n>${st.comments || "Comment"}</span></div>
         <button type="button" data-short-share title="Share"><i class="fa-solid fa-share"></i></button>
@@ -6555,15 +6555,11 @@ window.EktReact = (function () {
   // ---------- Shorts প্লেয়ার: YouTube-এর নিজের বাটন/টাইটেল শুরুর কয়েক সেকেন্ড ভেসে ওঠে ----------
   // তাই ভিডিও আগেই (পরেরটা আগেভাগে) লুকিয়ে চালু করে রাখা হয়; ওই সময় পেরোলে তবেই দেখানো হয় — ফলে ইউজার কোনো বাটন দেখে না।
   const CHROME_HOLD_MS = 2000;
-  const NOBTN_MS = 3500; // ভিডিও দেখানো/চালু/শব্দ বদলের পর এতক্ষণ মাঝখানের ছোট অংশ ঢাকা থাকে — YouTube-এর বাটন যেন কোনোভাবেই না দেখা যায়
-  function coverCenter(item) {
-    const f = item && item.querySelector("iframe");
-    if (!f) return;
-    f.classList.add("nobtn");
-    clearTimeout(f._nbT);
-    f._nbT = setTimeout(() => { f.classList.remove("nobtn"); }, NOBTN_MS);
-  }
   const POST_SEEK_HOLD_MS = 0; // রিওয়াইন্ডের পর এতক্ষণ লুকিয়ে রাখা হয় (বাটন পুরোপুরি মিলানোর জন্য)
+  function syncPP(item) {
+    const ic = item.querySelector("[data-short-pp] i");
+    if (ic) ic.className = "fa-solid " + (item.classList.contains("paused") ? "fa-play" : "fa-pause");
+  }
   function stopShortFrames(keepA, keepB) {
     document.querySelectorAll("#shortsList .short-item").forEach((it) => {
       if (it === keepA || it === keepB) return;
@@ -6572,6 +6568,7 @@ window.EktReact = (function () {
       if (f) f.remove();
       it._pre = false; it._active = false;
       it.classList.remove("paused");
+      syncPP(it);
     });
   }
   function buildFrame(item) {
@@ -6595,6 +6592,7 @@ window.EktReact = (function () {
       ytCmd(f, "addEventListener", ["onStateChange"]);
     });
     item.classList.remove("paused");
+    syncPP(item);
     item.insertBefore(f, item.querySelector(".short-shield"));
     return f;
   }
@@ -6623,10 +6621,7 @@ window.EktReact = (function () {
       return;
     }
     f._shown = true;
-    f.classList.add("nobtn");
     f.classList.remove("hold");
-    clearTimeout(f._nbT);
-    f._nbT = setTimeout(() => { f.classList.remove("nobtn"); }, NOBTN_MS);
     item._w = { acc: 0, t0: Date.now(), loops: 0 };
   }
   function activateShort(item) {
@@ -6725,7 +6720,7 @@ window.EktReact = (function () {
     if (e.target.closest("[data-short-sound]")) {
       shortMuted = !shortMuted;
       const f = item.querySelector("iframe");
-      if (f) { coverCenter(item); ytCmd(f, shortMuted ? "mute" : "unMute"); }
+      if (f) ytCmd(f, shortMuted ? "mute" : "unMute");
       $("shortsList").querySelectorAll("[data-short-sound] i").forEach((i) => { i.className = "fa-solid " + (shortMuted ? "fa-volume-xmark" : "fa-volume-high"); });
       return;
     }
@@ -6743,8 +6738,8 @@ window.EktReact = (function () {
       if (!f) { activateShort(item); return; }
       if (!f._shown) return; // এখনো তৈরি হচ্ছে
       const nowPaused = !item.classList.contains("paused");
-      item.classList.toggle("paused", nowPaused);
-      if (nowPaused) { pauseWatch(item); ytCmd(f, "pauseVideo"); } else { coverCenter(item); resumeWatch(item); ytCmd(f, "playVideo"); }
+      item.classList.toggle("paused", nowPaused); syncPP(item);
+      if (nowPaused) { pauseWatch(item); ytCmd(f, "pauseVideo"); } else { resumeWatch(item); ytCmd(f, "playVideo"); }
     }
   });
 
