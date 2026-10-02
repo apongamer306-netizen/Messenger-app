@@ -6419,9 +6419,20 @@ window.EktReact = (function () {
   // ---------- SHORTS (YouTube থেকে সরাসরি — আমাদের সার্ভারে ভিডিও জমে না) ----------
   let shortsMode = false, shortsSeen = [], shortsLoading = false, shortsEnded = false, shortsObserver = null, shortMuted = true;
   const YT_ID_RE = /^[\w-]{11}$/;
-  function ytCmd(frame, func) {
-    try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*"); } catch (e) {}
+  function ytCmd(frame, func, args) {
+    try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: args || [] }), "*"); } catch (e) {}
   }
+  // playlist প্যারামিটার দিলে YouTube মাঝখানে আগের/পরের বাটন দেখায় — তাই সেটা বাদ; লুপ নিজেরা করি (শেষ হলে আবার শুরু)
+  window.addEventListener("message", (e) => {
+    if (!e.origin || e.origin.indexOf("youtube") === -1) return;
+    let d = e.data;
+    if (typeof d === "string") { try { d = JSON.parse(d); } catch (er) { return; } }
+    if (d && d.event === "onStateChange" && d.info === 0) {
+      document.querySelectorAll("#shortsList iframe").forEach((f) => {
+        if (f.contentWindow === e.source) { ytCmd(f, "seekTo", [0, true]); ytCmd(f, "playVideo"); }
+      });
+    }
+  });
   // লাইক/কমেন্টের গণনা (ভিডিও আইডি -> { likes, comments, my })
   const shortStates = {};
   function shortItemHtml(v) {
@@ -6552,8 +6563,12 @@ window.EktReact = (function () {
     f.title = "YouTube Short";
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.referrerPolicy = "strict-origin-when-cross-origin";
-    f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&controls=0&loop=1&playlist=" + id +
+    f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&controls=0&loop=0" +
       "&playsinline=1&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+    f.addEventListener("load", () => {
+      try { f.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*"); } catch (er) {}
+      ytCmd(f, "addEventListener", ["onStateChange"]);
+    });
     f.addEventListener("load", () => { if (!shortMuted) setTimeout(() => ytCmd(f, "unMute"), 600); });
     item.classList.remove("paused");
     item.insertBefore(f, item.querySelector(".short-shield"));
