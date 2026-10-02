@@ -6452,6 +6452,7 @@ window.EktReact = (function () {
       <div class="reel-info short-info"><div class="reel-owner"><i class="fa-brands fa-youtube short-yt"></i><b>${esc(v.channel || "YouTube")}</b></div>${v.title ? `<p>${esc(v.title)}</p>` : ""}</div>
       <button type="button" class="reel-sound-top" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
       <div class="reel-side">
+        <button type="button" class="reel-round short-pp" data-short-pp title="Play / Pause"><i class="fa-solid fa-pause pp-pause"></i><i class="fa-solid fa-play pp-play"></i></button>
         <div class="reel-act"><button type="button" class="reel-round${st.my ? " reacted" : ""}" data-short-like title="Like"><i class="${st.my ? "fa-solid" : "fa-regular"} fa-thumbs-up"></i></button><span class="reel-count" data-short-like-n>${st.likes || "Like"}</span></div>
         <div class="reel-act"><button type="button" class="reel-round" data-short-comment title="Comment"><i class="fa-regular fa-comment"></i></button><span class="reel-count" data-short-cm-n>${st.comments || "Comment"}</span></div>
         <button type="button" data-short-share title="Share"><i class="fa-solid fa-share"></i></button>
@@ -6736,7 +6737,7 @@ window.EktReact = (function () {
       return;
     }
     if (e.target.closest("[data-short-open]")) { window.open("https://www.youtube.com/shorts/" + id, "_blank", "noopener"); return; }
-    if (e.target.closest("[data-short-tap]")) {
+    if (e.target.closest("[data-short-tap]") || e.target.closest("[data-short-pp]")) {
       // ট্যাপ করলে থামা/চলা
       const f = item.querySelector("iframe");
       if (!f) { activateShort(item); return; }
