@@ -1994,6 +1994,10 @@ profileModalOverlay.id = "profileModalOverlay";
 profileModalOverlay.className = "profile-modal-overlay";
 profileModalOverlay.innerHTML = `
   <div class="profile-modal">
+    <div class="pm-topbar">
+      <button type="button" id="pmCloseBtn" class="pm-back-btn" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>
+      <div id="pmTopTitle" class="pm-top-title"></div>
+    </div>
     <div class="profile-modal-cover" id="pmCover">
       <div class="profile-cover-clip">
         <img id="pmCoverImg" class="profile-cover-img" alt="" style="display:none;">
@@ -2016,6 +2020,10 @@ profileModalOverlay.innerHTML = `
         <button type="button" id="pmEditNameBtn" class="pm-edit-name-btn" style="display:none;" title="Change name"><i class="fa-solid fa-pen"></i></button>
       </div>
       <div id="pmSub" class="profile-modal-sub pm-bio-box">Friend on EKT Chatter</div>
+      <div class="profile-modal-actions pm-actions-top">
+        <button id="pmFriendBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-user-plus"></i> Add Friend</button>
+        <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
+      </div>
       <div id="pmAboutBox" class="pm-about-box"></div>
       <div id="pmLockedBox" class="pm-locked-box" style="display:none;">
         <i class="fa-solid fa-lock"></i>
@@ -2060,15 +2068,19 @@ profileModalOverlay.innerHTML = `
         <div id="pmGallery" class="profile-gallery"></div>
       </div>
 
-      <div class="profile-modal-actions">
-        <button id="pmFriendBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-user-plus"></i> Add Friend</button>
-        <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
-        <button id="pmCloseBtn" class="btn btn-secondary">Close</button>
-      </div>
     </div>
   </div>
 `;
 document.body.appendChild(profileModalOverlay);
+{
+  // উপরের বারে প্রোফাইলের নাম দেখানো (pmName বদলালেই সাথে সাথে বদলায়)
+  const _n = document.getElementById("pmName"), _t = document.getElementById("pmTopTitle");
+  if (_n && _t) {
+    const sync = () => { _t.textContent = _n.textContent || ""; };
+    new MutationObserver(sync).observe(_n, { childList: true, characterData: true, subtree: true });
+    sync();
+  }
+}
 
 // আপলোডের জন্য লুকানো ফাইল ইনপুট
 const profileFileInput = document.createElement("input");
@@ -3008,7 +3020,7 @@ function openProfile(phone, fallback) {
   pmComposerPreview.innerHTML = "";
   profileViewState = { phone, isMe, data: (isMe && window.__ektMyProfile) || fallback || {}, tab: "posts", locked: false, loading: !isMe };
   const moreWrap = document.getElementById("pmMoreWrap");
-  if (moreWrap) moreWrap.style.display = isMe ? "block" : "none";
+  if (moreWrap) moreWrap.style.display = "block";
   const moreMenu = document.getElementById("pmMoreMenu");
   if (moreMenu) moreMenu.classList.remove("open");
   profileModalOverlay.classList.add("active");
@@ -3100,13 +3112,18 @@ document.addEventListener("click", (e) => {
 });
 document.getElementById("pmCopyLinkBtn").onclick = () => {
   document.getElementById("pmMoreMenu").classList.remove("open");
-  ektGetMyLinkId(async (id) => {
-    if (!id) { if (typeof showMiniToast === "function") showMiniToast("লিংক পাওয়া যায়নি, আবার চেষ্টা করুন"); return; }
+  const toast = (m) => { if (typeof showMiniToast === "function") showMiniToast(m); };
+  const copyId = async (id) => {
+    if (!id) return toast("লিংক পাওয়া যায়নি, আবার চেষ্টা করুন");
     const link = location.origin + "/u/" + id;
     const ok = await ektCopyText(link);
-    if (ok) { if (typeof showMiniToast === "function") showMiniToast("প্রোফাইল লিংক কপি হয়েছে"); }
-    else if (typeof showCustomAlert === "function") showCustomAlert("Your profile link", link);
-  });
+    if (ok) toast("প্রোফাইল লিংক কপি হয়েছে");
+    else if (typeof showCustomAlert === "function") showCustomAlert("Profile link", link);
+  };
+  if (profileViewState.isMe) { ektGetMyLinkId(copyId); return; }
+  // অন্যের প্রোফাইলে সার্ভার থেকে আসা আইডিটাই (pid) লিংকে বসে — আসল নম্বর/ইমেইল কখনো লিংকে যায় না
+  const pid = String(profileViewState.phone || "");
+  copyId(/^u[0-9a-f]{16}$/.test(pid) ? pid : null);
 };
 
 // কেউ প্রোফাইল লিংক (/u/<আইডি>) দিয়ে ঢুকলে, লগইনের পর সেই প্রোফাইল খোলা
@@ -6736,7 +6753,7 @@ window.EktReact = (function () {
         (opts.sub ? '<p class="ekt-form-sub">' + esc(opts.sub) + "</p>" : "") +
         '<div class="ekt-form-fields">' +
         opts.fields.map((f, i) =>
-          '<label class="ekt-field"><span>' + esc(f.label) + '</span><input data-i="' + i + '" type="' + (f.type || "text") + '" placeholder="' + esc(f.placeholder || "") + '" autocomplete="off"' + (f.inputmode ? ' inputmode="' + f.inputmode + '"' : "") + "></label>"
+          '<label class="ekt-field"><span>' + esc(f.label) + '</span><div class="ekt-field-box"><input data-i="' + i + '" name="ekt_f_' + Math.random().toString(36).slice(2, 8) + '" type="' + (f.type || "text") + '" placeholder="' + esc(f.placeholder || "") + '" autocomplete="' + (f.type === "password" ? "new-password" : "off") + '" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true"' + (f.type === "password" ? " readonly" : "") + (f.inputmode ? ' inputmode="' + f.inputmode + '"' : "") + ">" + (f.type === "password" ? '<button type="button" class="ekt-eye" aria-label="Show password" tabindex="-1"><i class="fa-solid fa-eye"></i></button>' : "") + "</div></label>"
         ).join("") +
         "</div>" +
         '<div class="ekt-form-err" style="display:none"></div>' +
@@ -6744,6 +6761,14 @@ window.EktReact = (function () {
         "</div>";
       document.body.appendChild(ov);
       const inputs = Array.from(ov.querySelectorAll("input"));
+      // ব্রাউজারের অটো-ফিল/সেভ-করা-পাসওয়ার্ড বন্ধ: পাসওয়ার্ডের ঘর ট্যাপ/ফোকাস করার আগে readonly থাকে
+      inputs.forEach((inp) => {
+        if (inp.hasAttribute("readonly")) {
+          const unlock = () => inp.removeAttribute("readonly");
+          inp.addEventListener("focus", unlock);
+          inp.addEventListener("pointerdown", unlock);
+        }
+      });
       const errEl = ov.querySelector(".ekt-form-err");
       const okBtn = ov.querySelector('[data-act="ok"]');
       let busy = false;
@@ -6759,6 +6784,17 @@ window.EktReact = (function () {
         if (err) showErr(err); else close(true);
       };
       ov.addEventListener("click", (e) => {
+        const eye = e.target.closest(".ekt-eye");
+        if (eye) {
+          // চোখ চাপলে পাসওয়ার্ড দেখা / লুকানো
+          e.preventDefault();
+          const inp = eye.parentNode.querySelector("input");
+          const show = inp.type === "password";
+          inp.type = show ? "text" : "password";
+          eye.querySelector("i").className = "fa-solid " + (show ? "fa-eye-slash" : "fa-eye");
+          try { inp.focus(); } catch (er) {}
+          return;
+        }
         if (e.target === ov && !busy) return close(false);
         const b = e.target.closest("[data-act]");
         if (!b) return;
