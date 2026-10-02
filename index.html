@@ -7,7 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%236366f1'/%3E%3Cstop%20offset='0.5'%20stop-color='%237c5cff'/%3E%3Cstop%20offset='1'%20stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3CradialGradient%20id='core'%20cx='32%25'%20cy='28%25'%20r='70%25'%3E%3Cstop%20offset='0'%20stop-color='%23ddd6fe'/%3E%3Cstop%20offset='0.45'%20stop-color='%236366f1'/%3E%3Cstop%20offset='1'%20stop-color='%231e1b4b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width='64'%20height='64'%20rx='16'%20fill='url(%23g)'/%3E%3Ccircle%20cx='32'%20cy='32'%20r='22'%20fill='url(%23core)'/%3E%3Cpath%20d='M18%2032.5L46%2018l-10%2028-6.5-8.5L18%2032.5zm12.2%206.2l4.3%205.6L41.5%2024.5%2030.2%2038.7z'%20fill='white'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=Poppins:ital,wght@1,400;1,500;1,600;1,700&family=Pacifico&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=Poppins:ital,wght@1,400;1,500;1,600;1,700&family=Pacifico&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=Poppins:ital,wght@1,400;1,500;1,600;1,700&family=Pacifico&display=swap"></noscript>
   <meta name="theme-color" content="#0a0e17">
 
   <!-- ===== PWA/APK ইনস্টলযোগ্য বানানোর জন্য (manifest + আইকন) ===== -->
@@ -19,10 +20,11 @@
   <meta name="mobile-web-app-capable" content="yes">
 
   <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
   
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+  <script defer src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
   <!-- ===== SPLASH: Energy Atom multi-ring + title reveal + circular fill % + typewriter ===== -->
   <style>
@@ -36,17 +38,12 @@
     }
     #splashScreen.splash-hide{ opacity:0; visibility:hidden; pointer-events:none; }
     #splashScreen::before{
-      content:""; position:absolute; inset:-20%;
+      content:""; position:absolute; inset:0;
       background:
         radial-gradient(ellipse 50% 40% at 50% 35%, rgba(79,70,229,.22), transparent 60%),
         radial-gradient(ellipse 40% 30% at 30% 70%, rgba(168,85,247,.12), transparent 55%),
         radial-gradient(ellipse 35% 25% at 75% 60%, rgba(34,211,238,.1), transparent 50%);
-      animation:splashBgDrift 10s ease-in-out infinite alternate;
       pointer-events:none;
-    }
-    @keyframes splashBgDrift{
-      from{ transform:translate(-2%,-1%) scale(1); }
-      to{ transform:translate(2%,1%) scale(1.05); }
     }
 
     .sp-inner{
@@ -72,9 +69,19 @@
       position:relative;
       width:clamp(140px, 38vw, 180px);
       height:clamp(140px, 38vw, 180px);
-      transform-style:preserve-3d;
       margin-bottom:clamp(18px, 4vw, 28px);
       animation:spEnergyIn .9s cubic-bezier(.16,1.2,.3,1) both;
+    }
+    .sp-energy::before{
+      content:""; position:absolute; left:50%; top:50%; width:60%; height:60%; margin:-30% 0 0 -30%;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(129,140,248,.55), rgba(99,102,241,0) 68%);
+      animation:spGlow 2.4s ease-in-out infinite;
+      will-change:transform, opacity;
+    }
+    @keyframes spGlow{
+      0%,100%{ opacity:.55; transform:scale(.88); }
+      50%{ opacity:1; transform:scale(1.12); }
     }
     @keyframes spEnergyIn{
       from{ opacity:0; transform:scale(.4) rotateX(40deg); }
@@ -85,32 +92,23 @@
       width:clamp(48px, 13vw, 58px); height:clamp(48px, 13vw, 58px);
       border-radius:50%;
       background:radial-gradient(circle at 32% 28%, #ddd6fe, #6366f1 45%, #1e1b4b);
-      box-shadow:
-        0 0 26px #6366f1,
-        0 0 52px rgba(99,102,241,.45),
-        inset 0 -8px 14px rgba(0,0,0,.35),
-        inset 0 3px 8px rgba(255,255,255,.18);
+      box-shadow:0 0 20px rgba(99,102,241,.8), inset 0 -8px 14px rgba(0,0,0,.35), inset 0 3px 8px rgba(255,255,255,.18);
       display:flex; align-items:center; justify-content:center;
-      animation:spCorePulse 2.2s ease-in-out infinite;
       z-index:5;
     }
-    .sp-core i{ font-size:clamp(18px, 5vw, 22px); color:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
-    @keyframes spCorePulse{
-      0%,100%{ box-shadow:0 0 26px #6366f1,0 0 52px rgba(99,102,241,.45),inset 0 -8px 14px rgba(0,0,0,.35); }
-      50%{ box-shadow:0 0 38px #818cf8,0 0 72px rgba(129,140,248,.55),inset 0 -8px 14px rgba(0,0,0,.35); }
-    }
+    .sp-core svg{ width:clamp(20px, 5.6vw, 25px); height:clamp(20px, 5.6vw, 25px); fill:#fff; transform:rotate(-24deg) translate(1px,0); }
 
     .sp-ring{
       position:absolute; left:50%; top:50%;
       border-radius:50%;
       border:1.5px solid transparent;
-      transform-style:preserve-3d;
       pointer-events:none;
+      will-change:transform;
     }
     .sp-ring .sp-ball{
       position:absolute; width:7px; height:7px; border-radius:50%;
       top:-3.5px; left:50%; margin-left:-3.5px;
-      box-shadow:0 0 10px currentColor, 0 0 3px #fff;
+      box-shadow:0 0 6px currentColor;
     }
     .sp-ring.r1{
       width:42%; height:42%; margin:0; transform:translate(-50%,-50%) rotateX(72deg);
@@ -136,50 +134,34 @@
       animation:spR4 5.2s linear infinite; opacity:.9;
     }
     .sp-ring.r4 .sp-ball{ background:#a78bfa; color:#a78bfa; width:6px; height:6px; }
-    .sp-ring.r5{
-      width:90%; height:90%; transform:translate(-50%,-50%) rotateX(62deg) rotateZ(20deg);
-      border-top-color:#34d399; border-right-color:rgba(52,211,153,.2);
-      animation:spR5 6.2s linear infinite; opacity:.75;
-    }
-    .sp-ring.r5 .sp-ball{ background:#34d399; color:#34d399; width:5px; height:5px; }
-    .sp-ring.r6{
-      width:98%; height:98%; transform:translate(-50%,-50%) rotateX(75deg) rotateZ(-30deg);
-      border-bottom-color:#f472b6; border-left-color:rgba(244,114,182,.2);
-      animation:spR6 7.4s linear infinite; opacity:.65;
-    }
-    .sp-ring.r6 .sp-ball{ background:#f472b6; color:#f472b6; width:5px; height:5px; }
 
     @keyframes spR1{ to{ transform:translate(-50%,-50%) rotateX(72deg) rotate(360deg); } }
     @keyframes spR2{ to{ transform:translate(-50%,-50%) rotateX(68deg) rotateZ(40deg) rotate(-360deg); } }
     @keyframes spR3{ to{ transform:translate(-50%,-50%) rotateX(65deg) rotateZ(-55deg) rotate(360deg); } }
     @keyframes spR4{ to{ transform:translate(-50%,-50%) rotateX(70deg) rotateZ(90deg) rotate(-360deg); } }
-    @keyframes spR5{ to{ transform:translate(-50%,-50%) rotateX(62deg) rotateZ(20deg) rotate(360deg); } }
-    @keyframes spR6{ to{ transform:translate(-50%,-50%) rotateX(75deg) rotateZ(-30deg) rotate(-360deg); } }
 
     /* ---- Title: one line, responsive ---- */
     .sp-title{
-      font-family:"Inter",system-ui,sans-serif;
-      font-size:clamp(16px, 4.5vw, 22px);
-      font-weight:800;
-      letter-spacing:0.12em;
-      text-indent:0;
+      font-family:"Pacifico","Hind Siliguri",cursive;
+      font-size:clamp(24px, 7vw, 32px);
+      font-weight:400;
+      font-style:normal;
+      letter-spacing:0.05em;
+      line-height:1.35;
       text-align:center;
-      margin:0 0 6px;
+      margin:0 0 4px;
       padding:0 8px;
       width:100%;
       white-space:nowrap;
-      color:#f1f5ff;
-      text-shadow:
-        0 0 14px rgba(129,140,248,.65),
-        0 0 28px rgba(99,102,241,.3),
-        0 2px 6px rgba(0,0,0,.35);
+      color:#e0e7ff;
+      text-shadow:0 0 14px rgba(129,140,248,.5);
     }
     .sp-title span{
       display:inline-block;
       opacity:0;
       transform:translateY(10px);
-      color:#f1f5ff;
-      -webkit-text-fill-color:#f1f5ff;
+      font-family:inherit; font-style:normal; font-weight:400;
+      color:#e0e7ff;
     }
     .sp-title.show span{
       animation:spLetterIn .45s cubic-bezier(.16,1.1,.3,1) forwards;
@@ -271,13 +253,10 @@
     }
     .sp-credit-text{
       background:linear-gradient(90deg,#94a3b8,#c4b5fd,#67e8f9,#c4b5fd,#94a3b8);
-      background-size:200% auto;
       -webkit-background-clip:text; background-clip:text;
       -webkit-text-fill-color:transparent;
       color:transparent;
-      animation:spCreditShine 5s linear infinite;
     }
-    @keyframes spCreditShine{ to{ background-position:200% center; } }
     .sp-credit-cursor{
       display:inline-block;
       width:1.5px; height:1em;
@@ -290,6 +269,16 @@
     .sp-credit-cursor.on{ opacity:1; }
     @keyframes spBlink{ 50%{ opacity:0; } }
 
+    /* ---- লো-এন্ড ডিভাইসের জন্য আরও হালকা মোড (JS নিজে বুঝে চালু করে) ---- */
+    .sp-lite .sp-ring.r3, .sp-lite .sp-ring.r4{ display:none; }
+    .sp-lite .sp-energy::before{ animation:none; opacity:.8; }
+    .sp-lite .sp-energy{ animation-duration:.4s; }
+    .sp-lite .sp-title{ text-shadow:none; }
+    .sp-lite .sp-title span{ animation-duration:.01ms !important; animation-delay:0s !important; }
+    .sp-lite .sp-tagline.show{ animation-duration:.3s; }
+    .sp-lite .sp-circle{ box-shadow:none; }
+    .sp-lite .sp-core{ box-shadow:0 0 12px rgba(99,102,241,.7), inset 0 -6px 10px rgba(0,0,0,.3); }
+    .sp-lite .sp-ball{ box-shadow:none !important; }
     @media (prefers-reduced-motion: reduce){
       #splashScreen *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; }
     }
@@ -304,9 +293,7 @@
         <div class="sp-ring r2"><span class="sp-ball"></span></div>
         <div class="sp-ring r3"><span class="sp-ball"></span></div>
         <div class="sp-ring r4"><span class="sp-ball"></span></div>
-        <div class="sp-ring r5"><span class="sp-ball"></span></div>
-        <div class="sp-ring r6"><span class="sp-ball"></span></div>
-        <div class="sp-core"><i class="fa-solid fa-paper-plane"></i></div>
+        <div class="sp-core"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></div>
       </div>
 
       <h1 class="sp-title" id="splashTitle" aria-label="EKT CHATTER"></h1>
@@ -399,6 +386,25 @@
       var creditEl = document.getElementById("splashCredit");
       var cursorEl = document.getElementById("splashCursor");
 
+      // লো-এন্ড ডিভাইস চেনা: কম RAM/কম কোর/ডেটা-সেভার হলে সাথে সাথে, আর বাকিদের ক্ষেত্রে প্রথম ~১ সেকেন্ডে
+      // ফ্রেম-রেট মেপে (৩০ FPS-এর নিচে হলে) হালকা মোডে চলে যায়। হালকা মোডে রিং কম, গ্লো/শ্যাডো নেই।
+      var spEl = document.getElementById("splashScreen");
+      function goLite() { if (spEl) spEl.classList.add("sp-lite"); }
+      try {
+        var dm = navigator.deviceMemory, hc = navigator.hardwareConcurrency;
+        var cn = navigator.connection;
+        if ((dm && dm <= 3) || (hc && hc <= 4) || (cn && cn.saveData)) goLite();
+        else {
+          var pf = 0, pt0 = 0;
+          (function probe(now) {
+            if (!pt0) pt0 = now;
+            pf++;
+            if (now - pt0 < 1000) requestAnimationFrame(probe);
+            else if (pf / ((now - pt0) / 1000) < 30) goLite();
+          })(performance.now());
+        }
+      } catch (e) {}
+
       function realHide() {
         if (splashDone) return;
         splashDone = true;
@@ -483,11 +489,19 @@
         if (!titleEl) { titleDone = true; tryFinish(); return; }
                 var name = "EKT CHATTER";
         titleEl.textContent = "";
+        // অক্ষর ধরে ধরে গ্রেডিয়েন্ট রং: ল্যাভেন্ডার → আকাশি → গোলাপি
+        var stops = [[196,181,253],[103,232,249],[232,121,249]];
+        function titleColor(t) {
+          var seg = t * (stops.length - 1), k = Math.min(stops.length - 2, Math.floor(seg)), f = seg - k;
+          var a = stops[k], b = stops[k + 1];
+          return "rgb(" + [0,1,2].map(function (n) { return Math.round(a[n] + (b[n] - a[n]) * f); }).join(",") + ")";
+        }
         titleEl.innerHTML = "";
         for (var i = 0; i < name.length; i++) {
           var s = document.createElement("span");
           s.textContent = name[i] === " " ? String.fromCharCode(160) : name[i];
           s.style.animationDelay = (i * 0.06) + "s";
+          s.style.color = titleColor(i / (name.length - 1));
           s.style.opacity = "0";
           titleEl.appendChild(s);
         }
@@ -751,7 +765,9 @@
 
       <section id="tabReels" class="tab-panel">
         <div class="tp-head"><h3>Reels</h3><div class="tp-head-btns"><button type="button" id="trUpload" title="Upload reel"><i class="fa-solid fa-video"></i></button></div></div>
+        <div class="reel-switch" id="reelSwitch"><button type="button" class="active" data-rs="reels">Reels</button><button type="button" data-rs="shorts">Shorts</button></div>
         <div id="reelsList" class="reels-list"></div>
+        <div id="shortsList" class="reels-list" style="display:none"></div>
       </section>
 
       <section id="tabMenu" class="tab-panel">
@@ -1026,7 +1042,7 @@
 
   </main>
 
-  <script src="/app.js"></script>
+  <script defer src="/app.js"></script>
   <script>
     // পুনর্ব্যবহারযোগ্য টাইপ → কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ।
     // হেডারের "EKT CHATTER" ও "Developed by Eyamin" — দুটো জায়গাতেই এই একই ফাংশন চলে।
