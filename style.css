@@ -3221,3 +3221,13 @@ body.tab-reels { overflow: hidden; }
 #tabReels .reel-switch button { padding: 5px 10px; font-size: 13px; }
 #tabReels { padding-top: 4px; }
 @media (min-width: 900px) { #tabReels { padding-top: 4px; } }
+
+/* Shorts: শুরুর কয়েক সেকেন্ড (YouTube-এর নিজের বাটন/টাইটেল ভেসে থাকার সময়) প্লেয়ার লুকানো, থাম্বনেইল দেখা যায় */
+.short-item .short-frame.hold { opacity: 0; }
+.short-item .short-frame { transition: opacity .25s ease; }
+
+/* Shorts: YouTube-এর মাঝের প্লে/পজ বাটন ঢাকার জন্য — ঝুঁকির সময়টুকুতে মাঝখানে ছোট গোল অংশ কেটে নিচের থাম্বনেইল দেখানো হয় */
+.short-item .short-frame.nobtn {
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
+}
