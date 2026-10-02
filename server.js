@@ -994,6 +994,107 @@ function broadcastRoomMembers(roomCode) {
   emitRoom(roomCode, "room-members-update", members);
 }
 
+// ---------- YouTube Shorts ফিড ----------
+// ভিডিও আমাদের সার্ভারে আসে না — শুধু ভিডিও আইডি + টাইটেল মনে রাখা হয় (কয়েক বাইট)। ভিডিও চলে সরাসরি
+// YouTube-এর প্লেয়ার থেকে। YOUTUBE_API_KEY Render-এর Environment-এ সেট করতে হয়।
+// খরচ: প্রতি রিফ্রেশে ৪টা সার্চ (৪০০ কোটা) — ছয় ঘণ্টায় একবার, তাই দিনের ১০,০০০ কোটার অনেক নিচে থাকে।
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || "";
+// টপিক লেখার নিয়ম: "ভাষা:সার্চ-লেখা" (bn = বাংলা, hi = হিন্দি, en = ইংরেজি)। ভাষা না দিলে সব ভাষা।
+// Render-এ SHORTS_TOPICS দিলে কমা দিয়ে আলাদা করে নিজের টপিক বসানো যায়।
+const SHORTS_TOPICS = (process.env.SHORTS_TOPICS
+  ? process.env.SHORTS_TOPICS.split(",").map((x) => x.trim()).filter(Boolean)
+  : [
+    // মজার ভিডিও — বিশ্বজুড়ে
+    "funny shorts", "funny moments shorts", "try not to laugh shorts", "funny animals shorts", "prank shorts", "comedy skit shorts", "fails compilation shorts",
+    // হিন্দি মজার
+    "hi:hindi comedy shorts", "hi:funny hindi video shorts", "hi:desi comedy shorts", "hi:hindi memes shorts",
+    // বাংলা হালকা মজার
+    "bn:bangla funny shorts", "bn:bangla comedy shorts", "bn:বাংলা ফানি ভিডিও", "bn:bangla natok funny shorts",
+    // গেমিং
+    "gaming shorts", "gaming funny moments shorts", "free fire shorts", "pubg mobile shorts", "minecraft shorts", "gta funny shorts",
+    // ভাইরাল / টিকটক ধরনের — ডান্স, লিপ-সিঙ্ক, ট্রেন্ড
+    "viral dance shorts", "trending dance reels shorts", "bollywood song dance shorts", "lip sync shorts", "viral trend shorts", "hi:viral reels hindi shorts", "bn:bangla viral dance shorts",
+    // শায়ারি / স্ট্যাটাস
+    "hi:shayari shorts", "hi:love shayari status shorts", "hi:sad shayari shorts", "bn:bangla shayari status shorts", "bn:bangla sad status shorts",
+  ]);
+let shortsPool = [];       // { id, title, channel }
+let shortsAt = 0;          // শেষ সফল রিফ্রেশ
+let shortsFailAt = 0;      // শেষ ব্যর্থ চেষ্টা (বারবার চেষ্টা ঠেকাতে)
+let shortsErr = "";
+let shortsBusy = null;     // চলতে থাকা রিফ্রেশের Promise
+
+function isoSecs(d) {
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(d || "");
+  if (!m) return 0;
+  return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+}
+async function ytJson(url) {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error && j.error.message) || "YouTube API status " + r.status);
+  return j;
+}
+function refreshShorts() {
+  if (!YOUTUBE_API_KEY) return Promise.resolve();
+  if (shortsBusy) return shortsBusy;
+  if (Date.now() - shortsFailAt < 10 * 60 * 1000) return Promise.resolve();
+  shortsBusy = (async () => {
+    try {
+      // প্রতিবার ৪টা আলাদা টপিক — সব ধরন ঘুরে ঘুরে মিশবে
+      const picks = SHORTS_TOPICS.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+      const found = new Map();
+      for (const topic of picks) {
+        const lm = /^(bn|hi|en|ur|ar):(.*)$/.exec(topic);
+        const lang = lm ? lm[1] : "";
+        const q = lm ? lm[2].trim() : topic;
+        const u = new URL("https://www.googleapis.com/youtube/v3/search");
+        u.searchParams.set("part", "snippet");
+        u.searchParams.set("type", "video");
+        u.searchParams.set("videoDuration", "short");
+        u.searchParams.set("videoEmbeddable", "true");
+        u.searchParams.set("safeSearch", "moderate");
+        u.searchParams.set("maxResults", "50");
+        if (lang) u.searchParams.set("relevanceLanguage", lang);
+        u.searchParams.set("order", ["relevance", "viewCount", "date"][Math.floor(Math.random() * 3)]);
+        u.searchParams.set("q", q);
+        u.searchParams.set("key", YOUTUBE_API_KEY);
+        const j = await ytJson(u);
+        (j.items || []).forEach((it) => {
+          const id = it && it.id && it.id.videoId;
+          if (id && /^[\w-]{11}$/.test(id) && !found.has(id)) {
+            found.set(id, { id, title: String((it.snippet && it.snippet.title) || "").slice(0, 150), channel: String((it.snippet && it.snippet.channelTitle) || "").slice(0, 60) });
+          }
+        });
+      }
+      // আসল শর্টস কি না (৬৫ সেকেন্ডের মধ্যে), embed চলে কি না, পাবলিক কি না — এক কোটায় যাচাই
+      const ids = Array.from(found.keys());
+      const good = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const u = new URL("https://www.googleapis.com/youtube/v3/videos");
+        u.searchParams.set("part", "contentDetails,status");
+        u.searchParams.set("id", ids.slice(i, i + 50).join(","));
+        u.searchParams.set("key", YOUTUBE_API_KEY);
+        const j = await ytJson(u);
+        (j.items || []).forEach((v) => {
+          const secs = isoSecs(v.contentDetails && v.contentDetails.duration);
+          if (v.status && v.status.embeddable && v.status.privacyStatus === "public" && secs > 0 && secs <= 65) good.push(found.get(v.id));
+        });
+      }
+      const have = new Set(shortsPool.map((x) => x.id));
+      shortsPool = good.filter((x) => x && !have.has(x.id)).concat(shortsPool).slice(0, 500);
+      shortsAt = Date.now();
+      shortsErr = "";
+    } catch (e) {
+      shortsFailAt = Date.now();
+      shortsErr = String((e && e.message) || e).slice(0, 200);
+      console.warn("⚠️ YouTube Shorts রিফ্রেশ ব্যর্থ:", shortsErr);
+    } finally {
+      shortsBusy = null;
+    }
+  })();
+  return shortsBusy;
+}
+
 io.on("connection", (socket) => {
   // প্রতিটা ইভেন্টে: ইনকামিং pid → আসল ফোন, আর ack/callback-এর উত্তর থেকে অন্যের নম্বর-ইমেইল সরানো
   socket.use((packet, next) => {
@@ -1257,6 +1358,22 @@ io.on("connection", (socket) => {
     u.loginHistory = (u.loginHistory || []).filter((x) => x && x.deviceId !== did);
     saveData();
     reply({ success: true });
+  });
+
+  // ---------- YouTube Shorts: সামনের কয়েকটা ভিডিও (আগে দেখা আইডি বাদ দিয়ে) ----------
+  socket.on("get-shorts", async (data, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!YOUTUBE_API_KEY) return reply({ success: false, error: "no_key" });
+    const seen = new Set(Array.isArray(data && data.seen) ? data.seen.slice(-300).map(String) : []);
+    const stale = Date.now() - shortsAt > 6 * 60 * 60 * 1000;
+    let fresh = shortsPool.filter((v) => !seen.has(v.id));
+    if (!shortsPool.length || !fresh.length) await refreshShorts();
+    else if (stale || fresh.length < 12) refreshShorts(); // পেছনে চলবে, অপেক্ষা করাবে না
+    fresh = shortsPool.filter((v) => !seen.has(v.id));
+    if (!shortsPool.length) return reply({ success: false, error: shortsErr ? "api_error" : "empty", detail: shortsErr });
+    const list = fresh.length ? fresh : shortsPool; // সব দেখা হয়ে গেলে আবার শুরু
+    const out = list.slice().sort(() => Math.random() - 0.5).slice(0, 12);
+    reply({ success: true, shorts: out });
   });
 
   // ---------- রিপোর্ট সিস্টেম ----------
