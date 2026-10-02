@@ -3169,3 +3169,17 @@ body.dashboard-active .profile-modal {
 .short-info p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .short-pause { position: absolute; z-index: 3; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center; font-size: 24px; pointer-events: none; }
 .short-item.paused .short-pause { display: flex; }
+
+
+/* ===== Shorts স্ক্রিন: সবসময় ৯:১৬ বক্স — ব্রাউজার জুম-আউট বা বড় স্ক্রিনেও ভিডিও লম্বা কালো ফাঁকা হয়ে যাবে না ===== */
+#shortsList {
+  --rh: min(calc(100dvh - 190px), 760px);
+  height: var(--rh);
+  width: min(100%, calc(var(--rh) * 0.5625));
+  max-width: 100%;
+}
+#shortsList .short-item { background: #000; }
+#shortsList .tp-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+@media (min-width: 900px) {
+  #shortsList { --rh: min(calc(100dvh - 130px), 760px); height: var(--rh); }
+}
