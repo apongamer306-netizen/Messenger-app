@@ -343,6 +343,8 @@ setInterval(() => purgeExpiredStories(), 5 * 60 * 1000);
 setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.warn("sync media links:", e.message); } }, 1500); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
 let bannedUsers = {};        // phone -> { reason, time }
+let deletedHashes = {};      // sha256(id) -> 1  (শুধু হ্যাশ — মুছে ফেলা অ্যাকাউন্ট যেন পুরোনো ডিভাইস থেকে আবার তৈরি না হয়; আর কোনো তথ্য রাখা হয় না)
+let phoneAliases = {};       // পুরোনো নম্বর -> নতুন নম্বর (নম্বর বদলালে পুরোনো ডিভাইস যেন নকল অ্যাকাউন্ট না বানায়)
 
 // ================= অ্যাডমিন প্যানেল =================
 // অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
@@ -375,17 +377,252 @@ function verifyPassword(pw, stored) {
   return a.length === b.length && nodeCrypto.timingSafeEqual(a, b);
 }
 
+
+// ================= অ্যাকাউন্ট সেটিংস: ইমেইল / ডিভাইস হিস্ট্রি / স্থায়ী ডিলিট =================
+function idHash(id) {
+  return nodeCrypto.createHash("sha256").update("ekt:" + String(id || "").trim().toLowerCase()).digest("hex");
+}
+function isDeletedId(id) { return !!deletedHashes[idHash(id)]; }
+function normalizeEmail(e) {
+  const v = String(e || "").trim().toLowerCase();
+  if (!v || v.length > 120) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? v : "";
+}
+function normalizePhoneInput(p) {
+  const v = String(p || "").replace(/[\s-]/g, "");
+  return /^\+?[0-9]{6,18}$/.test(v) ? v : "";
+}
+// লগইনে ফোন নম্বর বা ইমেইল — যেটাই দেওয়া হোক, অ্যাকাউন্টের আসল key (phone) ফেরত দেয়
+function resolveLoginPhone(idf) {
+  const s = String(idf || "").trim();
+  if (!s) return null;
+  if (users[s]) return s;
+  const em = s.toLowerCase();
+  if (em.indexOf("@") > 0) {
+    const u = Object.values(users).find((x) => x && x.email === em);
+    if (u) return u.phone;
+  }
+  return null;
+}
+function emailTaken(em, exceptPhone) {
+  if (!em) return false;
+  if (users[em] && users[em].phone !== exceptPhone) return true;
+  return Object.values(users).some((x) => x && x.email === em && x.phone !== exceptPhone);
+}
+function selfUserPayload(user, password) {
+  const copy = { ...user };
+  delete copy.loginHistory;
+  copy.password = String(password);
+  return copy;
+}
+
+function getClientIp(sock) {
+  try {
+    const h = sock.handshake || {};
+    const xf = (h.headers && h.headers["x-forwarded-for"]) || "";
+    const ip = String(xf).split(",")[0].trim() || h.address || "";
+    return String(ip).replace(/^::ffff:/, "").slice(0, 64);
+  } catch (e) { return ""; }
+}
+function parseDevice(ua) {
+  ua = String(ua || "");
+  let os = "Unknown OS";
+  if (/Android/i.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = "iOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = "macOS";
+  else if (/CrOS/i.test(ua)) os = "ChromeOS";
+  else if (/Linux/i.test(ua)) os = "Linux";
+  let br = "Browser";
+  if (/Edg\//i.test(ua)) br = "Edge";
+  else if (/OPR\/|Opera/i.test(ua)) br = "Opera";
+  else if (/SamsungBrowser/i.test(ua)) br = "Samsung Internet";
+  else if (/Firefox\//i.test(ua)) br = "Firefox";
+  else if (/Chrome\//i.test(ua) || /CriOS/i.test(ua)) br = "Chrome";
+  else if (/Safari\//i.test(ua)) br = "Safari";
+  return br + " · " + os;
+}
+// প্রতিটা ডিভাইস একবার করে থাকে (deviceId দিয়ে); লগইন/সাইনআপ হলে "lastLogin" বদলায়, অ্যাপ খুললে "lastSeen"
+function recordDevice(user, sock, deviceId, method) {
+  if (!user) return;
+  if (!Array.isArray(user.loginHistory)) user.loginHistory = [];
+  const ua = (sock && sock.handshake && sock.handshake.headers && sock.handshake.headers["user-agent"]) || "";
+  const id = String(deviceId || "").slice(0, 64) || ("ua_" + idHash(ua).slice(0, 12));
+  const now = Date.now();
+  const ip = getClientIp(sock);
+  const device = parseDevice(ua);
+  let e = user.loginHistory.find((x) => x && x.deviceId === id);
+  if (e) {
+    e.ip = ip; e.device = device; e.lastSeen = now;
+    if (method !== "session") { e.lastLogin = now; e.method = method; }
+  } else {
+    user.loginHistory.push({ deviceId: id, device, ip, method, firstLogin: now, lastLogin: now, lastSeen: now });
+  }
+  user.loginHistory.sort((a, b) => (b.lastLogin || 0) - (a.lastLogin || 0));
+  user.loginHistory = user.loginHistory.slice(0, 20);
+}
+function touchDevice(phone, deviceId) {
+  const u = users[phone];
+  if (!u || !deviceId || !Array.isArray(u.loginHistory)) return;
+  const e = u.loginHistory.find((x) => x && x.deviceId === String(deviceId).slice(0, 64));
+  if (!e) return;
+  const now = Date.now();
+  if (now - (e.lastSeen || 0) > 5 * 60 * 1000) { e.lastSeen = now; saveData(); }
+}
+
+// ---------- নম্বর বদলালে: সব জায়গায় পুরোনো নম্বর -> নতুন নম্বর ----------
+function renamePhoneEverywhere(oldP, newP) {
+  const swap = (v) => (v === oldP ? newP : v);
+  const swapKey = (obj) => {
+    if (obj && Object.prototype.hasOwnProperty.call(obj, oldP)) { obj[newP] = obj[oldP]; delete obj[oldP]; }
+  };
+  const u = users[oldP];
+  delete users[oldP];
+  u.phone = newP;
+  users[newP] = u;
+
+  delete profiles[newP];
+  [friendships, friendRequests, blockedUsers].forEach((st) => delete st[newP]);
+  swapKey(profiles);
+  swapKey(bannedUsers);
+  [friendships, friendRequests, blockedUsers].forEach((st) => {
+    swapKey(st);
+    Object.keys(st).forEach((k) => {
+      const set = st[k];
+      if (set && set.has && set.has(oldP)) { set.delete(oldP); set.add(newP); }
+    });
+  });
+
+  Object.keys(directMessages).forEach((key) => {
+    const parts = key.split("|");
+    if (!parts.includes(oldP)) return;
+    const list = directMessages[key] || [];
+    delete directMessages[key];
+    list.forEach((m) => {
+      if (!m) return;
+      m.senderPhone = swap(m.senderPhone);
+      m.receiverPhone = swap(m.receiverPhone);
+      if (m.shared && m.shared.ownerPhone === oldP) m.shared.ownerPhone = newP;
+    });
+    const nk = directKey(...parts.map(swap));
+    directMessages[nk] = (directMessages[nk] || []).concat(list).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  });
+  Object.keys(directThemes).forEach((key) => {
+    const parts = key.split("|");
+    if (!parts.includes(oldP)) return;
+    const t = directThemes[key];
+    delete directThemes[key];
+    directThemes[directKey(...parts.map(swap))] = t;
+  });
+
+  Object.values(profiles).forEach((pr) => {
+    ((pr && pr.posts) || []).forEach((post) => {
+      if (!post) return;
+      if (Array.isArray(post.likes)) post.likes = post.likes.map(swap);
+      swapKey(post.reacts);
+      (post.comments || []).forEach((c) => { if (c && c.authorPhone === oldP) c.authorPhone = newP; });
+      if (post.sharedFrom && post.sharedFrom.ownerPhone === oldP) post.sharedFrom.ownerPhone = newP;
+    });
+  });
+  stories.forEach((st) => {
+    st.phone = swap(st.phone);
+    if (Array.isArray(st.views)) st.views = st.views.map(swap);
+    if (Array.isArray(st.likes)) st.likes = st.likes.map(swap);
+    swapKey(st.reacts);
+  });
+  reports.forEach((r) => { r.fromPhone = swap(r.fromPhone); r.storyOwner = swap(r.storyOwner); });
+
+  if (phoneToSocket[oldP]) { phoneToSocket[newP] = phoneToSocket[oldP]; delete phoneToSocket[oldP]; }
+  Object.keys(socketToPhone).forEach((k) => { if (socketToPhone[k] === oldP) socketToPhone[k] = newP; });
+  Object.keys(roomMembers).forEach((rc) => {
+    roomMembers[rc].forEach((m) => { if (m && m.user && m.user.phone === oldP) m.user = { ...m.user, phone: newP }; });
+  });
+
+  Object.keys(phoneAliases).forEach((k) => { if (phoneAliases[k] === oldP) phoneAliases[k] = newP; });
+  phoneAliases[oldP] = newP;
+  delete phoneAliases[newP];
+  delete deletedHashes[idHash(newP)];
+}
+
+// ---------- অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলা (কোনো হিস্ট্রি/ডেটা রাখা হয় না) ----------
+function purgeUserCompletely(phone) {
+  const u = users[phone] || {};
+  const p = profiles[phone] || {};
+  const urls = [u.pic, p.cover];
+  (p.posts || []).forEach((x) => { if (x && x.media) urls.push(x.media.src); });
+  (p.items || []).forEach((x) => { if (x) urls.push(x.src); });
+  stories.filter((st) => st.phone === phone).forEach((st) => storyUrls(st).forEach((x) => urls.push(x)));
+  const formerFriends = Array.from(ensureSet(friendships, phone));
+
+  delete users[phone];
+  delete profiles[phone];
+  delete bannedUsers[phone];
+  [friendships, friendRequests, blockedUsers].forEach((st) => {
+    delete st[phone];
+    Object.keys(st).forEach((k) => { if (st[k] && st[k].delete) st[k].delete(phone); });
+  });
+  Object.keys(directMessages).forEach((key) => { if (key.split("|").includes(phone)) delete directMessages[key]; });
+  Object.keys(directThemes).forEach((key) => { if (key.split("|").includes(phone)) delete directThemes[key]; });
+
+  stories = stories.filter((st) => st.phone !== phone);
+  stories.forEach((st) => {
+    if (Array.isArray(st.views)) st.views = st.views.filter((x) => x !== phone);
+    if (Array.isArray(st.likes)) st.likes = st.likes.filter((x) => x !== phone);
+    if (st.reacts) delete st.reacts[phone];
+  });
+  Object.values(profiles).forEach((pr) => {
+    ((pr && pr.posts) || []).forEach((post) => {
+      if (!post) return;
+      if (Array.isArray(post.likes)) post.likes = post.likes.filter((x) => x !== phone);
+      if (post.reacts) delete post.reacts[phone];
+      if (Array.isArray(post.comments)) post.comments = post.comments.filter((c) => !c || c.authorPhone !== phone);
+      if (post.sharedFrom && post.sharedFrom.ownerPhone === phone) post.sharedFrom.ownerName = "Deleted user";
+    });
+  });
+  reports = reports.filter((r) => r && r.fromPhone !== phone && r.storyOwner !== phone);
+
+  const sid = phoneToSocket[phone];
+  delete phoneToSocket[phone];
+  Object.keys(socketToPhone).forEach((k) => { if (socketToPhone[k] === phone) delete socketToPhone[k]; });
+  Object.keys(roomMembers).forEach((rc) => {
+    const mp = roomMembers[rc];
+    let changed = false;
+    mp.forEach((m, k) => { if (m && m.user && m.user.phone === phone) { mp.delete(k); changed = true; } });
+    if (changed) broadcastRoomMembers(rc);
+  });
+  Object.keys(phoneAliases).forEach((k) => { if (k === phone || phoneAliases[k] === phone) delete phoneAliases[k]; });
+
+  // শুধু একটা এক-মুখী হ্যাশ — যাতে মুছে ফেলা অ্যাকাউন্ট পুরোনো ডিভাইস থেকে আবার জীবিত না হয়
+  deletedHashes[idHash(phone)] = 1;
+  if (u.email) deletedHashes[idHash(u.email)] = 1;
+
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  enqueueSave();
+  cleanupMedia(urls);
+  formerFriends.forEach((fp) => {
+    sendFriendData(fp);
+    const fs2 = phoneToSocket[fp];
+    if (fs2) { io.to(fs2).emit("friend-profile-updated", { phone }); io.to(fs2).emit("stories-updated"); }
+  });
+  return sid;
+}
+
 // ক্লায়েন্ট থেকে আসা ইউজার-ডেটা মার্জ করার নিরাপদ উপায়:
 // শুধু name/pic/phone নেওয়া হয়। পাসওয়ার্ড শুধু তখনই সেট হয় যখন ওই অ্যাকাউন্টে আগে থেকে পাসওয়ার্ড নেই
 // (নতুন রেজিস্ট্রেশন বা সার্ভার ডেটা হারালে রিকভারি)। আগে যে কেউ অন্যের ফোন নম্বর দিয়ে তার পাসওয়ার্ড বদলে দিতে পারত।
 function mergeClientUser(u) {
   if (!u || typeof u.phone !== "string" || !u.phone) return null;
+  if (isDeletedId(u.phone) || phoneAliases[u.phone]) return null; // মুছে ফেলা / নম্বর-বদলানো অ্যাকাউন্ট আর তৈরি হবে না
   const existing = users[u.phone] || {};
   const merged = { ...existing, phone: u.phone };
   if (typeof u.name === "string") merged.name = u.name.slice(0, 80);
   if (typeof u.pic === "string") merged.pic = u.pic;
   if (!existing.password && typeof u.password === "string" && u.password) {
     merged.password = hashPassword(u.password);
+  }
+  if (!existing.email) {
+    const em = normalizeEmail(u.email);
+    if (em && !emailTaken(em, u.phone)) merged.email = em;
   }
   users[u.phone] = merged;
   return merged;
@@ -480,6 +717,8 @@ async function loadData() {
   reports = raw.reports || [];
   stories = raw.stories || [];
   bannedUsers = raw.bannedUsers || {};
+  deletedHashes = raw.deletedIds || {};
+  phoneAliases = raw.phoneAliases || {};
   console.log("Saved data loaded successfully.");
   try {
     const postCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).posts) || []).length, 0);
@@ -501,6 +740,8 @@ function buildPayload() {
     stories,
     reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
     bannedUsers,
+    deletedIds: deletedHashes,
+    phoneAliases,
   };
 }
 
@@ -619,27 +860,46 @@ function broadcastRoomMembers(roomCode) {
 
 io.on("connection", (socket) => {
   // ---------- USER / SESSION ----------
-  socket.on("set-user-socket", ({ phone }) => {
+  socket.on("set-user-socket", ({ phone, deviceId }) => {
     if (!phone) return;
     socketToPhone[socket.id] = phone;
     phoneToSocket[phone] = socket.id;
+    touchDevice(phone, deviceId);
   });
 
   socket.on("register-user", (newUser, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
     if (newUser && newUser.phone) {
-      if (bannedUsers[newUser.phone]) {
-        if (typeof callback === "function") callback({ success: false, banned: true });
-        return;
+      if (bannedUsers[newUser.phone]) return reply({ success: false, banned: true });
+      if (newUser.fresh) {
+        // নতুন সাইনআপ: আগে থেকে থাকা নম্বর/ইমেইলে সাইনআপ করা যাবে না
+        const key = String(newUser.phone).trim();
+        if (users[key] && users[key].password) return reply({ success: false, error: "exists" });
+        const em = normalizeEmail(newUser.email);
+        if (newUser.email && !em) return reply({ success: false, error: "bad_email" });
+        if (em && emailTaken(em, key)) return reply({ success: false, error: "email_taken" });
+        // একই নম্বর দিয়ে নতুন করে সাইনআপ করলে পুরোনো ডিলিট/অ্যালিয়াস চিহ্ন সরে যায়
+        delete deletedHashes[idHash(key)];
+        delete phoneAliases[key];
+        newUser.phone = key;
+        if (em) newUser.email = em; else delete newUser.email;
+        const merged = mergeClientUser(newUser);
+        if (merged) recordDevice(merged, socket, newUser.deviceId, "signup");
+        saveData();
+        return reply({ success: true });
       }
+      if (isDeletedId(newUser.phone)) return reply({ success: false, deleted: true });
+      if (phoneAliases[newUser.phone]) return reply({ success: false, renamed: true });
       mergeClientUser(newUser);
       saveData();
     }
-    if (typeof callback === "function") callback({ success: true });
+    reply({ success: true });
   });
 
   socket.on("login-user", (payload, callback) => {
     if (typeof callback !== "function") return;
-    const { phone, password } = payload || {};
+    const { phone: loginId, password, deviceId } = payload || {};
+    const phone = (typeof loginId === "string" ? resolveLoginPhone(loginId) : null) || loginId;
     if (bannedUsers[phone]) {
       callback({
         success: false,
@@ -650,12 +910,77 @@ io.on("connection", (socket) => {
     }
     const user = typeof phone === "string" ? users[phone] : null;
     if (user && verifyPassword(password, user.password)) {
-      if (!isHashedPassword(user.password)) { user.password = hashPassword(password); saveData(); }
+      if (!isHashedPassword(user.password)) user.password = hashPassword(password);
+      recordDevice(user, socket, deviceId, String(loginId).indexOf("@") > 0 ? "email" : "phone");
+      saveData();
       // ক্লায়েন্ট আগের মতোই পাসওয়ার্ড সহ ইউজার অবজেক্ট আশা করে (লোকাল ক্যাশের জন্য) — তাই যেটা টাইপ করা হয়েছে সেটাই ফেরত যায়
-      callback({ success: true, user: { ...user, password: String(password) } });
+      callback({ success: true, user: selfUserPayload(user, password) });
     } else {
       callback({ success: false });
     }
+  });
+
+  // ---------- সেটিংস: পাসওয়ার্ড / ইমেইল / নম্বর / লগইন হিস্ট্রি ----------
+  socket.on("change-password", ({ phone, oldPassword, newPassword }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(oldPassword, u.password)) return reply({ success: false, error: "wrong_password" });
+    const np = String(newPassword || "").trim();
+    if (np.length < 6) return reply({ success: false, error: "too_short" });
+    if (np === String(oldPassword)) return reply({ success: false, error: "same" });
+    u.password = hashPassword(np);
+    saveData();
+    reply({ success: true });
+  });
+
+  socket.on("get-login-history", ({ phone, deviceId }, callback) => {
+    if (typeof callback !== "function") return;
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || socketToPhone[socket.id] !== phone) return callback({ success: false });
+    const did = String(deviceId || "").slice(0, 64);
+    const list = (u.loginHistory || []).map((e) => ({
+      device: e.device, ip: e.ip, method: e.method,
+      lastLogin: e.lastLogin, lastSeen: e.lastSeen, firstLogin: e.firstLogin,
+      current: !!did && e.deviceId === did,
+    }));
+    callback({ success: true, list });
+  });
+
+  socket.on("change-email", ({ phone, password, email }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(password, u.password)) return reply({ success: false, error: "wrong_password" });
+    const em = normalizeEmail(email);
+    if (!em) return reply({ success: false, error: "bad_email" });
+    if (emailTaken(em, phone)) return reply({ success: false, error: "email_taken" });
+    if (isDeletedId(em) && !users[em]) delete deletedHashes[idHash(em)];
+    const oldKey = u.phone;
+    // শুধু ইমেইল দিয়ে খোলা অ্যাকাউন্টে ইমেইলই ছিল লগইন-আইডি — তাই নতুন ইমেইলেই আইডি বদলায়
+    if (u.email && u.email === oldKey && em !== oldKey) {
+      renamePhoneEverywhere(oldKey, em);
+      users[em].email = em;
+      saveData();
+      Array.from(ensureSet(friendships, em)).forEach((fp) => sendFriendData(fp));
+      return reply({ success: true, email: em, phone: em, renamed: true });
+    }
+    u.email = em;
+    saveData();
+    reply({ success: true, email: em, phone: oldKey });
+  });
+
+  socket.on("change-phone", ({ phone, password, newPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(password, u.password)) return reply({ success: false, error: "wrong_password" });
+    const np = normalizePhoneInput(newPhone);
+    if (!np) return reply({ success: false, error: "bad_phone" });
+    if (np === phone) return reply({ success: false, error: "same" });
+    if (users[np] || bannedUsers[np]) return reply({ success: false, error: "phone_taken" });
+    renamePhoneEverywhere(phone, np);
+    saveData();
+    socket.emit("account-phone-changed", { phone: np });
+    Array.from(ensureSet(friendships, np)).forEach((fp) => sendFriendData(fp));
+    reply({ success: true, phone: np, user: selfUserPayload(users[np], password) });
   });
 
   // ---------- রিপোর্ট সিস্টেম ----------
@@ -843,6 +1168,7 @@ io.on("connection", (socket) => {
         return {
           name: u.name,
           phone: u.phone,
+          email: u.email || "",
           pic: u.pic || "https://via.placeholder.com/80",
           bio: p.bio || "",
           location: p.location || "",
@@ -895,28 +1221,7 @@ io.on("connection", (socket) => {
       if (typeof callback === "function") callback({ success: false });
       return;
     }
-    delete users[phone];
-    delete profiles[phone];
-    delete friendships[phone];
-    delete friendRequests[phone];
-    delete blockedUsers[phone];
-    delete bannedUsers[phone];
-    // remove from others' friend lists / requests
-    Object.keys(friendships).forEach((p) => {
-      if (friendships[p] && friendships[p].has) friendships[p].delete(phone);
-    });
-    Object.keys(friendRequests).forEach((p) => {
-      if (friendRequests[p] && friendRequests[p].has) friendRequests[p].delete(phone);
-    });
-    // wipe direct message keys involving this phone
-    Object.keys(directMessages).forEach((key) => {
-      if (key.split("|").includes(phone)) delete directMessages[key];
-    });
-    Object.keys(directThemes).forEach((key) => {
-      if (key.split("|").includes(phone)) delete directThemes[key];
-    });
-    saveData();
-    const sid = phoneToSocket[phone];
+    const sid = purgeUserCompletely(phone);
     if (sid) {
       io.to(sid).emit("account-deleted");
       try { io.sockets.sockets.get(sid)?.disconnect(true); } catch (e) {}
@@ -961,9 +1266,26 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (isDeletedId(user.phone)) {
+      if (typeof callback === "function") callback({ requests: [], friends: [], deleted: true });
+      return;
+    }
+    if (phoneAliases[user.phone]) {
+      if (typeof callback === "function") callback({ requests: [], friends: [], renamed: true });
+      return;
+    }
+    const hadAccount = !!(users[user.phone] && users[user.phone].password);
     mergeClientUser(user);
     socketToPhone[socket.id] = user.phone;
     phoneToSocket[user.phone] = socket.id;
+    // এই ডিভাইস আগে লগইন-হিস্ট্রিতে না থাকলে (পুরোনো সেশন) পাসওয়ার্ড মিললে যোগ করা
+    if (hadAccount && users[user.phone]) {
+      const su = users[user.phone];
+      const did = String(user.deviceId || "").slice(0, 64);
+      const known = did && Array.isArray(su.loginHistory) && su.loginHistory.some((x) => x && x.deviceId === did);
+      if (known) touchDevice(user.phone, did);
+      else if (did && verifyPassword(user.password, su.password)) recordDevice(su, socket, did, "session");
+    }
 
     // ক্লায়েন্টের ব্যাকআপ প্রোফাইল (bio/location + ছোট গ্যালারি) সার্ভারে ফেরত আনা —
     // Render রিস্টার্টে ephemeral ডিস্ক মুছে গেলেও ইউজার লগইন করলেই ডেটা ফিরে আসে (ফ্রি)
@@ -984,12 +1306,16 @@ io.on("connection", (socket) => {
 
     if (Array.isArray(friends)) {
       friends.forEach((f) => {
-        if (!f || !f.phone || f.phone === user.phone) return;
-        if (!users[f.phone]) {
-          users[f.phone] = { name: f.name, phone: f.phone, pic: f.pic };
+        if (!f || !f.phone) return;
+        let fp = f.phone;
+        if (phoneAliases[fp]) fp = phoneAliases[fp]; // বন্ধু নম্বর বদলালে নতুন নম্বরে মিলিয়ে নেওয়া
+        if (fp === user.phone || isDeletedId(fp)) return; // মুছে ফেলা অ্যাকাউন্ট আর ফিরবে না
+        if (!users[fp]) {
+          if (fp !== f.phone) return;
+          users[fp] = { name: f.name, phone: fp, pic: f.pic };
         }
-        ensureSet(friendships, user.phone).add(f.phone);
-        ensureSet(friendships, f.phone).add(user.phone);
+        ensureSet(friendships, user.phone).add(fp);
+        ensureSet(friendships, fp).add(user.phone);
       });
     }
 
