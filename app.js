@@ -2,6 +2,15 @@
 // Bumping APP_STORAGE_VERSION wipes every old localStorage & sessionStorage
 // value from previous versions of the app, so nobody gets stuck with a
 // corrupted/old session, PIN, or room flag.
+// প্রোফাইল লিংক: https://সাইট/u/<আইডি> — লগইন করার পর সেই প্রোফাইল নিজে থেকে খুলবে
+try {
+  const dl = location.pathname.match(/^\/u\/(u[0-9a-f]{16})\/?$/i);
+  if (dl) {
+    window.__ektPendingProfile = dl[1].toLowerCase();
+    history.replaceState(null, "", "/");
+  }
+} catch (e) {}
+
 const APP_STORAGE_VERSION = "v2";
 try {
   if (localStorage.getItem("appStorageVersion") !== APP_STORAGE_VERSION) {
@@ -477,7 +486,7 @@ friendsPanelOverlay.innerHTML = `
     <div class="friends-panel-body">
       <div class="friend-search-box">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="friendSearchInput" placeholder="নাম বা নম্বর দিয়ে সার্চ করুন..." autocomplete="off">
+        <input type="text" id="friendSearchInput" placeholder="নাম বা প্রোফাইল লিংক দিয়ে সার্চ করুন..." autocomplete="off">
       </div>
       <div id="friendSearchResults" class="friend-search-results" style="display:none;"></div>
       <div id="friendRequestsSection" class="friend-requests-section">
@@ -1635,6 +1644,7 @@ function showDashboard() {
     fetchFriendData();
     if (typeof window.loadStoriesRow === "function") window.loadStoriesRow();
     if (typeof window.__tabsOnDashboard === "function") window.__tabsOnDashboard();
+    if (window.__ektPendingProfile) setTimeout(() => { if (typeof window.ektOpenPendingProfile === "function") window.ektOpenPendingProfile(); }, 600);
   }
   updateDashboardPinUI();
 }
@@ -1882,7 +1892,6 @@ function renderFriendData(data) {
         <img src="${u.pic || "https://via.placeholder.com/40"}" alt="">
         <div class="fs-info">
           <span class="fs-name">${u.name || "User"}</span>
-          <span class="fs-phone">${u.phone || ""}</span>
         </div>
         ${actionHtml}
       `;
@@ -2008,6 +2017,11 @@ profileModalOverlay.innerHTML = `
       </div>
       <div id="pmSub" class="profile-modal-sub pm-bio-box">Friend on EKT Chatter</div>
       <div id="pmAboutBox" class="pm-about-box"></div>
+      <div id="pmLockedBox" class="pm-locked-box" style="display:none;">
+        <i class="fa-solid fa-lock"></i>
+        <b>এই প্রোফাইল দেখতে বন্ধু হতে হবে</b>
+        <span>ফ্রেন্ড রিকোয়েস্ট পাঠান। একসেপ্ট হলে পোস্ট, ছবি, রিলস আর তথ্য সব দেখতে পাবেন।</span>
+      </div>
 
       <div class="profile-tabs">
         <button class="profile-tab active" data-tab="posts">Posts</button>
@@ -2040,6 +2054,7 @@ profileModalOverlay.innerHTML = `
 
       <div class="profile-modal-actions">
         <button id="pmFriendBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-user-plus"></i> Add Friend</button>
+        <button id="pmCopyLinkBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-link"></i> Copy link</button>
         <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
         <button id="pmCloseBtn" class="btn btn-secondary">Close</button>
       </div>
@@ -2551,10 +2566,10 @@ function renderProfileAbout() {
   if (!box) return;
   const isMe = !!profileViewState.isMe;
   const editing = isMe && !!profileViewState.aboutEditing;
+  if (profileViewState.locked || profileViewState.loading) { box.style.display = "none"; box.innerHTML = ""; return; }
 
   if (!editing) {
     const rows =
-      (isMe ? "" : detailRow("fa-solid fa-phone", "Phone", d.phone)) +
       detailRow("fa-solid fa-location-dot", "Lives in", d.location) +
       detailRow("fa-solid fa-briefcase", "Work", d.work) +
       detailRow("fa-solid fa-graduation-cap", "Education", d.education) +
@@ -2686,7 +2701,26 @@ function renderProfileGallery(kind) {
   });
 }
 
+// বন্ধু না হলে ট্যাব, পোস্ট, গ্যালারি, About কিছুই দেখানো হয় না — শুধু লক বক্স
+function applyProfileLock() {
+  const locked = !!profileViewState.locked;
+  const hide = locked || !!profileViewState.loading; // লোড হওয়ার সময়ও কনটেন্ট দেখানো হয় না
+  const tabs = document.querySelector(".profile-modal .profile-tabs");
+  const ids = ["pmTabPosts", "pmTabMedia"];
+  if (tabs) tabs.style.display = hide ? "none" : "";
+  const lockBox = document.getElementById("pmLockedBox");
+  if (lockBox) lockBox.style.display = locked ? "flex" : "none";
+  if (hide) {
+    ids.forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+    const about = document.getElementById("pmAboutBox");
+    if (about) { about.style.display = "none"; about.innerHTML = ""; }
+  }
+  const msgBtn = document.getElementById("pmMessageBtn");
+  if (msgBtn) msgBtn.style.display = (hide || profileViewState.isMe) ? "none" : "inline-flex";
+}
+
 function switchProfileTab(tab) {
+  if (profileViewState.locked || profileViewState.loading) { applyProfileLock(); return; }
   if (tab !== "posts" && tab !== "photos" && tab !== "reels") tab = "posts";
   profileViewState.tab = tab;
   document.querySelectorAll(".profile-tab").forEach((b) => {
@@ -2965,26 +2999,51 @@ function openProfile(phone, fallback) {
   pmComposerText.style.height = "auto";
   pmComposerPreview.style.display = "none";
   pmComposerPreview.innerHTML = "";
-  profileViewState = { phone, isMe, data: (isMe && window.__ektMyProfile) || fallback || {}, tab: "posts" };
+  profileViewState = { phone, isMe, data: (isMe && window.__ektMyProfile) || fallback || {}, tab: "posts", locked: false, loading: !isMe };
+  const copyBtn = document.getElementById("pmCopyLinkBtn");
+  if (copyBtn) copyBtn.style.display = isMe ? "inline-flex" : "none";
   profileModalOverlay.classList.add("active");
+  applyProfileLock();
   renderProfileAbout();
   switchProfileTab("posts");
-  socket.emit("get-profile", { phone, viewerPhone: currentUser.phone }, (data) => {
-    if (!data) return;
-    if (isMe) window.__ektMyProfile = data;
-    profileViewState.data = data;
-    document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
-    document.getElementById("pmName").textContent = data.name || "Profile";
-    const subEl = document.getElementById("pmSub");
-    const bioText = (data.bio || "").trim();
-    if (bioText) { subEl.textContent = bioText; subEl.classList.add("has-bio"); }
-    else { subEl.textContent = isMe ? "About বক্সের ✎ চেপে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
-    applyPmCover(data.cover || null, data.coverY, false);
-    updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
-    renderProfileAbout();
-    switchProfileTab(profileViewState.tab);
-  });
+  socket.emit("get-profile", { phone }, (data) => applyProfileData(phone, isMe, data));
 }
+
+function applyProfileData(phone, isMe, data) {
+  if (profileViewState.phone !== phone) return; // এর মধ্যে অন্য প্রোফাইল খোলা হয়ে গেছে
+  const subEl = document.getElementById("pmSub");
+  if (!data) {
+    subEl.textContent = "প্রোফাইল পাওয়া যায়নি";
+    subEl.classList.remove("has-bio");
+    profileViewState.loading = false;
+    profileViewState.locked = true;
+    updateProfileFriendButton("self");
+    applyProfileLock();
+    return;
+  }
+  if (isMe) window.__ektMyProfile = data;
+  profileViewState.data = data;
+  profileViewState.loading = false;
+  profileViewState.locked = !!data.locked;
+  document.getElementById("pmAvatar").src = data.pic || "https://via.placeholder.com/100";
+  document.getElementById("pmName").textContent = data.name || "Profile";
+  const bioText = data.locked ? "" : (data.bio || "").trim();
+  if (bioText) { subEl.textContent = bioText; subEl.classList.add("has-bio"); }
+  else { subEl.textContent = isMe ? "About বক্সের ✎ চেপে bio যোগ করুন" : "EKT Chatter"; subEl.classList.remove("has-bio"); }
+  applyPmCover(data.locked ? null : (data.cover || null), data.locked ? 0 : data.coverY, false);
+  updateProfileFriendButton(data.relation || (isMe ? "self" : "none"));
+  applyProfileLock();
+  renderProfileAbout();
+  switchProfileTab(profileViewState.tab);
+}
+
+// খোলা প্রোফাইল আবার আনা — ফ্রেন্ড হলে/আনফ্রেন্ড হলে সাথে সাথে খুলে/বন্ধ হয়ে যাবে
+function refreshOpenProfile() {
+  if (!profileModalOverlay.classList.contains("active") || !profileViewState.phone || profileViewState.isMe) return;
+  const phone = profileViewState.phone;
+  socket.emit("get-profile", { phone }, (data) => applyProfileData(phone, false, data));
+}
+socket.on("friend-list-updated", () => { refreshOpenProfile(); });
 
 function openFriendProfile(friend) {
   if (!friend) return;
@@ -2994,15 +3053,54 @@ function openFriendProfile(friend) {
 // বন্ধু নতুন কিছু পোস্ট করলে, তার প্রোফাইল খোলা থাকলে রিফ্রেশ
 socket.on("friend-profile-updated", ({ phone }) => {
   if (profileViewState.phone === phone && profileModalOverlay.classList.contains("active")) {
-    socket.emit("get-profile", { phone }, (data) => {
-      if (data) {
-        profileViewState.data = data;
-        if (!profileViewState.isMe) renderProfileAbout();
-        switchProfileTab(profileViewState.tab);
-      }
-    });
+    socket.emit("get-profile", { phone }, (data) => applyProfileData(phone, !!profileViewState.isMe, data));
   }
 });
+
+function ektGetMyLinkId(cb) {
+  if (currentUser && currentUser.pid) return cb(currentUser.pid);
+  socket.emit("get-my-link", {}, (r) => {
+    if (r && r.success && r.linkId) {
+      currentUser.pid = r.linkId;
+      try { localStorage.setItem("appUser", JSON.stringify(currentUser)); } catch (e) {}
+      cb(r.linkId);
+    } else cb(null);
+  });
+}
+function ektCopyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return Promise.resolve(!!ok);
+  } catch (e) { return Promise.resolve(false); }
+}
+document.getElementById("pmCopyLinkBtn").onclick = () => {
+  ektGetMyLinkId(async (id) => {
+    if (!id) { if (typeof showMiniToast === "function") showMiniToast("লিংক পাওয়া যায়নি, আবার চেষ্টা করুন"); return; }
+    const link = location.origin + "/u/" + id;
+    const ok = await ektCopyText(link);
+    if (ok) { if (typeof showMiniToast === "function") showMiniToast("প্রোফাইল লিংক কপি হয়েছে"); }
+    else if (typeof showCustomAlert === "function") showCustomAlert("Your profile link", link);
+  });
+};
+
+// কেউ প্রোফাইল লিংক (/u/<আইডি>) দিয়ে ঢুকলে, লগইনের পর সেই প্রোফাইল খোলা
+function ektOpenPendingProfile() {
+  const pid = window.__ektPendingProfile;
+  if (!pid || !currentUser) return;
+  window.__ektPendingProfile = null;
+  ektGetMyLinkId((mine) => {
+    if (mine && mine === pid) openProfile(currentUser.phone, currentUser);
+    else openProfile(pid, {});
+  });
+}
+window.ektOpenPendingProfile = ektOpenPendingProfile;
 
 document.getElementById("pmCloseBtn").onclick = () => profileModalOverlay.classList.remove("active");
 document.getElementById("pmMessageBtn").onclick = () => {
@@ -6197,7 +6295,7 @@ window.EktReact = (function () {
         socket.emit("search-users", { query: q, myPhone: m.phone }, (list) => {
           searchCache = list || [];
           box.style.display = "block";
-          box.innerHTML = searchCache.length ? searchCache.map((u) => personRow({ ...u, sub: u.phone },
+          box.innerHTML = searchCache.length ? searchCache.map((u) => personRow({ ...u, sub: "" },
             u.isFriend ? `<span class="tp-tag">Friends</span>` : u.requestPending ? `<button class="tp-btn tp-btn-soft" disabled type="button">Sent</button>` : `<button class="tp-btn tp-btn-primary" data-add type="button"><i class="fa-solid fa-user-plus"></i> Add</button>`)).join("")
             : `<div class="tp-empty"><p>কোনো ইউজার পাওয়া যায়নি</p></div>`;
         });
