@@ -2023,10 +2023,18 @@ profileModalOverlay.innerHTML = `
         <span>ফ্রেন্ড রিকোয়েস্ট পাঠান। একসেপ্ট হলে পোস্ট, ছবি, রিলস আর তথ্য সব দেখতে পাবেন।</span>
       </div>
 
-      <div class="profile-tabs">
-        <button class="profile-tab active" data-tab="posts">Posts</button>
-        <button class="profile-tab" data-tab="photos">Photos</button>
-        <button class="profile-tab" data-tab="reels">Reels</button>
+      <div class="profile-tabs-row">
+        <div class="profile-tabs">
+          <button class="profile-tab active" data-tab="posts">Posts</button>
+          <button class="profile-tab" data-tab="photos">Photos</button>
+          <button class="profile-tab" data-tab="reels">Reels</button>
+        </div>
+        <div class="pm-more-wrap" id="pmMoreWrap" style="display:none;">
+          <button type="button" id="pmMoreBtn" class="dots-btn" aria-label="More options" aria-haspopup="true"><i class="fa-solid fa-ellipsis"></i></button>
+          <div id="pmMoreMenu" class="direct-dropdown-menu">
+            <button type="button" id="pmCopyLinkBtn" class="menu-item"><i class="fa-solid fa-link"></i><span>Copy link</span></button>
+          </div>
+        </div>
       </div>
 
       <div id="pmTabPosts" class="profile-tab-panel">
@@ -2054,7 +2062,6 @@ profileModalOverlay.innerHTML = `
 
       <div class="profile-modal-actions">
         <button id="pmFriendBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-user-plus"></i> Add Friend</button>
-        <button id="pmCopyLinkBtn" class="btn btn-secondary" style="display:none;"><i class="fa-solid fa-link"></i> Copy link</button>
         <button id="pmMessageBtn" class="btn btn-primary"><i class="fa-solid fa-message"></i> Message</button>
         <button id="pmCloseBtn" class="btn btn-secondary">Close</button>
       </div>
@@ -3000,8 +3007,10 @@ function openProfile(phone, fallback) {
   pmComposerPreview.style.display = "none";
   pmComposerPreview.innerHTML = "";
   profileViewState = { phone, isMe, data: (isMe && window.__ektMyProfile) || fallback || {}, tab: "posts", locked: false, loading: !isMe };
-  const copyBtn = document.getElementById("pmCopyLinkBtn");
-  if (copyBtn) copyBtn.style.display = isMe ? "inline-flex" : "none";
+  const moreWrap = document.getElementById("pmMoreWrap");
+  if (moreWrap) moreWrap.style.display = isMe ? "block" : "none";
+  const moreMenu = document.getElementById("pmMoreMenu");
+  if (moreMenu) moreMenu.classList.remove("open");
   profileModalOverlay.classList.add("active");
   applyProfileLock();
   renderProfileAbout();
@@ -3080,7 +3089,17 @@ function ektCopyText(text) {
     return Promise.resolve(!!ok);
   } catch (e) { return Promise.resolve(false); }
 }
+// প্রোফাইলের Posts/Photos/Reels ট্যাবের পাশের "⋯" মেনু
+document.getElementById("pmMoreBtn").onclick = (e) => {
+  e.stopPropagation();
+  document.getElementById("pmMoreMenu").classList.toggle("open");
+};
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("pmMoreMenu");
+  if (menu && menu.classList.contains("open") && !e.target.closest("#pmMoreWrap")) menu.classList.remove("open");
+});
 document.getElementById("pmCopyLinkBtn").onclick = () => {
+  document.getElementById("pmMoreMenu").classList.remove("open");
   ektGetMyLinkId(async (id) => {
     if (!id) { if (typeof showMiniToast === "function") showMiniToast("লিংক পাওয়া যায়নি, আবার চেষ্টা করুন"); return; }
     const link = location.origin + "/u/" + id;
@@ -6649,6 +6668,11 @@ window.EktReact = (function () {
     email_taken: "এই ইমেইল অন্য একটি অ্যাকাউন্টে ব্যবহার হচ্ছে।",
     bad_phone: "সঠিক ফোন নম্বর দিন (শুধু সংখ্যা, + দিয়ে শুরু করা যাবে)।",
     phone_taken: "এই নম্বর অন্য একটি অ্যাকাউন্টে ব্যবহার হচ্ছে।",
+    dup_own: "এই নম্বর/ইমেইল আপনার অ্যাকাউন্টে আগে থেকেই আছে।",
+    too_many: "অনেকবার ভুল পাসওয়ার্ড দেওয়া হয়েছে। এক মিনিট পর আবার চেষ্টা করুন।",
+    need_primary: "দ্বিতীয় নম্বর যোগ করার আগে একটি মূল ফোন নম্বর যোগ করুন।",
+    last_id: "এটাই আপনার লগইন করার একমাত্র উপায় — আগে অন্য একটি নম্বর/ইমেইল যোগ করুন।",
+    not_found: "এটা আর পাওয়া যাচ্ছে না। পেজ রিফ্রেশ করে দেখুন।",
   };
 
   function call(ev, payload, ms) {
@@ -6756,17 +6780,17 @@ window.EktReact = (function () {
     location.reload();
   }
 
-  async function doChangePhone() {
-    await openForm({
+  // pw দেওয়া থাকলে (পার্সোনাল ডিটেইলসে ঢোকার সময় যাচাই হয়ে গেছে) আবার পাসওয়ার্ড চাওয়া হয় না
+  async function doChangePhone(ctx) {
+    const hasPw = !!(ctx && ctx.pw);
+    return openForm({
       title: phoneOf() ? "Change phone number" : "Add phone number",
-      sub: "নিরাপত্তার জন্য আপনার পাসওয়ার্ড দিন। বন্ধু, চ্যাট আর পোস্ট সব যেমন আছে তেমনই থাকবে।",
-      fields: [
-        { label: "New phone number", placeholder: "01XXXXXXXXX", inputmode: "tel" },
-        { label: "Your password", type: "password", placeholder: "Password" },
-      ],
+      sub: "বন্ধু, চ্যাট আর পোস্ট সব যেমন আছে তেমনই থাকবে।" + (hasPw ? "" : " নিরাপত্তার জন্য পাসওয়ার্ড দিন।"),
+      fields: [{ label: "New phone number", placeholder: "01XXXXXXXXX", inputmode: "tel" }].concat(hasPw ? [] : [{ label: "Your password", type: "password", placeholder: "Password" }]),
       submitText: "Save",
-      onSubmit: async ([np, pw]) => {
-        const clean = np.replace(/[\s-]/g, "");
+      onSubmit: async (vals) => {
+        const clean = vals[0].replace(/[\s-]/g, "");
+        const pw = hasPw ? ctx.pw : vals[1];
         if (!PHONE_RE.test(clean)) return ERR.bad_phone;
         if (!pw) return ERR.wrong_password;
         const oldPhone = currentUser.phone;
@@ -6780,17 +6804,37 @@ window.EktReact = (function () {
     });
   }
 
-  async function doChangeEmail() {
-    await openForm({
-      title: emailOf() ? "Change email" : "Add email",
-      sub: "ইমেইল দিয়েও লগইন করা যাবে। নিরাপত্তার জন্য পাসওয়ার্ড দিন।",
-      fields: [
-        { label: "Email", placeholder: "name@example.com", inputmode: "email" },
-        { label: "Your password", type: "password", placeholder: "Password" },
-      ],
+  // দ্বিতীয় নম্বর যোগ/বদল
+  async function doSetAltPhone(ctx) {
+    return openForm({
+      title: ctx.info.altNum ? "Change second number" : "Add number",
+      sub: "দুটো নম্বর দিয়েই এই অ্যাকাউন্টে লগইন করা যাবে।",
+      fields: [{ label: "Phone number", placeholder: "01XXXXXXXXX", inputmode: "tel" }],
       submitText: "Save",
-      onSubmit: async ([em, pw]) => {
-        const mail = em.toLowerCase();
+      onSubmit: async ([np]) => {
+        const clean = np.replace(/[\s-]/g, "");
+        if (!PHONE_RE.test(clean)) return ERR.bad_phone;
+        const r = await call("set-alt-phone", { phone: currentUser.phone, password: ctx.pw, newPhone: clean });
+        if (!r || !r.success) return errText(r);
+        ctx.info = r;
+        persistUser({ altNum: r.altNum || "" });
+        renderPersonal(ctx);
+        showMiniToast("Number added");
+        return null;
+      },
+    });
+  }
+
+  async function doChangeEmail(ctx) {
+    const hasPw = !!(ctx && ctx.pw);
+    return openForm({
+      title: emailOf() ? "Change email" : "Add email",
+      sub: "ইমেইল দিয়েও লগইন করা যাবে।" + (hasPw ? "" : " নিরাপত্তার জন্য পাসওয়ার্ড দিন।"),
+      fields: [{ label: "Email", placeholder: "name@example.com", inputmode: "email" }].concat(hasPw ? [] : [{ label: "Your password", type: "password", placeholder: "Password" }]),
+      submitText: "Save",
+      onSubmit: async (vals) => {
+        const mail = vals[0].toLowerCase();
+        const pw = hasPw ? ctx.pw : vals[1];
         if (!EMAIL_RE.test(mail)) return ERR.bad_email;
         if (!pw) return ERR.wrong_password;
         const oldPhone = currentUser.phone;
@@ -6802,28 +6846,166 @@ window.EktReact = (function () {
           return null;
         }
         persistUser({ email: r.email });
-        renderSettings();
+        if (ctx) { ctx.info = Object.assign({}, ctx.info, { email: r.email }); renderPersonal(ctx); }
+        else renderSettings();
         showMiniToast("Email saved");
         return null;
       },
     });
   }
 
-  async function doChangePassword() {
+  // ---------- নিচ থেকে ওঠা ছোট অপশন-শিট (Change / Remove) ----------
+  function openSheet(title, items) {
+    return new Promise((resolve) => {
+      const ov = document.createElement("div");
+      ov.className = "ekt-form-ov";
+      ov.innerHTML =
+        '<div class="ekt-form-card" role="dialog" aria-modal="true"><h3>' + esc(title) + "</h3>" +
+        '<div class="stg-sheet">' +
+        items.map((it) => '<button type="button" class="stg-sheet-btn' + (it.danger ? " danger" : "") + '" data-k="' + esc(it.key) + '"><i class="fa-solid ' + esc(it.icon) + '"></i><span>' + esc(it.label) + "</span></button>").join("") +
+        '</div><div class="ekt-form-actions"><button type="button" class="btn btn-secondary" data-k="">Cancel</button></div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-k]");
+        if (e.target === ov || b) { const k = b ? b.dataset.k : ""; ov.remove(); resolve(k || null); }
+      });
+    });
+  }
+
+  // ---------- পাসওয়ার্ড দিয়ে ঢোকা (পার্সোনাল ডিটেইলস / পাসওয়ার্ড বদল দুটোর জন্যই) ----------
+  // সফল হলে { pw, info } ফেরত দেয়, বাতিল করলে null
+  async function askPasswordGate(title, sub) {
+    let out = null;
     await openForm({
-      title: "Change password",
+      title, sub,
+      fields: [{ label: "Your password", type: "password", placeholder: "Password" }],
+      submitText: "Confirm",
+      onSubmit: async ([pw]) => {
+        if (!pw) return ERR.wrong_password;
+        const r = await call("verify-password", { phone: currentUser.phone, password: pw });
+        if (!r || !r.success) return errText(r);
+        out = { pw, info: r };
+        return null;
+      },
+    });
+    return out;
+  }
+
+  // ---------- Personal details স্ক্রিন ----------
+  let personalOv = null;
+  function renderPersonal(ctx) {
+    if (!personalOv) return;
+    const info = ctx.info || {};
+    const body = personalOv.querySelector(".stg-body");
+    const numRow = (num, tag, key) =>
+      '<button type="button" class="stg-row" data-pd="' + key + '"><i class="fa-solid fa-phone" style="background:#10b981"></i>' +
+      '<span class="stg-lbl">' + esc(num) + '</span><span class="stg-val">' + esc(tag) + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>';
+    let h = '<div class="stg-sec">Phone number</div>';
+    if (info.phone) h += numRow(info.phone, info.altNum ? "Main" : "", "primary");
+    if (info.altNum) h += numRow(info.altNum, "Second", "alt");
+    if (!info.phone) {
+      h += '<button type="button" class="stg-row" data-pd="primary-add"><i class="fa-solid fa-phone" style="background:#10b981"></i><span class="stg-lbl">Phone number</span><span class="stg-val">Not added</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>';
+    } else if (!info.altNum) {
+      h += '<button type="button" class="stg-add" data-pd="alt-add"><i class="fa-solid fa-plus"></i> Add number</button>';
+    }
+    h += '<div class="stg-note">দুটো নম্বর রাখলে যেকোনো একটা দিয়েই লগইন করা যাবে। নম্বরে ট্যাপ করে বদলানো বা সরানো যাবে।</div>';
+    h += '<div class="stg-sec">Email</div>' +
+      '<button type="button" class="stg-row" data-pd="email"><i class="fa-solid fa-envelope" style="background:#0ea5e9"></i><span class="stg-lbl">Email</span><span class="stg-val">' + esc(info.email || "Not added") + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>';
+    body.innerHTML = h;
+  }
+
+  async function removeWithPassword(ctx, what) {
+    const labels = { primary: "এই মূল নম্বর", alt: "এই দ্বিতীয় নম্বর", email: "এই ইমেইল" };
+    let doneResp = null;
+    await openForm({
+      title: "Remove " + (what === "email" ? "email" : "number"),
+      sub: (labels[what] || "এটা") + " সরাতে আপনার পাসওয়ার্ড দিন।",
+      fields: [{ label: "Your password", type: "password", placeholder: "Password" }],
+      submitText: "Remove",
+      onSubmit: async ([pw]) => {
+        if (!pw) return ERR.wrong_password;
+        const r = what === "email"
+          ? await call("remove-email", { phone: currentUser.phone, password: pw })
+          : await call("remove-phone", { phone: currentUser.phone, password: pw, which: what });
+        if (!r || !r.success) return errText(r);
+        doneResp = r;
+        return null;
+      },
+    });
+    if (!doneResp) return;
+    if (doneResp.renamed && doneResp.newKey) {
+      const oldPhone = currentUser.phone;
+      persistUser(Object.assign({}, doneResp.user || {}, { phone: doneResp.newKey }), oldPhone);
+      await finishRename(oldPhone, doneResp.newKey, "নম্বর সরানো হয়েছে। এখন থেকে বাকি নম্বর/ইমেইল দিয়ে লগইন করতে হবে।");
+      return;
+    }
+    ctx.info = doneResp;
+    persistUser({ altNum: doneResp.altNum || "", email: doneResp.email || "" });
+    renderPersonal(ctx);
+    showMiniToast("Removed");
+  }
+
+  async function openPersonal() {
+    const ctx = await askPasswordGate("Personal details", "চালিয়ে যেতে আপনার অ্যাকাউন্টের পাসওয়ার্ড দিন।");
+    if (!ctx) return;
+    if (!personalOv) {
+      personalOv = document.createElement("div");
+      personalOv.id = "personalOverlay";
+      personalOv.className = "stg-ov";
+      personalOv.innerHTML =
+        '<div class="stg-card"><div class="stg-top"><button type="button" class="stg-back" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button><h2>Personal details</h2></div><div class="stg-body"></div></div>';
+      document.body.appendChild(personalOv);
+    }
+    // প্রতিবার নতুন করে ঢোকার সময় আগের ক্লিক-হ্যান্ডলার সরিয়ে নতুন ctx দিয়ে বসানো
+    const fresh = personalOv.cloneNode(true);
+    personalOv.replaceWith(fresh);
+    personalOv = fresh;
+    fresh.addEventListener("click", async (e) => {
+      if (e.target === fresh || e.target.closest(".stg-back")) { fresh.style.display = "none"; ctx.pw = null; renderSettings(); return; }
+      const el = e.target.closest("[data-pd]");
+      if (!el) return;
+      const k = el.dataset.pd;
+      if (k === "alt-add") return doSetAltPhone(ctx);
+      if (k === "primary-add") return doChangePhone(ctx);
+      if (k === "primary" || k === "alt") {
+        const pick = await openSheet(k === "alt" ? "Second number" : "Phone number", [
+          { key: "change", icon: "fa-pen", label: "Change number" },
+          { key: "remove", icon: "fa-trash", label: "Remove number", danger: true },
+        ]);
+        if (pick === "change") return k === "alt" ? doSetAltPhone(ctx) : doChangePhone(ctx);
+        if (pick === "remove") return removeWithPassword(ctx, k);
+        return;
+      }
+      if (k === "email") {
+        if (!ctx.info.email) return doChangeEmail(ctx);
+        const pick = await openSheet("Email", [
+          { key: "change", icon: "fa-pen", label: "Change email" },
+          { key: "remove", icon: "fa-trash", label: "Remove email", danger: true },
+        ]);
+        if (pick === "change") return doChangeEmail(ctx);
+        if (pick === "remove") return removeWithPassword(ctx, "email");
+      }
+    });
+    renderPersonal(ctx);
+    fresh.style.display = "flex";
+  }
+
+  // ---------- পাসওয়ার্ড বদল: আগে বর্তমান পাসওয়ার্ড, তারপর নতুন + কনফার্ম ----------
+  async function doChangePassword() {
+    const gate = await askPasswordGate("Change password", "প্রথমে আপনার বর্তমান পাসওয়ার্ড দিন।");
+    if (!gate) return;
+    await openForm({
+      title: "New password",
       sub: "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।",
       fields: [
-        { label: "Current password", type: "password", placeholder: "Current password" },
         { label: "New password", type: "password", placeholder: "New password" },
         { label: "Confirm new password", type: "password", placeholder: "Repeat new password" },
       ],
       submitText: "Change",
-      onSubmit: async ([oldPw, newPw, again]) => {
-        if (!oldPw) return ERR.wrong_password;
+      onSubmit: async ([newPw, again]) => {
         if (newPw.length < 6) return ERR.too_short;
         if (newPw !== again) return "নতুন পাসওয়ার্ড দুটো মিলছে না।";
-        const r = await call("change-password", { phone: currentUser.phone, oldPassword: oldPw, newPassword: newPw });
+        const r = await call("change-password", { phone: currentUser.phone, oldPassword: gate.pw, newPassword: newPw });
         if (!r || !r.success) return errText(r);
         persistUser({ password: newPw });
         showMiniToast("Password changed");
@@ -6832,14 +7014,13 @@ window.EktReact = (function () {
     });
   }
 
-  // ---------- লগইন ডিভাইস লিস্ট ----------
-  async function loadDevices() {
-    const box = $("stgDevices");
+  // ---------- লগইন ডিভাইস লিস্ট (আলাদা পপআপে) ----------
+  async function loadDevices(box) {
     if (!box) return;
     box.innerHTML = '<div class="stg-muted">Loading…</div>';
     try { socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() }); } catch (e) {}
     const r = await call("get-login-history", { phone: currentUser.phone, deviceId: getDeviceId() });
-    if (!$("stgDevices")) return;
+    if (!box.isConnected) return;
     if (!r || !r.success) { box.innerHTML = '<div class="stg-muted">' + (r ? "লোড করা যায়নি।" : NET_ERR) + "</div>"; return; }
     if (!r.list.length) { box.innerHTML = '<div class="stg-muted">এখনো কোনো রেকর্ড নেই। পরের লগইন থেকে এখানে দেখাবে।</div>'; return; }
     box.innerHTML = r.list.map((e) =>
@@ -6851,23 +7032,30 @@ window.EktReact = (function () {
     ).join("");
   }
 
+  function openDevicesPopup() {
+    const ov = document.createElement("div");
+    ov.className = "ekt-form-ov";
+    ov.innerHTML =
+      '<div class="ekt-form-card stg-dev-card" role="dialog" aria-modal="true"><h3>Where you\'re logged in</h3>' +
+      '<p class="ekt-form-sub">যেসব ডিভাইস/ব্রাউজার থেকে এই অ্যাকাউন্টে লগইন করা হয়েছে। চেনা না এমন কিছু দেখলে পাসওয়ার্ড বদলে ফেলুন।</p>' +
+      '<div class="stg-dev-list"></div>' +
+      '<div class="ekt-form-actions"><button type="button" class="btn btn-secondary" data-act="close">Close</button></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest('[data-act="close"]')) ov.remove(); });
+    loadDevices(ov.querySelector(".stg-dev-list"));
+  }
+
   // ---------- সেটিংস স্ক্রিন ----------
   let overlay = null;
-  function themeLabel() { return document.body.classList.contains("dark-theme") ? "Dark" : "Light"; }
 
   function renderSettings() {
     if (!overlay) return;
-    const ph = phoneOf(), em = emailOf();
     overlay.querySelector(".stg-body").innerHTML =
       '<div class="stg-sec">Account</div>' +
-      '<button type="button" class="stg-row" data-stg="phone"><i class="fa-solid fa-phone" style="background:#10b981"></i><span class="stg-lbl">Phone number</span><span class="stg-val">' + esc(ph || "Not added") + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
-      '<button type="button" class="stg-row" data-stg="email"><i class="fa-solid fa-envelope" style="background:#0ea5e9"></i><span class="stg-lbl">Email</span><span class="stg-val">' + esc(em || "Not added") + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
+      '<button type="button" class="stg-row" data-stg="personal"><i class="fa-solid fa-id-card" style="background:#10b981"></i><span class="stg-lbl">Personal details</span><span class="stg-val">Phone · Email</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
       '<button type="button" class="stg-row" data-stg="password"><i class="fa-solid fa-lock" style="background:#7c5cff"></i><span class="stg-lbl">Change password</span><span class="stg-val"></span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
-      '<div class="stg-sec">Appearance</div>' +
-      '<button type="button" class="stg-row" data-stg="theme"><i class="fa-solid fa-palette" style="background:#f59e0b"></i><span class="stg-lbl">Theme</span><span class="stg-val" id="stgThemeVal">' + themeLabel() + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
-      '<div class="stg-sec">Where you\'re logged in</div>' +
-      '<div class="stg-note">যেসব ডিভাইস/ব্রাউজার থেকে এই অ্যাকাউন্টে লগইন করা হয়েছে। চেনা না এমন কিছু দেখলে পাসওয়ার্ড বদলে ফেলুন।</div>' +
-      '<div id="stgDevices" class="stg-devices"></div>';
+      '<div class="stg-sec">Security</div>' +
+      '<button type="button" class="stg-row" data-stg="devices"><i class="fa-solid fa-laptop-mobile" style="background:#ef4444"></i><span class="stg-lbl">Where you\'re logged in</span><span class="stg-val"></span><i class="fa-solid fa-chevron-right stg-chev"></i></button>';
   }
 
   function openSettings() {
@@ -6886,18 +7074,15 @@ window.EktReact = (function () {
         const row = e.target.closest("[data-stg]");
         if (!row) return;
         const k = row.dataset.stg;
-        if (k === "phone") doChangePhone();
-        else if (k === "email") doChangeEmail();
+        if (k === "personal") openPersonal();
         else if (k === "password") doChangePassword();
-        else if (k === "theme") openThemePopup();
+        else if (k === "devices") openDevicesPopup();
       });
     }
     renderSettings();
     overlay.style.display = "flex";
-    loadDevices();
   }
 
-  document.addEventListener("ekt-theme-changed", () => { const v = $("stgThemeVal"); if (v) v.textContent = themeLabel(); });
 
   const btn = $("openSettingsBtn");
   if (btn) btn.addEventListener("click", () => { const dd = $("dashDropdownMenu"); if (dd) dd.classList.remove("open"); openSettings(); });
