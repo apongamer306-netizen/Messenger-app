@@ -6376,7 +6376,10 @@ window.EktReact = (function () {
   // ---------- REELS ----------
   let reelObserver = null, reelMuted = true, reelsCache = [];
   const reelSig = (l) => l.map((r) => r.id).join("|");
-  function pauseReels() { document.querySelectorAll("#reelsList video").forEach((v) => v.pause()); }
+  function pauseReels() {
+    document.querySelectorAll("#reelsList video").forEach((v) => v.pause());
+    document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); // Shorts-এর চালু প্লেয়ার বন্ধ
+  }
   function renderReels(list) {
     const box = $("reelsList");
     if (!list.length) {
@@ -6412,6 +6415,136 @@ window.EktReact = (function () {
       });
     });
   }
+
+  // ---------- SHORTS (YouTube থেকে সরাসরি — আমাদের সার্ভারে ভিডিও জমে না) ----------
+  let shortsMode = false, shortsSeen = [], shortsLoading = false, shortsEnded = false, shortsObserver = null, shortMuted = true;
+  const YT_ID_RE = /^[\w-]{11}$/;
+  function ytCmd(frame, func) {
+    try { frame.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*"); } catch (e) {}
+  }
+  function shortItemHtml(v) {
+    const id = v.id;
+    return `<div class="reel-item short-item" data-yt="${esc(id)}">
+      <img class="short-thumb" src="https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg" alt="" loading="lazy">
+      <div class="short-shield" data-short-tap></div>
+      <div class="short-pause"><i class="fa-solid fa-play"></i></div>
+      <div class="reel-info short-info"><div class="reel-owner"><i class="fa-brands fa-youtube short-yt"></i><b>${esc(v.channel || "YouTube")}</b></div>${v.title ? `<p>${esc(v.title)}</p>` : ""}</div>
+      <div class="reel-side">
+        <button type="button" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
+        <button type="button" data-short-share title="Share"><i class="fa-solid fa-share"></i></button>
+        <button type="button" data-short-open title="Open in YouTube"><i class="fa-brands fa-youtube"></i></button>
+      </div>
+    </div>`;
+  }
+  function stopShortFrames(exceptItem) {
+    document.querySelectorAll("#shortsList .short-item").forEach((it) => {
+      if (it === exceptItem) return;
+      const f = it.querySelector("iframe");
+      if (f) f.remove();
+      it.classList.remove("paused");
+    });
+  }
+  function activateShort(item) {
+    if (item.querySelector("iframe")) return;
+    stopShortFrames(item);
+    const id = item.dataset.yt;
+    if (!YT_ID_RE.test(id)) return;
+    const f = document.createElement("iframe");
+    f.className = "short-frame";
+    f.title = "YouTube Short";
+    f.allow = "autoplay; encrypted-media; picture-in-picture";
+    f.referrerPolicy = "strict-origin-when-cross-origin";
+    f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&mute=1&controls=0&loop=1&playlist=" + id +
+      "&playsinline=1&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+    f.addEventListener("load", () => { if (!shortMuted) setTimeout(() => ytCmd(f, "unMute"), 600); });
+    item.classList.remove("paused");
+    item.insertBefore(f, item.querySelector(".short-shield"));
+  }
+  function observeShorts(root) {
+    if (!shortsObserver) {
+      shortsObserver = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (en.isIntersecting && en.intersectionRatio > 0.6) activateShort(en.target);
+          else if (!en.isIntersecting) { const f = en.target.querySelector("iframe"); if (f) f.remove(); en.target.classList.remove("paused"); }
+        });
+      }, { threshold: [0, 0.6, 1] });
+    }
+    root.querySelectorAll(".short-item:not([data-obs])").forEach((el) => { el.dataset.obs = "1"; shortsObserver.observe(el); });
+  }
+  function shortsMessage(html) {
+    const box = $("shortsList");
+    if (!box.querySelector(".short-item")) box.innerHTML = `<div class="tp-empty"><i class="fa-brands fa-youtube"></i><p>${html}</p><button type="button" class="tp-btn tp-btn-primary" data-shorts-retry style="margin-top:10px">আবার চেষ্টা করুন</button></div>`;
+  }
+  function loadShorts() {
+    if (shortsLoading || shortsEnded) return;
+    shortsLoading = true;
+    const box = $("shortsList");
+    if (!box.children.length) box.innerHTML = `<div class="tp-empty"><i class="fa-solid fa-spinner fa-spin"></i><p>Shorts লোড হচ্ছে…</p></div>`;
+    socket.emit("get-shorts", { seen: shortsSeen.slice(-200) }, (res) => {
+      shortsLoading = false;
+      const first = !box.querySelector(".short-item");
+      if (!res || !res.success) {
+        const e = res && res.error;
+        if (first) {
+          if (e === "no_key") { shortsEnded = true; shortsMessage("Shorts এখনো চালু করা হয়নি। অ্যাডমিন সার্ভারে YouTube key বসালেই চালু হবে।"); }
+          else shortsMessage(res ? "এই মুহূর্তে Shorts আনা যাচ্ছে না। একটু পরে আবার চেষ্টা করুন।" : "সার্ভারের সাথে যোগাযোগ করা যায়নি। একটু পরে আবার চেষ্টা করুন।");
+        }
+        return;
+      }
+      const list = (res.shorts || []).filter((v) => v && YT_ID_RE.test(v.id));
+      if (first) box.innerHTML = "";
+      list.forEach((v) => { shortsSeen.push(v.id); });
+      if (shortsSeen.length > 400) shortsSeen = shortsSeen.slice(-300);
+      box.insertAdjacentHTML("beforeend", list.map(shortItemHtml).join(""));
+      observeShorts(box);
+    });
+  }
+  function setReelMode(mode) {
+    shortsMode = mode === "shorts";
+    $("reelSwitch").querySelectorAll("[data-rs]").forEach((b) => b.classList.toggle("active", b.dataset.rs === mode));
+    $("reelsList").style.display = shortsMode ? "none" : "";
+    $("shortsList").style.display = shortsMode ? "" : "none";
+    $("trUpload").style.display = shortsMode ? "none" : "";
+    if (shortsMode) { pauseReels(); loadShorts(); }
+    else { document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); loadReels(); }
+  }
+  $("reelSwitch").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rs]");
+    if (b) setReelMode(b.dataset.rs);
+  });
+  $("shortsList").addEventListener("scroll", () => {
+    const box = $("shortsList");
+    if (box.scrollTop + box.clientHeight * 3 >= box.scrollHeight - 10) loadShorts();
+  }, { passive: true });
+  $("shortsList").addEventListener("click", async (e) => {
+    if (e.target.closest("[data-shorts-retry]")) { shortsEnded = false; $("shortsList").innerHTML = ""; loadShorts(); return; }
+    const item = e.target.closest(".short-item");
+    if (!item) return;
+    const id = item.dataset.yt;
+    if (e.target.closest("[data-short-sound]")) {
+      shortMuted = !shortMuted;
+      const f = item.querySelector("iframe");
+      if (f) ytCmd(f, shortMuted ? "mute" : "unMute");
+      $("shortsList").querySelectorAll("[data-short-sound] i").forEach((i) => { i.className = "fa-solid " + (shortMuted ? "fa-volume-xmark" : "fa-volume-high"); });
+      return;
+    }
+    if (e.target.closest("[data-short-share]")) {
+      const link = "https://youtu.be/" + id;
+      try { if (navigator.share) { await navigator.share({ title: "YouTube Short", url: link }); return; } } catch (er) { if (er && er.name === "AbortError") return; }
+      const ok = await ektCopyText(link);
+      if (ok && typeof showMiniToast === "function") showMiniToast("লিংক কপি হয়েছে");
+      return;
+    }
+    if (e.target.closest("[data-short-open]")) { window.open("https://www.youtube.com/shorts/" + id, "_blank", "noopener"); return; }
+    if (e.target.closest("[data-short-tap]")) {
+      // ট্যাপ করলে থামা/চলা
+      const f = item.querySelector("iframe");
+      if (!f) { activateShort(item); return; }
+      const nowPaused = !item.classList.contains("paused");
+      item.classList.toggle("paused", nowPaused);
+      ytCmd(f, nowPaused ? "pauseVideo" : "playVideo");
+    }
+  });
 
   // ---------- REEL COMMENTS (নিচ থেকে ওঠা শিট) ----------
   const findReel = (id) => reelsCache.find((x) => x.id === id);
