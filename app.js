@@ -353,6 +353,45 @@ myPeer.on("open", (id) => {
   myPeerId = id;
 });
 
+// প্রতিটা ডিভাইস/ব্রাউজারের জন্য একটা আইডি — সেটিংসের "কোথায় কোথায় লগইন আছে" তালিকার জন্য
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem("appDeviceId");
+    if (!id) {
+      id = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem("appDeviceId", id);
+    }
+    return id;
+  } catch (e) { return ""; }
+}
+
+// অ্যাকাউন্ট মুছে গেলে / নম্বর বদলে গেলে এই ডিভাইস থেকে সব লোকাল চিহ্ন সরিয়ে লগআউট
+async function ektHandleAccountGone(kind) {
+  if (window.__ektGoneHandling) return;
+  window.__ektGoneHandling = true;
+  const phone = currentUser && currentUser.phone;
+  try {
+    localStorage.removeItem("appUser");
+    if (phone) {
+      const db = getStoredUsers();
+      delete db[phone];
+      localStorage.setItem("usersDatabase", JSON.stringify(db));
+      Object.keys(localStorage).forEach((k) => { if (k.endsWith("_" + phone)) localStorage.removeItem(k); });
+    }
+    sessionStorage.removeItem("activeRoom");
+    sessionStorage.removeItem("activeDirectChat");
+  } catch (e) {}
+  currentUser = null;
+  if (kind === "renamed") await showCustomAlert("Login again", "এই অ্যাকাউন্টের নম্বর/ইমেইল বদলানো হয়েছে। নতুনটা দিয়ে আবার লগইন করুন।");
+  else await showCustomAlert("Account Deleted", "আপনার অ্যাকাউন্ট অ্যাডমিন মুছে দিয়েছেন।");
+  location.reload();
+}
+function ektRegisterQuiet() {
+  socket.emit("register-user", currentUser, (r) => {
+    if (r && (r.deleted || r.renamed)) ektHandleAccountGone(r.renamed ? "renamed" : "deleted");
+  });
+}
+
 let currentUser = null;
 let currentRoom = null;
 let activeDirectChatFriend = null;
@@ -938,18 +977,44 @@ const savedTheme = localStorage.getItem("appTheme") || "light-theme";
 bodyElement.className = savedTheme;
 updateThemeIcon(savedTheme);
 
-if (themeToggleBtn) {
-  themeToggleBtn.addEventListener("click", () => {
-    if (bodyElement.classList.contains("dark-theme")) {
-      bodyElement.classList.replace("dark-theme", "light-theme");
-      localStorage.setItem("appTheme", "light-theme");
-      updateThemeIcon("light-theme");
-    } else {
-      bodyElement.classList.replace("light-theme", "dark-theme");
-      localStorage.setItem("appTheme", "dark-theme");
-      updateThemeIcon("dark-theme");
+function setAppTheme(theme) {
+  bodyElement.classList.remove("dark-theme", "light-theme");
+  bodyElement.classList.add(theme);
+  try { localStorage.setItem("appTheme", theme); } catch (e) {}
+  updateThemeIcon(theme);
+  try { document.dispatchEvent(new Event("ekt-theme-changed")); } catch (e) {}
+}
+
+// "Theme" চাপলে এই পপআপ আসে — এখান থেকে Light বা Dark বেছে নেওয়া যায়
+function openThemePopup() {
+  const existing = document.getElementById("themePopupOverlay");
+  if (existing) existing.remove();
+  const current = bodyElement.classList.contains("dark-theme") ? "dark-theme" : "light-theme";
+  const ov = document.createElement("div");
+  ov.id = "themePopupOverlay";
+  ov.className = "thm-ov";
+  ov.innerHTML =
+    '<div class="thm-card" role="dialog" aria-modal="true">' +
+    '<h3>Theme</h3><p>অ্যাপের লুক বেছে নিন</p>' +
+    '<div class="thm-opts">' +
+    '<button type="button" class="thm-opt' + (current === "light-theme" ? " selected" : "") + '" data-theme="light"><span class="thm-tick"><i class="fa-solid fa-check"></i></span><span class="thm-ico"><i class="fa-solid fa-sun"></i></span>Light</button>' +
+    '<button type="button" class="thm-opt' + (current === "dark-theme" ? " selected" : "") + '" data-theme="dark"><span class="thm-tick"><i class="fa-solid fa-check"></i></span><span class="thm-ico"><i class="fa-solid fa-moon"></i></span>Dark</button>' +
+    '</div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener("click", (e) => {
+    const opt = e.target.closest(".thm-opt");
+    if (opt) {
+      setAppTheme(opt.dataset.theme === "dark" ? "dark-theme" : "light-theme");
+      ov.querySelectorAll(".thm-opt").forEach((b) => b.classList.toggle("selected", b === opt));
+      setTimeout(() => ov.remove(), 180);
+      return;
     }
+    if (e.target === ov) ov.remove();
   });
+}
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", openThemePopup);
 }
 
 function updateThemeIcon(theme) {
@@ -1280,7 +1345,7 @@ function checkActiveSession() {
     if (isMasterUnlocked === "true") {
       if (savedUser) {
         currentUser = savedUser;
-        socket.emit("set-user-socket", { phone: currentUser.phone });
+        socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
         fetchFriendData();
         if (activeRoom) {
           joinRoom(activeRoom, true);
@@ -1343,7 +1408,7 @@ function grantAccess() {
   const savedUser = JSON.parse(localStorage.getItem("appUser"));
   if (savedUser) {
     currentUser = savedUser;
-    socket.emit("set-user-socket", { phone: currentUser.phone });
+    socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
     fetchFriendData();
 
     const activeRoom = sessionStorage.getItem("activeRoom");
@@ -1434,29 +1499,76 @@ authToggleLink.addEventListener("click", (e) => {
   }
 });
 
-authSubmitBtn.addEventListener("click", async () => {
-  const phone = phoneInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  if (!phone || !password) return await showCustomAlert("Input Missing", "ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন");
+// ---- ফোন / ইমেইল সুইচ (লগইন ও সাইন-আপ দুই জায়গাতেই) ----
+let authIdMode = "phone";
+const AUTH_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const AUTH_PHONE_RE = /^\+?[0-9]{6,18}$/;
+const authIdPhoneBtn = document.getElementById("authIdPhoneBtn");
+const authIdEmailBtn = document.getElementById("authIdEmailBtn");
+const signupEmailWrap = document.getElementById("signupEmailWrap");
+const signupEmailInput = document.getElementById("signupEmailInput");
+function setAuthIdMode(mode) {
+  authIdMode = mode === "email" ? "email" : "phone";
+  const isEmailMode = authIdMode === "email";
+  phoneInput.placeholder = isEmailMode ? "Email address" : "Phone Number";
+  phoneInput.setAttribute("inputmode", isEmailMode ? "email" : "tel");
+  phoneInput.setAttribute("autocapitalize", "none");
+  phoneInput.value = "";
+  if (authIdPhoneBtn) authIdPhoneBtn.classList.toggle("active", !isEmailMode);
+  if (authIdEmailBtn) authIdEmailBtn.classList.toggle("active", isEmailMode);
+  if (signupEmailWrap) signupEmailWrap.style.display = isEmailMode ? "none" : "block";
+}
+if (authIdPhoneBtn) authIdPhoneBtn.addEventListener("click", () => setAuthIdMode("phone"));
+if (authIdEmailBtn) authIdEmailBtn.addEventListener("click", () => setAuthIdMode("email"));
+setAuthIdMode("phone");
 
+authSubmitBtn.addEventListener("click", async () => {
+  const raw = phoneInput.value.trim();
+  const password = authPasswordInput.value.trim();
+  const idLabel = authIdMode === "email" ? "ইমেইল" : "ফোন নম্বর";
+  if (!raw || !password) return await showCustomAlert("Input Missing", idLabel + " এবং পাসওয়ার্ড প্রদান করুন");
+
+  const looksEmail = authIdMode === "email" || raw.includes("@");
   const localUsers = getStoredUsers();
   if (isSignUpMode) {
     const name = fullNameInput.value.trim();
     if (!name) return await showCustomAlert("Input Missing", "আপনার নাম লিখুন");
-    if (localUsers[phone]) return await showCustomAlert("Error", "এই নম্বরটি ইতিমধ্যেই নিবন্ধিত!");
 
-    const newUser = { name, phone, password, pic: "https://via.placeholder.com/100" };
-    saveUserToStorage(newUser);
-    socket.emit("register-user", newUser, () => {
+    let idv, extraEmail = "";
+    if (looksEmail) {
+      idv = raw.toLowerCase();
+      if (!AUTH_EMAIL_RE.test(idv)) return await showCustomAlert("Invalid Email", "সঠিক ইমেইল ঠিকানা দিন");
+    } else {
+      idv = raw.replace(/[\s-]/g, "");
+      if (!AUTH_PHONE_RE.test(idv)) return await showCustomAlert("Invalid Number", "সঠিক ফোন নম্বর দিন (শুধু সংখ্যা)");
+      extraEmail = signupEmailInput ? signupEmailInput.value.trim().toLowerCase() : "";
+      if (extraEmail && !AUTH_EMAIL_RE.test(extraEmail)) return await showCustomAlert("Invalid Email", "সঠিক ইমেইল ঠিকানা দিন, অথবা ঘরটা খালি রাখুন");
+    }
+    if (localUsers[idv]) return await showCustomAlert("Error", "এই নম্বর/ইমেইলটি ইতিমধ্যেই নিবন্ধিত!");
+
+    const newUser = { name, phone: idv, password, pic: "https://via.placeholder.com/100" };
+    const email = looksEmail ? idv : extraEmail;
+    if (email) newUser.email = email;
+    // সার্ভার আগে চেক করে — একই নম্বর/ইমেইল আগে থেকে থাকলে সাইন-আপ হবে না
+    socket.emit("register-user", Object.assign({}, newUser, { fresh: true, deviceId: getDeviceId() }), async (res) => {
+      if (!res) return await showCustomAlert("Error", "সার্ভারের সাথে যোগাযোগ করা যায়নি। একটু পরে আবার চেষ্টা করুন।");
+      if (res.banned) return await showCustomAlert("Account Banned", "এই নম্বর/ইমেইল ব্যান করা আছে।");
+      if (res.error === "exists") return await showCustomAlert("Error", "এই নম্বর/ইমেইলটি ইতিমধ্যেই নিবন্ধিত!");
+      if (res.error === "email_taken") return await showCustomAlert("Error", "এই ইমেইল অন্য একটি অ্যাকাউন্টে ব্যবহার হচ্ছে।");
+      if (res.error === "bad_email") return await showCustomAlert("Invalid Email", "সঠিক ইমেইল ঠিকানা দিন");
+      if (!res.success) return await showCustomAlert("Error", "সাইন-আপ করা যায়নি। আবার চেষ্টা করুন।");
+      saveUserToStorage(newUser);
       currentUser = newUser;
       localStorage.setItem("appUser", JSON.stringify(currentUser));
-      socket.emit("set-user-socket", { phone: currentUser.phone });
+      socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
       fetchFriendData();
       showDashboard();
     });
   } else {
+    // ফোন বা ইমেইল — যেটা দিয়েই অ্যাকাউন্ট খোলা হোক বা সেটিংসে পরে যোগ হোক, সার্ভার মিলিয়ে নেয়
+    const loginId = looksEmail ? raw.toLowerCase() : raw;
     // সবসময় সার্ভারে চেক — ব্যান থাকলে লোকাল ক্যাশ দিয়েও লগইন হবে না
-    socket.emit("login-user", { phone, password }, async (res) => {
+    socket.emit("login-user", { phone: loginId, password, deviceId: getDeviceId() }, async (res) => {
       if (res && res.banned) {
         await showCustomAlert("Account Banned", res.reason || "আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।");
         return;
@@ -1465,22 +1577,22 @@ authSubmitBtn.addEventListener("click", async () => {
         currentUser = res.user;
         saveUserToStorage(currentUser);
         localStorage.setItem("appUser", JSON.stringify(currentUser));
-        socket.emit("set-user-socket", { phone: currentUser.phone });
+        socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
         fetchFriendData();
         showDashboard();
         return;
       }
-      // সার্ভারে নেই — লোকাল ক্যাশ দিয়ে চেষ্টা
-      const localUser = localUsers[phone];
+      // সার্ভারে নেই — লোকাল ক্যাশ দিয়ে চেষ্টা (সার্ভার ডেটা হারালে রিকভারির জন্য)
+      const localUser = localUsers[loginId];
       if (localUser && localUser.password === password) {
         currentUser = localUser;
         localStorage.setItem("appUser", JSON.stringify(currentUser));
-        socket.emit("set-user-socket", { phone: currentUser.phone });
-        socket.emit("register-user", currentUser, () => {});
+        socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
+        ektRegisterQuiet();
         fetchFriendData();
         showDashboard();
       } else {
-        await showCustomAlert("Login Failed", "ফোন নম্বর বা পাসওয়ার্ড ভুল!");
+        await showCustomAlert("Login Failed", idLabel + " বা পাসওয়ার্ড ভুল!");
       }
     });
   }
@@ -1493,11 +1605,17 @@ socket.on("account-banned", async (data) => {
   currentUser = null;
   location.reload();
 });
-socket.on("account-deleted", async () => {
-  await showCustomAlert("Account Deleted", "আপনার অ্যাকাউন্ট অ্যাডমিন মুছে দিয়েছেন।");
-  try { localStorage.removeItem("appUser"); } catch (e) {}
-  currentUser = null;
-  location.reload();
+socket.on("account-deleted", () => { ektHandleAccountGone("deleted"); });
+// অন্য ডিভাইস থেকে নম্বর বদলানো হলে এই সকেটেই নতুন নম্বর জানানো হয়
+socket.on("account-phone-changed", ({ phone }) => {
+  if (!phone || !currentUser || currentUser.phone === phone) return;
+  const old = currentUser.phone;
+  currentUser = Object.assign({}, currentUser, { phone });
+  try {
+    localStorage.setItem("appUser", JSON.stringify(currentUser));
+    const db = getStoredUsers(); delete db[old]; db[phone] = currentUser;
+    localStorage.setItem("usersDatabase", JSON.stringify(db));
+  } catch (e) {}
 });
 
 function showDashboard() {
@@ -1513,7 +1631,7 @@ function showDashboard() {
   if (currentUser) {
     dashboardUserName.textContent = currentUser.name;
     if (currentUser.pic) dashboardAvatar.src = currentUser.pic;
-    socket.emit("set-user-socket", { phone: currentUser.phone });
+    socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
     fetchFriendData();
     if (typeof window.loadStoriesRow === "function") window.loadStoriesRow();
     if (typeof window.__tabsOnDashboard === "function") window.__tabsOnDashboard();
@@ -1588,8 +1706,9 @@ function fetchFriendData() {
   } catch (e) {}
   socket.emit(
     "sync-user-data",
-    { user: currentUser, friends: (cached && cached.friends) || [], profile: profileBackup },
+    { user: Object.assign({}, currentUser, { deviceId: getDeviceId() }), friends: (cached && cached.friends) || [], profile: profileBackup },
     (data) => {
+      if (data && (data.deleted || data.renamed)) return ektHandleAccountGone(data.renamed ? "renamed" : "deleted");
       if (data && Array.isArray(data.friends)) renderFriendData(data);
     }
   );
@@ -1598,8 +1717,8 @@ function fetchFriendData() {
 // সার্ভার রিস্টার্ট বা নেট কেটে গিয়ে আবার কানেক্ট হলে সব কিছু আবার সিঙ্ক হবে
 socket.on("connect", () => {
   if (!currentUser) return;
-  socket.emit("set-user-socket", { phone: currentUser.phone });
-  socket.emit("register-user", currentUser, () => {});
+  socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() });
+  ektRegisterQuiet();
   fetchFriendData();
   healMyProfileIfNeeded(); // সার্ভার ডেটা হারালে এই ডিভাইস থেকে "About" ফিরিয়ে আনা
   if (window.__ektPreloadDone) {
@@ -4917,16 +5036,24 @@ socket.on("direct-call-rejected", async () => {
         }
 
         if (act === "delete") {
-          if (!confirm("এই ইউজারের অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলবেন? (" + phone + ")")) return;
-          actBtn.disabled = true;
-          socket.emit("admin-delete-user", { password: adminSessionPassword, phone: phone }, function (res) {
-            actBtn.disabled = false;
-            if (res && res.success) {
-              if (typeof showMiniToast === "function") showMiniToast("Account deleted");
-              refreshAdminUsers();
-            } else {
-              showCustomAlert("Error", "ডিলিট করা যায়নি।");
-            }
+          // নেটিভ confirm() অনেক ফোন/PWA-তে আসে না — তাই অ্যাপের নিজস্ব পপআপ
+          showCustomModal({
+            title: "Delete account?",
+            subtitle: "এই ইউজারের (" + phone + ") অ্যাকাউন্ট, পোস্ট, স্টোরি, চ্যাট, ফ্রেন্ডলিস্ট সব স্থায়ীভাবে মুছে যাবে। কোনো হিস্ট্রি রাখা হবে না, আর ফেরত আনা যাবে না।",
+            confirmText: "Delete permanently",
+            cancelText: "Cancel"
+          }).then(function (ok) {
+            if (!ok) return;
+            actBtn.disabled = true;
+            socket.emit("admin-delete-user", { password: adminSessionPassword, phone: phone }, function (res) {
+              actBtn.disabled = false;
+              if (res && res.success) {
+                if (typeof showMiniToast === "function") showMiniToast("Account deleted permanently");
+                refreshAdminUsers();
+              } else {
+                showCustomAlert("Error", "ডিলিট করা যায়নি।");
+              }
+            });
           });
           return;
         }
@@ -6404,4 +6531,277 @@ window.EktReact = (function () {
     t.dataset.fb = "1";
     t.src = FALLBACK;
   }, true);
+})();
+
+
+// ======================================================================
+// SETTINGS — পাসওয়ার্ড · ফোন নম্বর · ইমেইল · লগইন ডিভাইস · থিম (Light/Dark পপআপ)
+// ======================================================================
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const PHONE_RE = /^\+?[0-9]{6,18}$/;
+  const NET_ERR = "সার্ভারের সাথে যোগাযোগ করা যায়নি। একটু পরে আবার চেষ্টা করুন।";
+  const ERR = {
+    wrong_password: "পাসওয়ার্ড ভুল হয়েছে।",
+    too_short: "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।",
+    same: "নতুনটা আগেরটার মতোই — অন্য কিছু দিন।",
+    bad_email: "সঠিক ইমেইল দিন।",
+    email_taken: "এই ইমেইল অন্য একটি অ্যাকাউন্টে ব্যবহার হচ্ছে।",
+    bad_phone: "সঠিক ফোন নম্বর দিন (শুধু সংখ্যা, + দিয়ে শুরু করা যাবে)।",
+    phone_taken: "এই নম্বর অন্য একটি অ্যাকাউন্টে ব্যবহার হচ্ছে।",
+  };
+
+  function call(ev, payload, ms) {
+    return new Promise((resolve) => {
+      let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, ms || 15000);
+      try {
+        socket.emit(ev, payload, (r) => { if (done) return; done = true; clearTimeout(t); resolve(r); });
+      } catch (e) { done = true; clearTimeout(t); resolve(null); }
+    });
+  }
+  const errText = (r) => (!r ? NET_ERR : (ERR[r.error] || "সম্ভব হয়নি। আবার চেষ্টা করুন।"));
+
+  function fmtTime(ts) {
+    if (!ts) return "—";
+    try { return new Date(ts).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
+  }
+  function agoLabel(ts) {
+    if (!ts) return "";
+    const m = Math.floor((Date.now() - ts) / 60000);
+    if (m < 2) return "এইমাত্র";
+    if (m < 60) return m + " মিনিট আগে";
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + " ঘণ্টা আগে";
+    return Math.floor(h / 24) + " দিন আগে";
+  }
+
+  // ---------- লোকাল ক্যাশ আপডেট ----------
+  function persistUser(patch, oldPhone) {
+    const next = Object.assign({}, currentUser, patch);
+    currentUser = next;
+    try { localStorage.setItem("appUser", JSON.stringify(next)); } catch (e) {}
+    try {
+      const db = getStoredUsers();
+      if (oldPhone && oldPhone !== next.phone) delete db[oldPhone];
+      db[next.phone] = next;
+      localStorage.setItem("usersDatabase", JSON.stringify(db));
+    } catch (e) {}
+  }
+  function migrateLocalKeys(oldPhone, newPhone) {
+    try {
+      const suffix = "_" + oldPhone;
+      Object.keys(localStorage).forEach((k) => {
+        if (k.length > suffix.length && k.endsWith(suffix)) {
+          const nk = k.slice(0, -oldPhone.length) + newPhone;
+          if (localStorage.getItem(nk) == null) localStorage.setItem(nk, localStorage.getItem(k));
+          localStorage.removeItem(k);
+        }
+      });
+    } catch (e) {}
+  }
+
+  // ---------- ছোট ফর্ম ডায়ালগ (ইনপুট + ভুল হলে নিচে লাল মেসেজ, ফর্ম বন্ধ হয় না) ----------
+  function openForm(opts) {
+    return new Promise((resolve) => {
+      const ov = document.createElement("div");
+      ov.className = "ekt-form-ov";
+      ov.innerHTML =
+        '<div class="ekt-form-card" role="dialog" aria-modal="true">' +
+        "<h3>" + esc(opts.title) + "</h3>" +
+        (opts.sub ? '<p class="ekt-form-sub">' + esc(opts.sub) + "</p>" : "") +
+        '<div class="ekt-form-fields">' +
+        opts.fields.map((f, i) =>
+          '<label class="ekt-field"><span>' + esc(f.label) + '</span><input data-i="' + i + '" type="' + (f.type || "text") + '" placeholder="' + esc(f.placeholder || "") + '" autocomplete="off"' + (f.inputmode ? ' inputmode="' + f.inputmode + '"' : "") + "></label>"
+        ).join("") +
+        "</div>" +
+        '<div class="ekt-form-err" style="display:none"></div>' +
+        '<div class="ekt-form-actions"><button type="button" class="btn btn-secondary" data-act="cancel">Cancel</button><button type="button" class="btn btn-primary" data-act="ok">' + esc(opts.submitText || "Save") + "</button></div>" +
+        "</div>";
+      document.body.appendChild(ov);
+      const inputs = Array.from(ov.querySelectorAll("input"));
+      const errEl = ov.querySelector(".ekt-form-err");
+      const okBtn = ov.querySelector('[data-act="ok"]');
+      let busy = false;
+      const close = (v) => { ov.remove(); resolve(v); };
+      const showErr = (m) => { errEl.textContent = m || ""; errEl.style.display = m ? "block" : "none"; };
+      const submit = async () => {
+        if (busy) return;
+        showErr("");
+        busy = true; okBtn.disabled = true; okBtn.textContent = "Please wait…";
+        let err = null;
+        try { err = await opts.onSubmit(inputs.map((i) => i.value.trim())); } catch (e) { err = "কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।"; }
+        busy = false; okBtn.disabled = false; okBtn.textContent = opts.submitText || "Save";
+        if (err) showErr(err); else close(true);
+      };
+      ov.addEventListener("click", (e) => {
+        if (e.target === ov && !busy) return close(false);
+        const b = e.target.closest("[data-act]");
+        if (!b) return;
+        if (b.dataset.act === "cancel" && !busy) close(false);
+        if (b.dataset.act === "ok") submit();
+      });
+      inputs.forEach((inp) => inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }));
+      setTimeout(() => { try { inputs[0].focus(); } catch (e) {} }, 50);
+    });
+  }
+
+  // ---------- অ্যাকাউন্টের ফোন/ইমেইল (key যদি ইমেইল হয় তাহলে ফোন নেই) ----------
+  const phoneOf = () => (currentUser && currentUser.phone && !EMAIL_RE.test(currentUser.phone) ? currentUser.phone : "");
+  const emailOf = () => (currentUser ? (currentUser.email || (EMAIL_RE.test(currentUser.phone || "") ? currentUser.phone : "")) : "");
+
+  async function finishRename(oldPhone, newPhone, message) {
+    migrateLocalKeys(oldPhone, newPhone);
+    await showCustomAlert("Success", message);
+    location.reload();
+  }
+
+  async function doChangePhone() {
+    await openForm({
+      title: phoneOf() ? "Change phone number" : "Add phone number",
+      sub: "নিরাপত্তার জন্য আপনার পাসওয়ার্ড দিন। বন্ধু, চ্যাট আর পোস্ট সব যেমন আছে তেমনই থাকবে।",
+      fields: [
+        { label: "New phone number", placeholder: "01XXXXXXXXX", inputmode: "tel" },
+        { label: "Your password", type: "password", placeholder: "Password" },
+      ],
+      submitText: "Save",
+      onSubmit: async ([np, pw]) => {
+        const clean = np.replace(/[\s-]/g, "");
+        if (!PHONE_RE.test(clean)) return ERR.bad_phone;
+        if (!pw) return ERR.wrong_password;
+        const oldPhone = currentUser.phone;
+        const r = await call("change-phone", { phone: oldPhone, password: pw, newPhone: clean });
+        if (!r || !r.success) return errText(r);
+        const u = r.user || {};
+        persistUser(Object.assign({}, u, { phone: r.phone }), oldPhone);
+        await finishRename(oldPhone, r.phone, "ফোন নম্বর আপডেট হয়েছে। এখন থেকে নতুন নম্বর দিয়ে লগইন করতে হবে।");
+        return null;
+      },
+    });
+  }
+
+  async function doChangeEmail() {
+    await openForm({
+      title: emailOf() ? "Change email" : "Add email",
+      sub: "ইমেইল দিয়েও লগইন করা যাবে। নিরাপত্তার জন্য পাসওয়ার্ড দিন।",
+      fields: [
+        { label: "Email", placeholder: "name@example.com", inputmode: "email" },
+        { label: "Your password", type: "password", placeholder: "Password" },
+      ],
+      submitText: "Save",
+      onSubmit: async ([em, pw]) => {
+        const mail = em.toLowerCase();
+        if (!EMAIL_RE.test(mail)) return ERR.bad_email;
+        if (!pw) return ERR.wrong_password;
+        const oldPhone = currentUser.phone;
+        const r = await call("change-email", { phone: oldPhone, password: pw, email: mail });
+        if (!r || !r.success) return errText(r);
+        if (r.renamed && r.phone) {
+          persistUser({ phone: r.phone, email: r.email }, oldPhone);
+          await finishRename(oldPhone, r.phone, "ইমেইল আপডেট হয়েছে। এখন থেকে নতুন ইমেইল দিয়ে লগইন করতে হবে।");
+          return null;
+        }
+        persistUser({ email: r.email });
+        renderSettings();
+        showMiniToast("Email saved");
+        return null;
+      },
+    });
+  }
+
+  async function doChangePassword() {
+    await openForm({
+      title: "Change password",
+      sub: "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।",
+      fields: [
+        { label: "Current password", type: "password", placeholder: "Current password" },
+        { label: "New password", type: "password", placeholder: "New password" },
+        { label: "Confirm new password", type: "password", placeholder: "Repeat new password" },
+      ],
+      submitText: "Change",
+      onSubmit: async ([oldPw, newPw, again]) => {
+        if (!oldPw) return ERR.wrong_password;
+        if (newPw.length < 6) return ERR.too_short;
+        if (newPw !== again) return "নতুন পাসওয়ার্ড দুটো মিলছে না।";
+        const r = await call("change-password", { phone: currentUser.phone, oldPassword: oldPw, newPassword: newPw });
+        if (!r || !r.success) return errText(r);
+        persistUser({ password: newPw });
+        showMiniToast("Password changed");
+        return null;
+      },
+    });
+  }
+
+  // ---------- লগইন ডিভাইস লিস্ট ----------
+  async function loadDevices() {
+    const box = $("stgDevices");
+    if (!box) return;
+    box.innerHTML = '<div class="stg-muted">Loading…</div>';
+    try { socket.emit("set-user-socket", { phone: currentUser.phone, deviceId: getDeviceId() }); } catch (e) {}
+    const r = await call("get-login-history", { phone: currentUser.phone, deviceId: getDeviceId() });
+    if (!$("stgDevices")) return;
+    if (!r || !r.success) { box.innerHTML = '<div class="stg-muted">' + (r ? "লোড করা যায়নি।" : NET_ERR) + "</div>"; return; }
+    if (!r.list.length) { box.innerHTML = '<div class="stg-muted">এখনো কোনো রেকর্ড নেই। পরের লগইন থেকে এখানে দেখাবে।</div>'; return; }
+    box.innerHTML = r.list.map((e) =>
+      '<div class="stg-dev">' +
+      '<div class="stg-dev-ico"><i class="fa-solid ' + (/Android|iOS/.test(e.device || "") ? "fa-mobile-screen" : "fa-laptop") + '"></i></div>' +
+      '<div class="stg-dev-main"><div class="stg-dev-name">' + esc(e.device || "Unknown device") + (e.current ? ' <em class="stg-badge">This device</em>' : "") + "</div>" +
+      '<div class="stg-dev-sub">IP ' + esc(e.ip || "—") + " · Last login " + esc(fmtTime(e.lastLogin)) + "</div>" +
+      '<div class="stg-dev-sub">Last active ' + esc(agoLabel(e.lastSeen)) + "</div></div></div>"
+    ).join("");
+  }
+
+  // ---------- সেটিংস স্ক্রিন ----------
+  let overlay = null;
+  function themeLabel() { return document.body.classList.contains("dark-theme") ? "Dark" : "Light"; }
+
+  function renderSettings() {
+    if (!overlay) return;
+    const ph = phoneOf(), em = emailOf();
+    overlay.querySelector(".stg-body").innerHTML =
+      '<div class="stg-sec">Account</div>' +
+      '<button type="button" class="stg-row" data-stg="phone"><i class="fa-solid fa-phone" style="background:#10b981"></i><span class="stg-lbl">Phone number</span><span class="stg-val">' + esc(ph || "Not added") + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
+      '<button type="button" class="stg-row" data-stg="email"><i class="fa-solid fa-envelope" style="background:#0ea5e9"></i><span class="stg-lbl">Email</span><span class="stg-val">' + esc(em || "Not added") + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
+      '<button type="button" class="stg-row" data-stg="password"><i class="fa-solid fa-lock" style="background:#7c5cff"></i><span class="stg-lbl">Change password</span><span class="stg-val"></span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
+      '<div class="stg-sec">Appearance</div>' +
+      '<button type="button" class="stg-row" data-stg="theme"><i class="fa-solid fa-palette" style="background:#f59e0b"></i><span class="stg-lbl">Theme</span><span class="stg-val" id="stgThemeVal">' + themeLabel() + '</span><i class="fa-solid fa-chevron-right stg-chev"></i></button>' +
+      '<div class="stg-sec">Where you\'re logged in</div>' +
+      '<div class="stg-note">যেসব ডিভাইস/ব্রাউজার থেকে এই অ্যাকাউন্টে লগইন করা হয়েছে। চেনা না এমন কিছু দেখলে পাসওয়ার্ড বদলে ফেলুন।</div>' +
+      '<div id="stgDevices" class="stg-devices"></div>';
+  }
+
+  function openSettings() {
+    if (!currentUser) return;
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "settingsOverlay";
+      overlay.className = "stg-ov";
+      overlay.innerHTML =
+        '<div class="stg-card">' +
+        '<div class="stg-top"><button type="button" class="stg-back" aria-label="Close"><i class="fa-solid fa-arrow-left"></i></button><h2>Settings</h2></div>' +
+        '<div class="stg-body"></div></div>';
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay || e.target.closest(".stg-back")) { overlay.style.display = "none"; return; }
+        const row = e.target.closest("[data-stg]");
+        if (!row) return;
+        const k = row.dataset.stg;
+        if (k === "phone") doChangePhone();
+        else if (k === "email") doChangeEmail();
+        else if (k === "password") doChangePassword();
+        else if (k === "theme") openThemePopup();
+      });
+    }
+    renderSettings();
+    overlay.style.display = "flex";
+    loadDevices();
+  }
+
+  document.addEventListener("ekt-theme-changed", () => { const v = $("stgThemeVal"); if (v) v.textContent = themeLabel(); });
+
+  const btn = $("openSettingsBtn");
+  if (btn) btn.addEventListener("click", () => { const dd = $("dashDropdownMenu"); if (dd) dd.classList.remove("open"); openSettings(); });
+  window.openSettings = openSettings;
 })();
