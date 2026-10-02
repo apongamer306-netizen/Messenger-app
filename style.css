@@ -3180,24 +3180,9 @@ body.tab-reels { overflow: hidden; }
 #shortsList .tp-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 
 /* YouTube প্লেয়ার: মাঝের বাটন/টাইটেল বার/লোগো লুকানো + দুই পাশের কালো দাগ ছাড়া পুরো কার্ড ভরা */
-.short-item { container-type: size; }
 .short-item .short-frame { pointer-events: none; transition: opacity .15s ease; }
 .short-item.paused .short-frame { opacity: 0; }
-@supports (container-type: size) {
-  .short-item .short-frame {
-    inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: max(calc((100cqh + 140px) * 0.5625), 100cqw);
-    height: calc(max(calc((100cqh + 140px) * 0.5625), 100cqw) * 1.7778);
-  }
-}
-
-/* উপর / নিচ অ্যারো বাটন */
-.reel-nav { position: absolute; z-index: 9; display: flex; flex-direction: column; gap: 10px; }
-.reel-nav button { width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; font-size: 16px; background: var(--surface-3); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-.reel-nav button:disabled { opacity: .35; cursor: default; }
-@media (max-width: 899px) {
-  .reel-nav button { width: 38px; height: 38px; background: rgba(0,0,0,.38); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: none; }
-}
+.short-item .short-frame { inset: 0; width: 100%; height: 100%; }
 
 /* Shorts: লাইক / কমেন্ট */
 .reel-round.reacted i { color: #f97316; }
@@ -3211,3 +3196,28 @@ body.tab-reels { overflow: hidden; }
   #tabReels .reel-side { gap: 5px; bottom: 10px; }
   #tabReels .reel-side button { width: 34px; height: 34px; font-size: 14px; }
 }
+
+/* Shorts: ভিডিওর ভেতরে কোনো বাটনই দেখা যাবে না — শুধু ট্যাপে বন্ধ/চালু */
+.short-item .short-pause { display: none !important; }
+.short-item .short-frame { pointer-events: none !important; }
+
+/* Reels স্ক্রিন বড় করা: "Reels" লেখা সরানো, আপলোড বাটন ওপরে ডানে — পুরো জায়গা কার্ড পাবে */
+#tabReels { position: relative; padding-top: 6px; }
+#tabReels .tp-head h3 { display: none; }
+#tabReels .tp-head { margin: 0 4px 6px; justify-content: flex-end; }
+#tabReels .tp-head-btns button { width: 32px; height: 32px; font-size: 14px; }
+#tabReels .reel-switch { margin-bottom: 8px; }
+@media (min-width: 900px) {
+  #tabReels { padding-top: 8px; }
+  #tabReels .tp-head { position: absolute; right: 6px; top: 12px; margin: 0; z-index: 5; }
+}
+
+/* ===== শেষ আপডেট: সাউন্ড বাটন উপরের কোণায়, ডানে শুধু Like / Comment / Share ===== */
+.reel-item .reel-sound-top { position: absolute; top: 10px; right: 10px; z-index: 5; width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(0,0,0,.42); color: #fff; font-size: 15px; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.short-info { padding-right: 70px; }
+
+/* Reels | Shorts সুইচ: ছোট ও উপরে চাপানো */
+#tabReels .reel-switch { max-width: 280px; padding: 3px; margin: 0 auto 6px; }
+#tabReels .reel-switch button { padding: 5px 10px; font-size: 13px; }
+#tabReels { padding-top: 4px; }
+@media (min-width: 900px) { #tabReels { padding-top: 4px; } }
