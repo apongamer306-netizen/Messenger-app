@@ -1,3233 +1,2905 @@
-/* =====================================================================
-   EKT CHATTER — নতুন ডিজাইন সিস্টেম
-   রঙ, ফন্ট, গোলাকার কোণা সব এক জায়গায় (নিচের ভ্যারিয়েবলে)।
-   ডার্ক = ডিফল্ট, লাইট = body.light-theme
-   ===================================================================== */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Poppins', 'Inter', 'Hind Siliguri', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-style: italic;
-}
-
-/* ফন্ট-অসম্বল আইকনগুলো (Font Awesome) যেন ইটালিকে বাঁকা না হয়ে যায়,
-   তাই আইকন গ্লিফ সবসময় normal রাখা হলো */
-i[class*="fa-"], .fa, .fa-solid, .fa-regular, .fa-brands,
-i[class*="fa-"]::before, .fa-solid::before, .fa-regular::before, .fa-brands::before {
-  font-style: normal !important;
-}
-
-body {
-  --bg: #090d16;
-  --surface: #121a2b;
-  --surface-2: #182238;
-  --surface-3: #202c47;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-2: rgba(255, 255, 255, 0.13);
-  --text: #eaf0ff;
-  --text-2: #a7b3d0;
-  --text-3: #6f7c9c;
-  --brand: #4f8cff;
-  --brand-2: #7c5cff;
-  --brand-grad: linear-gradient(135deg, #4f8cff 0%, #7c5cff 100%);
-  --green: #22c55e;
-  --red: #ef4444;
-  --amber: #f59e0b;
-  --bubble-other: #1b2540;
-  --bubble-other-text: #eaf0ff;
-  --glass: rgba(14, 20, 34, 0.78);
-  --overlay: rgba(4, 7, 14, 0.68);
-  --input-bg: rgba(255, 255, 255, 0.05);
-  --shadow-card: 0 18px 50px rgba(0, 0, 0, 0.42);
-  --shadow-pop: 0 14px 38px rgba(0, 0, 0, 0.5);
-  --chat-bg-1: #0b1120;
-  --chat-bg-2: #0d1426;
-  --chat-dot: rgba(255, 255, 255, 0.035);
-  --radius: 18px;
-  --ring: 0 0 0 3px rgba(79, 140, 255, 0.28);
-
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-body.light-theme {
-  --bg: #eef2fb;
-  --surface: #ffffff;
-  --surface-2: #f3f6fc;
-  --surface-3: #e7edf8;
-  --line: rgba(15, 23, 42, 0.08);
-  --line-2: rgba(15, 23, 42, 0.14);
-  --text: #0f172a;
-  --text-2: #475569;
-  --text-3: #8391a8;
-  --bubble-other: #eaeff8;
-  --bubble-other-text: #0f172a;
-  --glass: rgba(255, 255, 255, 0.82);
-  --overlay: rgba(15, 23, 42, 0.45);
-  --input-bg: rgba(15, 23, 42, 0.045);
-  --shadow-card: 0 18px 46px rgba(30, 50, 90, 0.12);
-  --shadow-pop: 0 14px 34px rgba(30, 50, 90, 0.18);
-  --chat-bg-1: #f4f7fd;
-  --chat-bg-2: #edf1fa;
-  --chat-dot: rgba(15, 23, 42, 0.05);
-  --ring: 0 0 0 3px rgba(79, 140, 255, 0.22);
-}
-
-/* পেছনের নরম রঙিন আভা */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(42% 38% at 12% 8%, rgba(79, 140, 255, 0.16) 0%, rgba(79, 140, 255, 0) 70%),
-    radial-gradient(40% 36% at 92% 14%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%),
-    radial-gradient(46% 40% at 50% 104%, rgba(236, 72, 153, 0.10) 0%, rgba(236, 72, 153, 0) 70%);
-}
-body.light-theme::before {
-  background:
-    radial-gradient(42% 38% at 12% 8%, rgba(79, 140, 255, 0.20) 0%, rgba(79, 140, 255, 0) 70%),
-    radial-gradient(40% 36% at 92% 14%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%),
-    radial-gradient(46% 40% at 50% 104%, rgba(236, 72, 153, 0.10) 0%, rgba(236, 72, 153, 0) 70%);
-}
-
-::selection { background: rgba(79, 140, 255, 0.35); }
-
-button { font-family: inherit; }
-img { -webkit-user-drag: none; }
-
-/* ---------- নেভবার ---------- */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 20px;
-  background: var(--glass);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-bottom: 1px solid var(--line);
-}
-
-.icon-btn {
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  color: var(--text);
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  font-size: 1rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease, transform 0.15s ease;
-}
-.icon-btn:hover { background: var(--surface-3); }
-.icon-btn:active { transform: scale(0.94); }
-
-/* লোগো — অক্ষর একটা একটা করে হালকা ফেড-ইন হয়ে বসে, তারপর লেখাজুড়ে নরম রঙিন ঝিলিক বয়ে যায় */
-.logo, .logo * {
-  font-family: 'Pacifico', 'Hind Siliguri', cursive;
-  font-style: normal;
-  font-weight: 400;
-}
-.logo {
-  position: relative;
-  display: inline-block;
-  font-size: clamp(1.2rem, 4.8vw, 1.75rem);
-  line-height: 1.35;
-  letter-spacing: 1px;
-  color: #4f8cff;
-  white-space: nowrap;
-  filter: drop-shadow(0 0 12px rgba(79, 140, 255, 0.35));
-}
-.logo-sizer { visibility: hidden; }
-.logo-type {
-  position: absolute;
-  left: 0;
-  top: 0;
-  white-space: nowrap;
-  filter: drop-shadow(0 0 12px rgba(124, 92, 255, 0.4));
-}
-.logo-loop-text {
-  background: linear-gradient(100deg, #4f8cff 0%, #7c5cff 45%, #ec4899 80%, #ffd166 100%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: logoGradientDrift 6s ease-in-out infinite;
-}
-@keyframes logoGradientDrift {
-  0%, 100% { background-position: 0% 50%; }
-  50%      { background-position: 100% 50%; }
-}
-.logo-loop-cursor {
-  display: inline-block;
-  width: 3px;
-  height: 0.85em;
-  margin-left: 3px;
-  vertical-align: -0.08em;
-  border-radius: 2px;
-  background: #a78bfa;
-  box-shadow: 0 0 8px rgba(167, 139, 250, 0.7);
-  animation: logoCursorBlink 0.9s steps(1) infinite;
-}
-@keyframes logoCursorBlink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .logo-loop-text { animation: none; }
-  .logo-loop-cursor { animation: none; opacity: 0; }
-}
-
-/* ---------- মূল কন্টেইনার ও কার্ড ---------- */
-.main-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: calc(100vh - 60px);
-  min-height: calc(100dvh - 60px);
-  padding: 16px;
-  position: relative;
-}
-
-@keyframes screenFadeSlide {
-  from { opacity: 0; transform: translateY(18px) scale(0.985); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes fadeScaleIn {
-  from { opacity: 0; transform: scale(0.94) translateY(10px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.card-screen {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 26px;
-  padding: 30px 26px 26px;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: var(--shadow-card);
-  text-align: center;
-  animation: screenFadeSlide 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.card-screen::before {
-  content: "";
-  position: absolute;
-  inset: 0 28px auto 28px;
-  height: 3px;
-  border-radius: 0 0 6px 6px;
-  background: var(--brand-grad);
-  opacity: 0.95;
-}
-.card-screen h2 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  margin-bottom: 4px;
-}
-.card-screen p { color: var(--text-2); }
-
-.auth-icon {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 14px;
-  border-radius: 20px;
-  background: var(--brand-grad);
-  color: #fff;
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 12px 28px rgba(79, 140, 255, 0.4);
-}
-
-/* ---------- ইনপুট ---------- */
-.input-wrapper {
-  position: relative;
-  margin-bottom: 14px;
-  width: 100%;
-}
-.input-wrapper input,
-.modal-input,
-.profile-edit-field {
-  width: 100%;
-  padding: 13px 44px 13px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--line-2);
-  background: var(--input-bg);
-  color: var(--text);
-  font-size: 14.5px;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-.input-wrapper input::placeholder { color: var(--text-3); }
-.input-wrapper input:focus,
-.profile-edit-field:focus {
-  border-color: var(--brand);
-  box-shadow: var(--ring);
-  background: var(--surface-2);
-}
-.toggle-eye,
-.password-toggle-icon {
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: pointer;
-  color: var(--text-3);
-  transition: color 0.2s ease;
-}
-.toggle-eye:hover { color: var(--text); }
-
-/* ---------- বাটন ---------- */
-.btn {
-  width: 100%;
-  padding: 13px 16px;
-  border: none;
-  border-radius: 14px;
-  font-size: 14.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease, background 0.2s ease;
-}
-.btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.btn:active { transform: scale(0.97); }
-.btn-primary {
-  background: var(--brand-grad);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(79, 140, 255, 0.32);
-}
-.btn-secondary {
-  background: var(--surface-3);
-  color: var(--text);
-  border: 1px solid var(--line-2);
-}
-.btn-danger {
-  background: linear-gradient(135deg, #f97373, #ef4444);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.28);
-}
-.btn-sm { padding: 9px 18px; font-size: 13px; width: auto; border-radius: 12px; }
-
-.auth-toggle-text { font-size: 13px; margin-top: 14px; color: var(--text-2); }
-.auth-toggle-text a { color: var(--brand); font-weight: 600; text-decoration: none; }
-.auth-toggle-text a:hover { text-decoration: underline; }
-.footer-text {
-  font-size: 10.5px;
-  margin-top: 22px;
-  color: var(--text-3);
-  letter-spacing: 1.6px;
-  font-weight: 600;
-}
-
-/* ---------- থ্রি-ডট বাটন ও ড্রপডাউন মেনু (সব জায়গায় এক) ---------- */
-.direct-menu-container { position: relative; }
-
-.dots-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--input-bg);
-  color: var(--text-2);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
-}
-.dots-btn:hover { background: var(--surface-3); color: var(--text); }
-.dots-btn:active { transform: scale(0.94); }
-
-.direct-dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 210px;
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
-  border-radius: 16px;
-  box-shadow: var(--shadow-pop);
-  padding: 6px;
-  z-index: 120;
-  opacity: 0;
-  transform: translateY(-6px) scale(0.97);
-  transform-origin: top right;
-  pointer-events: none;
-  visibility: hidden;
-  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
-  text-align: left;
-}
-.direct-dropdown-menu.open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-  visibility: visible;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 11px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 13.5px;
-  font-weight: 500;
-  border-radius: 11px;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s ease;
-}
-.menu-item i {
-  width: 18px;
-  text-align: center;
-  font-size: 14px;
-  color: var(--text-2);
-}
-.menu-item:hover { background: var(--surface-3); }
-.menu-danger,
-.menu-danger i { color: #f87171; }
-.menu-danger:hover { background: rgba(239, 68, 68, 0.12); }
-.menu-sep { height: 1px; background: var(--line); margin: 5px 4px; }
-
-/* ---------- ড্যাশবোর্ড ---------- */
-#dashboardScreen { max-width: 420px; padding-top: 22px; }
-.dash-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.dash-eyebrow-unused {
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
-/* ---------- রিপোর্ট ও অ্যাডমিন প্যানেল আইকন (ড্যাশবোর্ড টপবার) ---------- */
-.dash-topbar-icons { display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
-.topbar-icon-btn {
-  position: relative;
-  width: 38px; height: 38px; border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--input-bg);
-  color: var(--text-2);
-  cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 15px; font-style: normal;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
-}
-.topbar-icon-btn:hover { background: var(--surface-3); color: var(--text); }
-.topbar-icon-btn:active { transform: scale(0.94); }
-#openReportBtn:hover { color: var(--amber); }
-#openAdminPanelBtn:hover { color: var(--brand); }
-
-.admin-report-badge {
-  position: absolute; top: -5px; right: -5px;
-  min-width: 17px; height: 17px; padding: 0 4px;
-  border-radius: 999px;
-  background: var(--red); color: #fff;
-  font-size: 10px; font-weight: 800; font-style: normal;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 0 2px var(--surface);
-}
-.admin-report-badge.inline { position: static; margin-left: 6px; box-shadow: none; }
-
-/* ---------- রিপোর্ট মোডাল ---------- */
-.report-modal-card, .admin-panel-card { max-width: 380px; margin: auto; text-align: center; }
-.report-modal-card h2, .admin-panel-card h2 { font-size: 19px; margin-bottom: 6px; }
-.report-modal-sub { font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5; }
-.report-textarea {
-  width: 100%; background: var(--input-bg); border: 1px solid var(--line-2);
-  border-radius: 14px; padding: 12px 14px; color: var(--text);
-  font-size: 13.5px; resize: vertical; min-height: 100px;
-}
-.report-textarea:focus { outline: none; border-color: var(--brand); }
-.report-waiting-spinner {
-  width: 64px; height: 64px; margin: 4px auto 16px; border-radius: 50%;
-  background: var(--brand-grad); display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 24px; box-shadow: var(--shadow-pop);
-  animation: reportWaitPulse 1.6s ease-in-out infinite;
-}
-@keyframes reportWaitPulse { 0%,100%{ transform: scale(1); opacity: 1; } 50%{ transform: scale(1.08); opacity: .85; } }
-
-/* ---------- অ্যাডমিন প্যানেল ---------- */
-.admin-panel-card { max-width: 440px; text-align: left; max-height: 85vh; overflow-y: auto; overflow-x: hidden; }
-.admin-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.admin-panel-header h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 0; }
-.admin-close-btn {
-  width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--input-bg); color: var(--text-2); cursor: pointer; font-size: 14px;
-}
-.admin-close-btn:hover { background: var(--surface-3); color: var(--text); }
-
-.admin-tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--input-bg); padding: 4px; border-radius: 14px; }
-.admin-tab-btn {
-  flex: 1; padding: 9px 8px; border: none; border-radius: 11px; background: transparent;
-  color: var(--text-2); font-size: 12.5px; font-weight: 600; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  transition: background .18s ease, color .18s ease;
-}
-.admin-tab-btn.active { background: var(--brand-grad); color: #fff; }
-
-.admin-users-list, .admin-reports-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow-y: auto; }
-.admin-user-row-wrap { border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); overflow: visible; }
-.admin-user-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 10px; cursor: pointer;
-}
-.admin-user-row img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
-.admin-user-row .au-info { flex: 1; min-width: 0; }
-.admin-user-row .au-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
-.admin-user-row .au-phone { font-size: 11.5px; color: var(--text-3); }
-.au-chevron { font-size: 12px; color: var(--text-3); transition: transform .2s ease; }
-.admin-user-details {
-  padding: 12px 14px 14px;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.au-detail-block { display: flex; flex-direction: column; gap: 6px; }
-.au-friends-section {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-}
-.au-friends-title {
-  font-size: 12px; font-weight: 700; color: var(--text-2);
-  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
-}
-.au-friends-list {
-  display: flex; flex-wrap: wrap; gap: 8px;
-}
-.au-friend-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 10px 5px 5px;
-  border-radius: 999px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  cursor: pointer;
-  font-size: 12px; font-weight: 600; color: var(--text);
-  max-width: 100%;
-}
-.au-friend-chip:hover { border-color: var(--brand); background: var(--surface-3); }
-.au-friend-chip img {
-  width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-}
-.au-friend-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
-.admin-user-row-wrap.is-banned { border-color: rgba(239, 68, 68, 0.35); }
-.admin-user-row-wrap.is-banned .admin-user-row { opacity: 0.85; }
-.au-ban-badge {
-  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
-  font-size: 10px; font-weight: 800; background: rgba(239, 68, 68, 0.2); color: #f87171;
-  vertical-align: middle;
-}
-.au-admin-actions {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
-}
-.au-act-btn {
-  flex: 1; min-width: 90px; padding: 9px 10px; border-radius: 11px; border: none;
-  font-size: 12px; font-weight: 700; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-}
-.au-view { background: var(--brand-grad); color: #fff; }
-.au-ban { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35) !important; }
-.au-unban { background: rgba(34, 197, 94, 0.16); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3) !important; }
-.au-delete { background: rgba(239, 68, 68, 0.16); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3) !important; }
-.au-act-btn:hover { filter: brightness(1.08); }
-.au-act-btn:disabled { opacity: 0.5; cursor: wait; }
-.admin-panel-card { max-width: 440px !important; }
-.admin-users-list { max-height: 52vh !important; }
-
-.au-detail-row { font-size: 12px; color: var(--text-2); padding: 4px 0; line-height: 1.5; }
-.au-detail-row i { width: 16px; color: var(--brand); margin-right: 6px; }
-.au-detail-label { font-weight: 700; color: var(--text); }
-.admin-empty-note { font-size: 12.5px; color: var(--text-3); text-align: center; padding: 18px 6px; }
-
-.admin-site-info {
-  background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px;
-  padding: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-2); line-height: 1.6;
-}
-.admin-site-info i { color: var(--brand); margin-right: 6px; }
-.admin-section-title { font-size: 13px; font-weight: 700; color: var(--text-2); margin-bottom: 8px; }
-.admin-report-row {
-  padding: 11px 12px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--line);
-}
-.admin-report-row.pending { border-color: rgba(245, 158, 11, .4); }
-.admin-report-row .ar-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.admin-report-row .ar-name { font-size: 12.5px; font-weight: 700; color: var(--text); }
-.admin-report-row .ar-time { font-size: 10.5px; color: var(--text-3); }
-.admin-report-row .ar-msg { font-size: 12.5px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
-.admin-report-row .ar-actions { display: flex; gap: 8px; }
-.admin-report-row .ar-actions button {
-  flex: 1; padding: 7px; border-radius: 9px; border: none; font-size: 11.5px; font-weight: 700; cursor: pointer;
-}
-.ar-resolve-btn { background: var(--green); color: #fff; }
-.ar-dismiss-btn { background: var(--input-bg); color: var(--text-2); border: 1px solid var(--line) !important; }
-.ar-status-tag {
-  display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
-  background: rgba(245, 158, 11, .16); color: var(--amber);
-}
-.ar-status-tag.resolved { background: rgba(34, 197, 94, .16); color: var(--green); }
-.ar-status-tag.dismissed { background: rgba(148, 163, 184, .16); color: var(--text-3); }
-
-.profile-header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.avatar-container {
-  position: relative;
-  width: 148px;
-  height: 148px;
-  margin-bottom: 14px;
-  padding: 4px;
-  border-radius: 50%;
-  background: var(--brand-grad);
-  box-shadow: 0 14px 34px rgba(79, 140, 255, 0.32);
-}
-.avatar-container img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--surface);
-  background: var(--surface-2);
-  display: block;
-}
-.avatar-edit-badge {
-  position: absolute;
-  bottom: 2px;
-  right: 0;
-  background: var(--brand-grad);
-  color: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 3px solid var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 12px;
-  transition: transform 0.15s ease;
-}
-.avatar-edit-badge:hover { transform: scale(1.08); }
-
-.dash-name-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  max-width: 100%;
-}
-#dashboardUserName {
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.edit-name-btn {
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--brand);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--input-bg);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease;
-}
-.edit-name-btn:hover { background: var(--surface-3); }
-
-.dash-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.dash-tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-.dash-tile:hover {
-  transform: translateY(-3px);
-  border-color: var(--line-2);
-  background: var(--surface-3);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
-}
-.dash-tile:active { transform: scale(0.97); }
-.tile-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: #fff;
-}
-.tile-label { font-size: 14.5px; font-weight: 600; }
-.tile-friends .tile-icon { background: linear-gradient(135deg, #a78bfa, #7c5cff); box-shadow: 0 8px 18px rgba(124, 92, 255, 0.35); }
-.tile-profile .tile-icon { background: linear-gradient(135deg, #22d3ee, #0ea5b7); box-shadow: 0 8px 18px rgba(14, 165, 183, 0.32); }
-.tile-create  .tile-icon { background: linear-gradient(135deg, #60a5fa, #3b82f6); box-shadow: 0 8px 18px rgba(59, 130, 246, 0.35); }
-.tile-join    .tile-icon { background: linear-gradient(135deg, #4ade80, #16a34a); box-shadow: 0 8px 18px rgba(22, 163, 74, 0.32); }
-.tile-report  .tile-icon { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 8px 18px rgba(245, 158, 11, 0.35); }
-.tile-admin   .tile-icon { background: linear-gradient(135deg, #818cf8, #4f46e5); box-shadow: 0 8px 18px rgba(79, 70, 229, 0.35); }
-
-.friend-req-badge {
-  display: none;
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #fb7185, #ef4444);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 14px rgba(239, 68, 68, 0.4);
-}
-.friend-req-badge.show { display: inline-flex; }
-
-@media (min-width: 768px) {
-  #dashboardScreen { max-width: 460px; padding: 26px 30px 28px; }
-  .avatar-container { width: 164px; height: 164px; }
-  #dashboardUserName { font-size: 23px; }
-  .dash-tile { padding: 18px; }
-}
-
-
-/* =====================================================================
-   চ্যাট স্ক্রিন (রুম + ডিরেক্ট) — হেডার, মেসেজ, ইনপুট
-   ===================================================================== */
-.chat-container {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  animation: screenFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.direct-chat-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 100001;
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  visibility: hidden;
-  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.42s;
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.direct-chat-screen.active {
-  transform: translateX(0);
-  visibility: visible;
-  transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s;
-}
-
-/* ---------- হেডার ---------- */
-.chat-header {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 10px max(12px, calc((100% - 980px) / 2));
-  background: var(--glass);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-bottom: 1px solid var(--line);
-  position: relative;
-  z-index: 20;
-}
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.user-info img {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(79, 140, 255, 0.55);
-}
-.user-info > div,
-.header-profile-btn > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.user-info h4 {
-  font-size: 15.5px;
-  font-weight: 700;
-  letter-spacing: -0.1px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.user-info span,
-.direct-chat-status {
-  font-size: 12px;
-  color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.header-profile-btn {
-  background: none;
-  border: none;
-  padding: 2px 6px 2px 2px;
-  border-radius: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: inherit;
-  text-align: left;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  transition: background 0.2s ease;
-}
-.header-profile-btn:hover { background: var(--input-bg); }
-
-.direct-back-btn { flex-shrink: 0; }
-
-.chat-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
-.action-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 13px;
-  border: 1px solid var(--line);
-  background: var(--input-bg);
-  color: var(--text-2);
-  font-size: 15px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease;
-}
-.action-btn:hover { background: var(--surface-3); color: var(--text); }
-.action-btn:active { transform: scale(0.93); }
-.action-btn.call-audio { background: rgba(34, 197, 94, 0.14); border-color: rgba(34, 197, 94, 0.28); color: #22c55e; }
-.action-btn.call-video { background: rgba(79, 140, 255, 0.14); border-color: rgba(79, 140, 255, 0.3); color: #6ea3ff; }
-.action-btn.call-audio:hover { background: rgba(34, 197, 94, 0.24); color: #22c55e; }
-.action-btn.call-video:hover { background: rgba(79, 140, 255, 0.24); color: #6ea3ff; }
-
-@media (max-width: 420px) {
-  .chat-actions { gap: 6px; }
-  .action-btn { width: 37px; height: 37px; font-size: 14px; }
-}
-
-/* রুম মেম্বার বার */
-.room-members-bar {
-  flex-shrink: 0;
-  align-items: center;
-  gap: 12px;
-  padding: 8px max(12px, calc((100% - 980px) / 2));
-  overflow-x: auto;
-  white-space: nowrap;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  scrollbar-width: none;
-}
-.room-members-bar::-webkit-scrollbar { display: none; }
-.room-members-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text-3);
-  flex-shrink: 0;
-}
-.room-members-label i { margin-right: 4px; }
-.room-members-list { display: inline-flex; gap: 8px; }
-.member-avatar-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 12px 4px 4px;
-  border-radius: 999px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  cursor: pointer;
-  font-size: 12.5px;
-  font-weight: 500;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-.member-avatar-card img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
-.member-avatar-card i { font-size: 10px; color: var(--brand); }
-.member-avatar-card:hover { background: rgba(79, 140, 255, 0.14); border-color: rgba(79, 140, 255, 0.4); }
-
-/* ---------- মেসেজ এরিয়া ---------- */
-.chat-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 16px max(12px, calc((100% - 980px) / 2)) 10px;
-  background-color: var(--chat-bg-1);
-  background-image:
-    radial-gradient(var(--chat-dot) 1px, transparent 1px),
-    radial-gradient(70% 50% at 85% 0%, rgba(124, 92, 255, 0.07) 0%, transparent 70%),
-    radial-gradient(60% 45% at 5% 100%, rgba(79, 140, 255, 0.07) 0%, transparent 70%);
-  background-size: 24px 24px, 100% 100%, 100% 100%;
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-.chat-messages::-webkit-scrollbar { width: 8px; }
-.chat-messages::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; }
-
-.chat-container.special-room-chat .chat-messages {
-  background-image: url('https://i.ibb.co.com/nMsF224Y/Whats-App-Image-2026-08-23-at-8-18-13-PM-2.jpg') !important;
-  background-repeat: no-repeat !important;
-  background-position: center !important;
-  background-size: cover !important;
-}
-@media screen and (max-width: 768px) {
-  .chat-container.special-room-chat .chat-messages { background-size: 100% 100% !important; }
-}
-
-.msg-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: 100%;
-  animation: bubblePop 0.22s ease both;
-}
-@keyframes bubblePop {
-  from { opacity: 0; transform: translateY(6px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.msg-row.me { justify-content: flex-end; }
-.msg-row.group-mid,
-.msg-row.group-end { margin-top: -5px; }
-
-.msg-avatar { width: 30px; height: 30px; flex-shrink: 0; align-self: flex-end; }
-.msg-row .msg-avatar img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; display: block; }
-.msg-row:not(.group-end) .msg-avatar img { visibility: hidden; }
-
-.msg-bubble {
-  position: relative;
-  max-width: 74%;
-  padding: 9px 14px;
-  border-radius: 20px;
-  font-size: 14.5px;
-  line-height: 1.45;
-  word-break: break-word;
-  white-space: pre-wrap;
-  background: var(--bubble-other);
-  color: var(--bubble-other-text);
-  border: 1px solid var(--line);
-}
-.msg-row.me .msg-bubble {
-  background: var(--brand-grad);
-  color: #fff;
-  border: none;
-  box-shadow: 0 6px 16px rgba(79, 140, 255, 0.22);
-}
-
-.msg-row.me .msg-bubble             { border-radius: 20px; }
-.msg-row.me.group-start .msg-bubble { border-bottom-right-radius: 6px; }
-.msg-row.me.group-mid   .msg-bubble { border-radius: 20px 6px 6px 20px; }
-.msg-row.me.group-end   .msg-bubble { border-radius: 20px 6px 20px 20px; }
-.msg-row.me.group-start.group-end .msg-bubble { border-radius: 20px; }
-.msg-row:not(.me) .msg-bubble { border-radius: 20px; }
-.msg-row:not(.me).group-start .msg-bubble { border-bottom-left-radius: 6px; }
-.msg-row:not(.me).group-mid   .msg-bubble { border-radius: 6px 20px 20px 6px; }
-.msg-row:not(.me).group-end   .msg-bubble { border-radius: 6px 20px 20px 20px; }
-.msg-row:not(.me).group-start.group-end .msg-bubble { border-radius: 20px; }
-
-.msg-row.pending .msg-bubble { opacity: 0.6; }
-
-.room-msg-col .msg-bubble { max-width: 100%; }
-.room-msg-col.me { align-items: flex-end; }
-.room-msg-col .media-wrap { max-width: 300px; }
-.room-sender-name {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--brand);
-  margin: 0 0 3px 8px;
-}
-
-/* ছবি / ভিডিও বাবল */
-.msg-bubble.media-bubble {
-  padding: 0;
-  background: transparent !important;
-  border: none;
-  box-shadow: none !important;
-  border-radius: 20px;
-  overflow: hidden;
-  max-width: 70%;
-  line-height: 0;
-}
-.media-wrap {
-  position: relative;
-  display: block;
-  width: 100%;
-  border-radius: 20px;
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--input-bg);
-  line-height: 0;
-}
-.media-wrap .msg-media {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  max-height: 340px;
-  object-fit: cover;
-  border-radius: 20px;
-  border: none;
-  outline: none;
-}
-.media-wrap.video-wrap { background: #000; }
-.media-wrap.video-wrap .msg-media { aspect-ratio: 4 / 3; object-fit: cover; max-height: 320px; }
-.media-wrap video::-webkit-media-controls { display: none !important; }
-.video-play-badge {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 17px;
-  pointer-events: none;
-  transition: transform 0.18s ease;
-}
-.media-wrap.video-wrap:hover .video-play-badge { transform: scale(1.08); }
-.media-wrap.loading {
-  min-height: 150px;
-  background: linear-gradient(100deg, var(--input-bg) 30%, var(--line-2) 50%, var(--input-bg) 70%);
-  background-size: 250% 100%;
-  animation: mediaShimmer 1.2s linear infinite;
-}
-@keyframes mediaShimmer {
-  0%   { background-position: 160% 0; }
-  100% { background-position: -60% 0; }
-}
-
-.msg-audio { width: 230px; max-width: 100%; height: 40px; display: block; }
-.msg-file-link {
-  color: inherit;
-  text-decoration: none;
-  font-size: 13.5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 2px 0;
-}
-.msg-file-link i { font-size: 17px; opacity: 0.9; }
-.msg-file-link span { text-decoration: underline; }
-.audio-chip { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; min-width: 170px; }
-.audio-chip-play {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-.msg-row:not(.me) .audio-chip-play { background: rgba(79, 140, 255, 0.18); color: var(--brand); }
-.audio-chip-name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
-
-.msg-time-divider {
-  align-self: center;
-  margin: 12px 0 6px;
-  padding: 4px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: var(--text-3);
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-}
-
-.msg-status-row { display: flex; justify-content: flex-end; align-items: center; padding: 3px 2px 2px; min-height: 16px; }
-.status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--text-3);
-}
-.status-chip i { font-size: 11.5px; }
-.msg-status-row .seen-avatar {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid var(--line-2);
-}
-
-.typing-row .msg-bubble { display: inline-flex; gap: 4px; padding: 12px 14px; }
-.typing-row .msg-bubble span {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: currentColor; opacity: .45;
-  animation: typingDot 1.3s infinite ease-in-out;
-}
-.typing-row .msg-bubble span:nth-child(2) { animation-delay: .18s; }
-.typing-row .msg-bubble span:nth-child(3) { animation-delay: .36s; }
-@keyframes typingDot {
-  0%, 100% { transform: translateY(0); opacity: .35; }
-  40%      { transform: translateY(-5px); opacity: .95; }
-}
-
-@media (min-width: 768px) {
-  .msg-bubble { max-width: 62%; font-size: 15px; }
-  .msg-bubble.media-bubble { max-width: 340px; }
-  .media-wrap .msg-media { max-height: 400px; }
-  .user-info img { width: 46px; height: 46px; }
-  .user-info h4 { font-size: 17px; }
-  .action-btn { width: 42px; height: 42px; }
-}
-
-/* ---------- ইনপুট বার ---------- */
-.chat-input-area {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px max(12px, calc((100% - 980px) / 2)) 12px;
-  background: var(--glass);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-top: 1px solid var(--line);
-}
-.chat-input-area input[type="text"] {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--line-2);
-  background: var(--input-bg);
-  color: var(--text);
-  font-size: 15px;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-.chat-input-area input[type="text"]::placeholder { color: var(--text-3); }
-.chat-input-area input[type="text"]:focus {
-  border-color: var(--brand);
-  box-shadow: var(--ring);
-  background: var(--surface-2);
-}
-.attach-btn,
-.send-btn {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 16px;
-  transition: transform 0.15s ease, filter 0.2s ease, background 0.2s ease;
-}
-.attach-btn { background: var(--input-bg); color: var(--text-2); border: 1px solid var(--line); }
-.attach-btn:hover { background: var(--surface-3); color: var(--text); }
-.send-btn { background: var(--brand-grad); color: #fff; box-shadow: 0 8px 20px rgba(79, 140, 255, 0.4); }
-.send-btn:hover { filter: brightness(1.1); }
-.attach-btn:active, .send-btn:active { transform: scale(0.92); }
-
-/* চ্যাট লোডিং */
-.chat-loading-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  background: var(--overlay);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  gap: 12px;
-  color: var(--text);
-  font-size: 13px;
-}
-.spinner-border {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 3px solid var(--line-2);
-  border-top-color: var(--brand);
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* =====================================================================
-   ফ্রেন্ড প্যানেল + টোস্ট
-   ===================================================================== */
-.friends-panel-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  z-index: 100000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-.friends-panel-overlay.active { opacity: 1; pointer-events: auto; }
-.friends-panel {
-  width: 100%;
-  max-width: 480px;
-  max-height: 88vh;
-  max-height: 88dvh;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 28px 28px 0 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-card);
-  transform: translateY(60px);
-  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-.friends-panel-overlay.active .friends-panel { transform: translateY(0); }
-@media (min-width: 600px) {
-  .friends-panel-overlay { align-items: center; padding: 20px; }
-  .friends-panel { border-radius: 28px; max-height: 82vh; transform: scale(0.95) translateY(16px); }
-  .friends-panel-overlay.active .friends-panel { transform: scale(1) translateY(0); }
-}
-.friends-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 22px 16px;
-  background: linear-gradient(135deg, rgba(79, 140, 255, 0.16), rgba(124, 92, 255, 0.16));
-  border-bottom: 1px solid var(--line);
-}
-.friends-panel-header h3 {
-  font-size: 18px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.friends-panel-header h3 i { color: var(--brand); font-size: 16px; }
-.friends-panel-header p { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
-.friends-panel-close {
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  color: var(--text-2);
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.2s;
-  flex-shrink: 0;
-}
-.friends-panel-close:hover { background: rgba(239, 68, 68, 0.16); color: #f87171; }
-.friends-panel-body { padding: 18px 18px 22px; overflow-y: auto; }
-.friends-panel-body h4 {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--text-3);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.friend-requests-section { display: none; margin-bottom: 22px; }
-.friend-requests-section.has-requests { display: block; }
-.friend-requests-list, .friends-list { display: flex; flex-direction: column; gap: 8px; }
-
-/* Friend search */
-.friend-search-box {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; margin-bottom: 14px;
-  border-radius: 16px; border: 1px solid var(--line-2);
-  background: var(--input-bg);
-}
-.friend-search-box i { color: var(--text-3); font-size: 14px; }
-.friend-search-box input {
-  flex: 1; border: none; background: transparent; outline: none;
-  color: var(--text); font-size: 14px; font-family: inherit;
-}
-.friend-search-box input::placeholder { color: var(--text-3); }
-.friend-search-results {
-  display: flex; flex-direction: column; gap: 8px;
-  margin-bottom: 16px; max-height: 220px; overflow-y: auto;
-}
-.friend-search-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border-radius: 16px;
-  background: var(--surface-2); border: 1px solid var(--line);
-}
-.friend-search-row img {
-  width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-}
-.fs-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.fs-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.fs-phone { font-size: 11.5px; color: var(--text-3); }
-.fs-btn {
-  border: none; border-radius: 12px; padding: 8px 12px; cursor: pointer;
-  font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
-}
-.fs-add { background: var(--brand-grad); color: #fff; }
-.fs-msg { background: var(--surface-3); color: var(--text); border: 1px solid var(--line); }
-.fs-pending { background: var(--input-bg); color: var(--text-3); cursor: default; }
-
-.fr-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.fr-reject-btn {
-  width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer;
-  background: rgba(239, 68, 68, 0.15); color: #f87171;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.fr-reject-btn:hover { background: rgba(239, 68, 68, 0.28); }
-.fr-accept-btn {
-  width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer;
-  background: rgba(34, 197, 94, 0.18); color: #4ade80;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.fr-accept-btn:hover { background: rgba(34, 197, 94, 0.3); }
-
-.friend-request-card, .friend-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 12px;
-  border-radius: 18px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  animation: fadeScaleIn 0.25s ease both;
-  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
-}
-.friend-request-card img, .friend-card img {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px rgba(79, 140, 255, 0.5);
-}
-.friend-request-info, .friend-card-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.friend-request-name, .friend-card-name {
-  font-size: 14.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.friend-request-sub, .friend-card-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.friend-card { cursor: pointer; }
-.friend-card:hover { background: var(--surface-3); border-color: rgba(79, 140, 255, 0.35); transform: translateX(2px); }
-.friend-card:active, .friend-request-card:active { transform: scale(0.98); }
-
-.fr-accept-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, #4ade80, #16a34a);
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 18px rgba(22, 163, 74, 0.35);
-  transition: transform 0.15s ease;
-}
-.fr-accept-btn:hover { transform: scale(1.08); }
-
-.friend-card-unread-dot {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #fb7185, #ef4444);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.friend-card-profile-btn {
-  background: rgba(79, 140, 255, 0.14);
-  border: none;
-  color: #6ea3ff;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  font-size: 16px;
-  cursor: pointer;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.18s ease, transform 0.15s ease;
-}
-.friend-card-profile-btn:hover { background: rgba(79, 140, 255, 0.28); }
-.friend-card-profile-btn:active { transform: scale(0.9); }
-
-.friends-empty-state { text-align: center; padding: 34px 16px; color: var(--text-3); }
-.friends-empty-state i { font-size: 34px; margin-bottom: 12px; color: var(--brand); opacity: 0.7; }
-.friends-empty-state p { font-size: 13px; line-height: 1.6; }
-
-.toast-container {
-  position: fixed;
-  top: calc(14px + env(safe-area-inset-top, 0px));
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 400px;
-  padding: 0 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 200000;
-  pointer-events: none;
-}
-.message-toast {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface-2);
-  color: var(--text);
-  border-radius: 18px;
-  padding: 12px 14px;
-  box-shadow: var(--shadow-pop);
-  border: 1px solid var(--line-2);
-  opacity: 0;
-  transform: translateY(-16px) scale(0.96);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  pointer-events: auto;
-  cursor: pointer;
-}
-.message-toast.show { opacity: 1; transform: translateY(0) scale(1); }
-.message-toast img {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 4px rgba(79, 140, 255, 0.55);
-}
-.message-toast-body { display: flex; flex-direction: column; min-width: 0; }
-.message-toast-name { font-size: 13.5px; font-weight: 700; }
-.message-toast-text { font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.mini-toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
-  transform: translate(-50%, 16px);
-  background: var(--text);
-  color: var(--bg);
-  padding: 10px 20px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: var(--shadow-pop);
-  opacity: 0;
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  z-index: 300000;
-  pointer-events: none;
-}
-.mini-toast.show { opacity: 1; transform: translate(-50%, 0); }
-
-
-/* =====================================================================
-   প্রোফাইল মোডাল, গ্যালারি, পোস্ট ফিড
-   ===================================================================== */
-.profile-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 300000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-.profile-modal-overlay.active { opacity: 1; pointer-events: auto; }
-.profile-modal {
-  width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  max-height: 90dvh;
-  overflow-y: auto;
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 28px;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
-  transform: scale(0.94) translateY(16px);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@media (min-width: 768px) { .profile-modal { max-width: 540px; } }
-.profile-modal-overlay.active .profile-modal { transform: scale(1) translateY(0); }
-.profile-modal::-webkit-scrollbar { width: 6px; }
-.profile-modal::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 6px; }
-
-.profile-modal-cover {
-  height: 140px;
-  position: relative;
-  overflow: visible; /* avatar নিচে বেরোবে — clip করবে না */
-  background: radial-gradient(60% 90% at 20% 0%, rgba(255,255,255,0.22) 0%, transparent 60%),
-    linear-gradient(135deg, #4f8cff 0%, #7c5cff 55%, #ec4899 100%);
-  border-radius: 26px 26px 0 0;
-}
-/* শুধু কভার ছবি ক্লিপ — অ্যাভাটার আলাদা লেয়ারে */
-.profile-cover-clip {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: 26px 26px 0 0;
-  z-index: 0;
-  pointer-events: none;
-}
-.profile-cover-img {
-  position: absolute;
-  left: 0; top: 0;
-  width: 100%;
-  height: 160%; /* একটু বড় যাতে উপরে-নিচে সরানো যায় */
-  object-fit: cover;
-  object-position: center 30%;
-  z-index: 0;
-  pointer-events: none;
-  user-select: none;
-}
-.profile-modal-cover.has-cover { background: #1a2236; }
-.profile-modal-cover.has-cover .profile-cover-clip { pointer-events: auto; }
-
-.pm-cover-edit-btn {
-  position: absolute; right: 12px; top: 12px; z-index: 5;
-  width: 36px; height: 36px; border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.5); color: #fff;
-  cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 14px;
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-}
-.pm-cover-edit-btn:hover { background: rgba(0,0,0,0.7); }
-
-/* কভার পজিশন স্লাইডার (শুধু নিজের প্রোফাইলে, কভার থাকলে) */
-.pm-cover-pos-bar {
-  position: absolute; left: 12px; right: 56px; bottom: 10px; z-index: 5;
-  display: none; align-items: center; gap: 8px;
-  padding: 6px 10px; border-radius: 999px;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff; font-size: 11px; font-weight: 600;
-}
-.pm-cover-pos-bar.show { display: flex; }
-.pm-cover-pos-bar input[type="range"] {
-  flex: 1; height: 4px; accent-color: #7c5cff; cursor: pointer;
-}
-.pm-cover-pos-btn {
-  width: 24px; height: 24px; border-radius: 50%; border: none;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 11px; flex-shrink: 0; padding: 0;
-}
-.pm-cover-save-btn { background: #22c55e; color: #fff; }
-.pm-cover-save-btn:hover { background: #16a34a; }
-.pm-cover-save-btn:disabled { opacity: .55; cursor: not-allowed; }
-.pm-cover-cancel-btn { background: rgba(255,255,255,0.18); color: #fff; }
-.pm-cover-cancel-btn:hover { background: rgba(255,255,255,0.32); }
-
-.pm-avatar-wrap {
-  position: absolute;
-  left: 50%;
-  bottom: -72px;
-  transform: translateX(-50%);
-  z-index: 6;
-  width: 144px;
-  height: 144px;
-}
-.profile-modal-avatar {
-  width: 144px; height: 144px; border-radius: 50%; object-fit: cover;
-  border: 5px solid var(--surface);
-  background: var(--surface);
-  box-shadow: 0 12px 28px rgba(0,0,0,0.4);
-  display: block;
-}
-.pm-avatar-edit-btn {
-  position: absolute; right: 6px; bottom: 8px; z-index: 7;
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 2px solid var(--surface); background: var(--brand-grad); color: #fff;
-  cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 12px;
-  box-shadow: 0 4px 12px rgba(79,140,255,0.45);
-}
-.pm-avatar-edit-btn:hover { transform: scale(1.06); }
-.profile-modal-body { padding: 88px 20px 20px; text-align: center; }
-.pm-name-row { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; max-width: 100%; }
-.profile-modal-name { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; margin: 0; }
-.pm-edit-name-btn {
-  width: 30px; height: 30px; border-radius: 10px; border: 1px solid var(--line); background: var(--input-bg);
-  color: var(--text-2); cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;
-}
-.pm-edit-name-btn:hover { background: var(--surface-3); color: var(--brand); }
-.profile-modal-sub, .pm-bio-box {
-  font-size: 13px; color: var(--text-2); margin: 0 auto 16px; max-width: 92%; line-height: 1.45; word-break: break-word;
-}
-.pm-bio-box.has-bio {
-  display: block; padding: 12px 16px; border-radius: 16px;
-  background: linear-gradient(135deg, rgba(79,140,255,0.08), rgba(124,92,255,0.08));
-  border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 500; text-align: center; position: relative;
-}
-.pm-bio-box.has-bio::before {
-  content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 2px;
-  border-radius: 0 0 4px 4px; background: var(--brand-grad); opacity: 0.7;
-}
-.dash-avatar-readonly .avatar-edit-badge { display: none !important; }
-.dash-avatar-readonly { cursor: pointer; }
-
-.profile-detail-row {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  text-align: left;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  margin-bottom: 8px;
-  font-size: 13.5px;
-}
-.profile-detail-row i { width: 20px; text-align: center; color: var(--brand); }
-.profile-detail-row .pd-label { color: var(--text-3); font-size: 11.5px; display: block; }
-.profile-detail-row .pd-value { font-weight: 600; }
-.profile-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.profile-modal-actions .btn { flex: 1; padding: 12px; font-size: 13.5px; }
-
-.profile-tabs {
-  display: flex;
-  gap: 4px;
-  margin: 16px 0 14px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  padding: 4px;
-  border-radius: 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.profile-tabs::-webkit-scrollbar { display: none; }
-.profile-tab {
-  flex: 1 0 auto;
-  min-width: 64px;
-  padding: 9px 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  border-radius: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-.profile-tab:hover { color: var(--text); }
-.profile-tab.active { background: var(--brand-grad); color: #fff; box-shadow: 0 6px 16px rgba(79, 140, 255, 0.3); }
-@media (max-width: 380px) { .profile-tab { font-size: 11.5px; padding: 8px 4px; min-width: 56px; } }
-.profile-tab-panel { animation: fadeScaleIn 0.28s ease both; }
-
-.profile-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.profile-gallery-item {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 14px;
-  overflow: hidden;
-  cursor: pointer;
-  background: var(--surface-2);
-  transition: transform 0.15s ease;
-}
-.profile-gallery-item:hover { transform: scale(1.02); }
-.profile-gallery-item img,
-.profile-gallery-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.profile-gallery-item .pg-badge {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.profile-gallery-item.audio-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: var(--brand);
-  background: rgba(79, 140, 255, 0.12);
-}
-.profile-gallery-item .pg-delete {
-  position: absolute;
-  left: 6px;
-  top: 6px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.92);
-  color: #fff;
-  border: none;
-  font-size: 10px;
-  cursor: pointer;
-  display: none;
-}
-.profile-gallery.editable .pg-delete { display: block; }
-.profile-empty { grid-column: 1 / -1; text-align: center; padding: 28px 10px; color: var(--text-3); font-size: 12.5px; }
-
-.profile-upload-row { display: flex; gap: 8px; margin-bottom: 10px; }
-.profile-upload-btn {
-  flex: 1;
-  padding: 11px;
-  border-radius: 14px;
-  border: 1.5px dashed var(--line-2);
-  background: var(--input-bg);
-  color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
-.profile-upload-btn:hover { border-color: var(--brand); color: var(--brand); background: rgba(79, 140, 255, 0.08); }
-.profile-edit-field { padding: 11px 14px; font-size: 13.5px; margin-bottom: 8px; }
-textarea.profile-edit-field { resize: vertical; min-height: 64px; font-family: inherit; }
-
-/* ---------- পোস্ট কম্পোজার ---------- */
-.post-composer {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 12px;
-  margin-bottom: 14px;
-  text-align: left;
-}
-.post-composer-row { display: flex; align-items: flex-start; gap: 10px; }
-.post-composer-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.post-composer-input {
-  flex: 1;
-  border: 1px solid transparent;
-  background: var(--input-bg);
-  color: var(--text);
-  border-radius: 16px;
-  padding: 10px 14px;
-  font-size: 14.5px;
-  resize: none;
-  max-height: 160px;
-  font-family: inherit;
-  line-height: 1.4;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.post-composer-input::placeholder { color: var(--text-3); }
-.post-composer-input:focus { border-color: var(--brand); box-shadow: var(--ring); }
-.post-composer-preview {
-  position: relative;
-  margin-top: 10px;
-  border-radius: 14px;
-  overflow: hidden;
-  max-height: 260px;
-  background: #000;
-}
-.post-composer-preview img,
-.post-composer-preview video { width: 100%; max-height: 260px; object-fit: contain; display: block; background: #000; }
-.post-preview-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.post-composer-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.post-composer-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 8px 6px;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background 0.2s ease;
-}
-.post-composer-btn:hover { background: var(--input-bg); }
-.post-submit-btn { flex: 0 0 auto; width: auto; padding: 9px 24px; font-size: 13px; border-radius: 12px; }
-
-/* ---------- পোস্ট ফিড ---------- */
-.posts-feed { display: flex; flex-direction: column; gap: 12px; text-align: left; }
-.post-card {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 14px 14px 6px;
-  animation: fadeScaleIn 0.25s ease both;
-}
-.post-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.post-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.post-header-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.post-author-name { font-size: 14px; font-weight: 700; line-height: 1.25; }
-.post-time { font-size: 11.5px; color: var(--text-3); }
-.post-text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px; }
-.post-media-wrap {
-  position: relative;
-  border-radius: 14px;
-  overflow: hidden;
-  margin: 0 0 8px;
-  cursor: pointer;
-  background: #000;
-}
-.post-media { width: 100%; max-height: 420px; object-fit: contain; display: block; background: #000; }
-@media (min-width: 768px) { .post-media { max-height: 480px; } }
-.post-meta-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); padding: 4px 2px 8px; }
-.post-actions-row { display: flex; border-top: 1px solid var(--line); padding-top: 4px; }
-.post-action-btn {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 9px 4px;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-.post-action-btn:hover { background: var(--input-bg); color: var(--text); }
-.post-action-btn.liked { color: var(--brand); }
-
-/* পোস্টের থ্রি-ডট */
-.post-more { position: relative; flex-shrink: 0; }
-.post-more-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  font-size: 15px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease;
-}
-.post-more-btn:hover { background: var(--input-bg); color: var(--text); }
-.post-more-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  min-width: 170px;
-  background: var(--surface-3);
-  border: 1px solid var(--line-2);
-  border-radius: 14px;
-  box-shadow: var(--shadow-pop);
-  padding: 5px;
-  z-index: 30;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px) scale(0.97);
-  transform-origin: top right;
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
-}
-.post-more-menu.open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
-.post-more-menu .menu-item:hover { background: var(--input-bg); }
-
-.post-comments-section { border-top: 1px solid var(--line); margin-top: 4px; padding: 10px 0; animation: fadeScaleIn 0.2s ease both; }
-.post-comments-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.post-comment { display: flex; align-items: flex-start; gap: 8px; }
-.post-comment-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.post-comment-bubble { background: var(--input-bg); border-radius: 16px; padding: 7px 13px; font-size: 13px; max-width: 84%; }
-.post-comment-name { display: block; font-weight: 700; font-size: 12px; margin-bottom: 1px; }
-.post-comment-text { word-break: break-word; }
-.post-comment-input-row { display: flex; align-items: center; gap: 8px; }
-.post-comment-input {
-  flex: 1;
-  border: 1px solid transparent;
-  background: var(--input-bg);
-  color: var(--text);
-  border-radius: 999px;
-  padding: 9px 15px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.post-comment-input:focus { border-color: var(--brand); box-shadow: var(--ring); }
-
-
-/* =====================================================================
-   পপআপ / মডাল / থিম / মিডিয়া প্রিভিউ
-   ===================================================================== */
-.call-modal {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 9999;
-}
-#callModal { z-index: 200001 !important; }
-#customModalOverlay { z-index: 400000 !important; }
-#themeModal { z-index: 200000 !important; }
-/* প্রোফাইল মোডাল (300000)-এর উপরে খুলবে, কিন্তু customModal (400000)-এর নিচে */
-#mediaPreviewModal { z-index: 350000 !important; }
-
-#customModalOverlay .card-screen { max-width: 360px; margin: auto; padding: 28px 22px 22px; }
-#customModalOverlay h2 { font-size: 19px; }
-#modalActionContainer .btn { padding: 12px; }
-
-#themeModal {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  justify-content: center;
-  align-items: center;
-  padding: 16px;
-}
-.theme-modal-card {
-  width: 100%;
-  max-width: 400px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 26px;
-  padding: 24px 22px 20px;
-  box-shadow: var(--shadow-card);
-  animation: fadeScaleIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.theme-modal-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-.theme-modal-title i { color: var(--brand); }
-.theme-modal-sub { font-size: 12.5px; color: var(--text-3); margin: 4px 0 16px; }
-.theme-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.theme-box {
-  aspect-ratio: 1 / 1;
-  border-radius: 18px;
-  cursor: pointer;
-  border: 2px solid var(--line-2);
-  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.theme-box:hover { transform: scale(1.06); border-color: var(--brand); box-shadow: var(--ring); }
-.theme-upload {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 13px 14px;
-  border-radius: 16px;
-  border: 1.5px dashed var(--line-2);
-  background: var(--input-bg);
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-bottom: 18px;
-  transition: border-color 0.2s ease, color 0.2s ease;
-}
-.theme-upload:hover { border-color: var(--brand); color: var(--brand); }
-.theme-upload input { display: none; }
-.theme-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
-/* =====================================================================
-   কল স্ক্রিন (ফুল স্ক্রিন)
-   ===================================================================== */
-#callModal.call-modal { background: #070b14; padding: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
-#callModal .call-box {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  max-width: none;
-  background: radial-gradient(120% 90% at 50% 10%, #16223b 0%, #070b14 64%);
-  border-radius: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  text-align: center;
-}
-#callModal .call-box::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(60% 45% at 50% 38%, rgba(79, 140, 255, 0.14) 0%, rgba(79, 140, 255, 0) 70%),
-    radial-gradient(90% 60% at 50% 112%, rgba(124, 92, 255, 0.14) 0%, rgba(124, 92, 255, 0) 70%);
-}
-
-#callVideoGrid.video-grid { position: absolute; inset: 0; display: block; background: #000; z-index: 1; animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
-#callVideoGrid .call-remote-video { width: 100%; height: 100%; object-fit: cover; background: #000; }
-#callVideoGrid .call-local-video {
-  position: absolute;
-  right: 16px;
-  top: calc(16px + env(safe-area-inset-top, 0px));
-  width: 118px;
-  height: 168px;
-  object-fit: cover;
-  border-radius: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
-  background: #111;
-  z-index: 3;
-}
-@media (min-width: 768px) {
-  #callVideoGrid .call-local-video { width: 190px; height: 130px; right: 24px; top: 24px; }
-}
-
-#callProfileGrid.call-profile-grid {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  z-index: 2;
-  text-align: center;
-  padding: 0 20px;
-  animation: fadeScaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-#callProfileGrid .call-profile-item { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; text-align: center; }
-.call-avatar-ring { position: relative; width: 168px; height: 168px; display: flex; align-items: center; justify-content: center; margin: 0 auto 26px; flex-shrink: 0; }
-.call-avatar-ring::before,
-.call-avatar-ring::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 1.5px solid rgba(79, 140, 255, 0.5);
-  animation: callPulse 2.8s ease-out infinite;
-}
-.call-avatar-ring::after { animation-delay: 1.4s; }
-@keyframes callPulse {
-  0%   { transform: scale(0.82); opacity: 0.9; }
-  100% { transform: scale(1.4); opacity: 0; }
-}
-#callModal.connected .call-avatar-ring::before,
-#callModal.connected .call-avatar-ring::after { animation: none; opacity: 0; }
-.call-avatar {
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: #1b2540;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12), 0 0 46px rgba(79, 140, 255, 0.3), 0 22px 55px rgba(0, 0, 0, 0.55);
-}
-#callModal.connected .call-avatar {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14), 0 0 42px rgba(34, 197, 94, 0.22), 0 22px 55px rgba(0, 0, 0, 0.55);
-}
-.call-username { display: block; width: 100%; font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 0.3px; line-height: 1.25; text-shadow: 0 3px 18px rgba(0, 0, 0, 0.55); }
-.call-status-text { display: block; margin-top: 10px; font-size: 14.5px; letter-spacing: 0.4px; color: rgba(255, 255, 255, 0.6); min-height: 20px; }
-.call-timer { display: block; margin-top: 10px; font-size: 17px; font-weight: 600; letter-spacing: 1.2px; color: #4ade80; font-variant-numeric: tabular-nums; }
-@media (max-width: 420px) {
-  .call-avatar-ring { width: 142px; height: 142px; margin-bottom: 22px; }
-  .call-avatar { width: 126px; height: 126px; }
-  .call-username { font-size: 24px; }
-}
-@media (min-width: 900px) {
-  .call-avatar-ring { width: 190px; height: 190px; margin-bottom: 30px; }
-  .call-avatar { width: 170px; height: 170px; }
-  .call-username { font-size: 31px; }
-}
-
-.call-top-bar {
-  position: absolute;
-  top: calc(18px + env(safe-area-inset-top, 0px));
-  left: 18px;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-}
-#callTopName { font-size: 17px; font-weight: 600; }
-#callTopTimer { font-size: 13px; opacity: 0.75; font-variant-numeric: tabular-nums; }
-
-#callModal .call-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(38px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  z-index: 5;
-  padding: 0 16px;
-  flex-wrap: wrap;
-}
-.call-ctrl-btn {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  cursor: pointer;
-  font-size: 19px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease, background 0.2s ease;
-}
-.call-ctrl-btn:hover { background: rgba(255, 255, 255, 0.22); }
-.call-ctrl-btn:active { transform: scale(0.92); }
-.call-ctrl-btn.active { background: #fff; color: #0b1120; }
-.call-ctrl-btn.accept { background: #22c55e; border: none; width: 64px; height: 64px; font-size: 22px; box-shadow: 0 10px 26px rgba(34, 197, 94, 0.4); }
-.call-ctrl-btn.accept:hover { background: #1fb556; }
-.call-ctrl-btn.end { background: #ef4444; border: none; width: 64px; height: 64px; font-size: 22px; box-shadow: 0 10px 26px rgba(239, 68, 68, 0.4); }
-.call-ctrl-btn.end:hover { background: #dc3838; }
-@media (max-width: 380px) {
-  .call-ctrl-btn { width: 50px; height: 50px; font-size: 17px; }
-  .call-ctrl-btn.accept, .call-ctrl-btn.end { width: 56px; height: 56px; }
-  #callModal .call-controls { gap: 12px; }
-}
-
-.call-ended-actions {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(40px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 40px;
-  padding: 0 16px;
-  z-index: 6;
-}
-.call-ended-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 12.5px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.call-ended-btn .ce-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  transition: transform 0.15s ease;
-}
-.call-ended-btn .ce-icon.green { background: #22c55e; }
-.call-ended-btn:active .ce-icon { transform: scale(0.92); }
-@media (max-width: 380px) { .call-ended-actions { gap: 26px; } }
-
-/* =====================================================================
-   মিডিয়া প্রিভিউ (ছবি / ভিডিও / অডিও)
-   ===================================================================== */
-#mediaPreviewModal {
-  background: rgba(3, 5, 10, 0.95) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.media-preview-topbar {
-  position: absolute;
-  top: calc(14px + env(safe-area-inset-top, 0px));
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  z-index: 5;
-}
-.media-preview-title { color: rgba(255, 255, 255, 0.85); font-size: 13.5px; font-weight: 600; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.media-preview-tools { display: flex; gap: 10px; }
-.media-tool-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  border: none;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  font-size: 16px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  transition: background 0.2s ease, transform 0.15s ease;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.media-tool-btn:hover { background: rgba(255, 255, 255, 0.26); }
-.media-tool-btn:active { transform: scale(0.92); }
-#mediaPreviewContent { max-width: 94vw !important; max-height: 84vh !important; }
-#mediaPreviewContent img,
-#mediaPreviewContent video {
-  max-width: 94vw;
-  max-height: 84vh;
-  border-radius: 16px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
-  background: #000;
-  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.audio-player-card {
-  width: min(420px, 90vw);
-  background: #141c2f;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 26px;
-  padding: 28px 22px;
-  text-align: center;
-  color: #fff;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
-  animation: fadeScaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.audio-player-card .ap-disc {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 16px;
-  border-radius: 50%;
-  background: var(--brand-grad);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 34px;
-  animation: apSpin 7s linear infinite;
-}
-@keyframes apSpin { to { transform: rotate(360deg); } }
-.audio-player-card .ap-name { font-size: 14px; font-weight: 600; margin-bottom: 14px; word-break: break-word; }
-.audio-player-card audio { width: 100%; }
-
-/* ---------- ছোট স্ক্রিন ---------- */
-@media (max-width: 767px) {
-  .main-container { padding: 12px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-}
-
-
-/* ---------- "Developed by Eyamin" — স্টাইলিশ ফন্টে টাইপ/মোছার লুপ ---------- */
-.dev-credit {
-  position: relative;
-  display: inline-block;
-  font-family: 'Pacifico', 'Hind Siliguri', cursive;
-  font-weight: 400;
-  font-size: 15px;
-  letter-spacing: 0.4px;
-  text-transform: none;
-  color: var(--text-3);
-  white-space: nowrap;
-  line-height: 1.4;
-}
-/* মূল কারণ: ফাইলের শুরুর `* { font-family: Poppins; font-style: italic }` রুল ভেতরের span-গুলোতেও
-   সরাসরি লাগছিল, তাই Pacifico-র বদলে ইটালিক Poppins দেখাত। এখানে স্প্যানগুলোতে আলাদা করে ঠিক করা হলো। */
-.dev-credit, .dev-credit *,
-.sp-credit, .sp-credit * {
-  font-family: 'Pacifico', 'Hind Siliguri', cursive;
-  font-style: normal;
-  font-weight: 400;
-}
-.dev-credit-sizer { visibility: hidden; }
-.dev-credit-type {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  filter: drop-shadow(0 0 8px rgba(124, 92, 255, 0.28));
-}
-.dev-credit-text {
-  background: linear-gradient(90deg, #4f8cff 0%, #7c5cff 50%, #ec4899 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-.dev-credit-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 0.95em;
-  margin-left: 2px;
-  vertical-align: -0.08em;
-  border-radius: 2px;
-  background: #a78bfa;
-  animation: devCursorBlink 0.9s steps(1) infinite;
-}
-@keyframes devCursorBlink {
-  0%, 49%   { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-.splash-footer.dev-credit { font-size: 17px; margin-top: 4px; }
-@media (prefers-reduced-motion: reduce) {
-  .dev-credit-cursor { animation: none; opacity: 0; }
-}
-
-
-/* About tab: Edit / Save / Close row */
-.profile-about-actions{
-  display:flex;
-  gap:10px;
-  margin-top:14px;
-  flex-wrap:wrap;
-}
-.profile-about-actions .btn{
-  flex:1;
-  min-width:120px;
-}
-
-
-/* ===== About box (bio-র নিচে আলাদা বক্স, ভেতর থেকেই এডিট) ===== */
-.pm-about-box {
-  margin: 0 0 6px;
-  padding: 14px 16px 16px;
-  border-radius: 18px;
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  text-align: left;
-}
-.pm-about-head {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 8px;
-}
-.pm-about-title { font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
-.pm-about-title i { color: var(--brand); }
-.pm-about-edit-btn {
-  width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--surface-2, var(--input-bg)); color: var(--text-2); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
-}
-.pm-about-edit-btn:hover { color: var(--brand); background: var(--surface-3, var(--input-bg)); }
-.pm-about-box .profile-empty { padding: 14px 6px; }
-
-/* Reels: লম্বা (৯:১৬) থাম্বনেইল */
-.profile-gallery.reels .profile-gallery-item { aspect-ratio: 9 / 16; }
-.profile-gallery.reels .pg-badge { width: 26px; height: 26px; font-size: 11px; }
-
-
-/* =====================================================================
-   মিডিয়া প্রিভিউ: শুধু ছবি/ভিডিও + কোণায় বাটন (উপরে-ডানে Close, নিচে-ডানে Download)
-   ===================================================================== */
-.media-corner-btn {
-  position: absolute;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  font-size: 18px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  z-index: 6;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 0.2s ease, transform 0.15s ease;
-}
-.media-corner-btn:hover { background: rgba(255, 255, 255, 0.28); }
-.media-corner-btn:active { transform: scale(0.92); }
-.media-corner-close { top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; }
-.media-corner-download { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); right: 16px; }
-
-/* ছবি/ভিডিও সবসময় ফ্রেমের ঠিক মাঝখানে */
-.post-media-wrap { display: flex; align-items: center; justify-content: center; }
-.post-media-wrap .post-media { margin: 0 auto; }
-.post-composer-preview img, .post-composer-preview video { margin: 0 auto; }
-
-/* পোস্টে ভিডিওর ⤢ (পপআপে খোলার) বাটন */
-.post-expand-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.post-media-wrap.playing .video-play-badge { display: none; }
-
-
-/* ---------- ক্যাপশন ডায়ালগ ---------- */
-.caption-dialog-overlay {
-  position: fixed; inset: 0; z-index: 400000;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  display: flex; align-items: center; justify-content: center; padding: 16px;
-}
-.caption-dialog {
-  width: 100%; max-width: 420px; max-height: 92dvh; overflow-y: auto;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--line); border-radius: 22px; padding: 16px;
-  box-shadow: var(--shadow-card);
-}
-.caption-dialog-title { font-weight: 700; font-size: 15px; margin-bottom: 10px; text-align: center; }
-.caption-dialog-input {
-  width: 100%; resize: none; border: 1px solid var(--line); border-radius: 14px;
-  background: transparent; color: inherit; font: inherit; font-size: 14px;
-  padding: 10px 12px; outline: none; box-sizing: border-box;
-}
-.caption-dialog-preview {
-  margin-top: 10px; border-radius: 14px; overflow: hidden; background: #000;
-  display: flex; align-items: center; justify-content: center;
-}
-.caption-dialog-preview img, .caption-dialog-preview video {
-  max-width: 100%; max-height: 42vh; display: block; margin: 0 auto; object-fit: contain;
-}
-.caption-dialog-actions { display: flex; gap: 10px; margin-top: 12px; }
-.caption-dialog-actions .btn { flex: 1; }
-
-/* ---------- প্রিভিউতে ক্যাপশন (নিচে-বামে, ডাউনলোড বাটনের পাশে নয়) ---------- */
-.media-preview-caption {
-  position: absolute;
-  left: 16px; right: 76px;
-  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-  max-height: 22vh; overflow-y: auto;
-  color: #fff; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
-  z-index: 6;
-}
-
-/* গ্যালারি টাইলের ক্যাপশন */
-.pg-caption {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  padding: 16px 8px 6px;
-  font-size: 11px; line-height: 1.3; color: #fff;
-  background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
-  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  pointer-events: none;
-}
-.profile-gallery-item { position: relative; }
-
-
-/* =====================================================================
-   FACEBOOK-স্টাইল লাইট ডিজাইন (ফাইনাল)
-   ওপর থেকে নিচে: ব্র্যান্ড বার → আইকন নেভ বার → স্টোরি → প্রোফাইল কার্ড
-   ===================================================================== */
-body.light-theme {
-  --bg: #f0f2f5;
-  --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --surface-3: #e4e6eb;
-  --line: rgba(0, 0, 0, 0.09);
-  --line-2: rgba(0, 0, 0, 0.16);
-  --text: #050505;
-  --text-2: #65676b;
-  --text-3: #8a8d91;
-  --brand: #1877f2;
-  --brand-2: #0a5fd6;
-  --brand-grad: linear-gradient(135deg, #1877f2, #0a5fd6);
-  --bubble-other: #e4e6eb;
-  --bubble-other-text: #050505;
-  --input-bg: #f0f2f5;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.16);
-  --chat-bg-1: #f0f2f5;
-  --chat-bg-2: #f0f2f5;
-  --ring: 0 0 0 3px rgba(24, 119, 242, 0.25);
-}
-body.light-theme::before { background: none; }
-body.light-theme .btn-primary { box-shadow: none; }
-
-/* ব্র্যান্ড */
-.dash-brand { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: var(--brand); text-transform: none; }
-.dash-brand span { color: var(--text); font-weight: 700; }
-
-/* আইকন নেভ বার (আগের বড় টাইলের বদলে) */
-.dash-actions {
-  display: flex !important;
-  gap: 0 !important;
-  margin: 6px -4px 12px;
-  padding: 2px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.dash-actions .dash-tile {
-  flex: 1; min-width: 0;
-  flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 2px; border: none; border-radius: 10px;
-  background: transparent; box-shadow: none; text-align: center;
-}
-.dash-actions .dash-tile:hover { transform: none; background: var(--surface-2); }
-.dash-actions .tile-icon {
-  width: 36px; height: 30px; border-radius: 0; font-size: 20px;
-  background: none !important; box-shadow: none !important; color: var(--text-2);
-}
-.dash-actions .tile-friends .tile-icon,
-.dash-actions .tile-profile .tile-icon { color: var(--brand); }
-.dash-actions .tile-report .tile-icon { color: #f5a623; }
-.dash-actions .tile-admin .tile-icon { color: #7c5cff; }
-.dash-actions .tile-create .tile-icon,
-.dash-actions .tile-join .tile-icon { color: #42b72a; }
-.dash-actions .tile-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
-.dash-actions .friend-req-badge { top: 2px; right: 10px; }
-
-/* ---------- স্টোরি বার ---------- */
-.stories-row {
-  display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; margin-bottom: 8px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
-}
-.stories-row::-webkit-scrollbar { display: none; }
-.story-card {
-  position: relative; flex: 0 0 96px; height: 158px; border: none; padding: 0;
-  border-radius: 12px; overflow: hidden; cursor: pointer; background: var(--surface-3);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); color: #fff;
-}
-.story-card > img:not(.story-ring), .story-card > video, .story-textbg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.story-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.55), transparent 55%); pointer-events: none; }
-.story-name { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; font-size: 12px; font-weight: 700; text-align: left; text-shadow: 0 1px 4px rgba(0,0,0,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.story-ring { position: absolute; top: 8px; left: 8px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 3px solid var(--brand); background: #fff; }
-.story-ring.seen { border-color: #b0b3b8; }
-.story-add { background: var(--surface); }
-.story-add > img { position: absolute; top: 0; left: 0; width: 100%; height: 66%; object-fit: cover; }
-.story-add::after { display: none; }
-.story-add .story-name { color: var(--text); text-shadow: none; text-align: center; bottom: 8px; left: 4px; right: 4px; }
-.story-plus {
-  position: absolute; z-index: 3; left: 50%; top: 66%; transform: translate(-50%, -50%);
-  width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff;
-  border: 3px solid var(--surface); display: flex; align-items: center; justify-content: center; font-size: 13px;
-}
-
-/* ---------- স্টোরি তৈরি ---------- */
-.story-overlay { position: fixed; inset: 0; z-index: 250000; background: rgba(0,0,0,.75); align-items: center; justify-content: center; padding: 12px; }
-.story-create-card { width: 100%; max-width: 380px; max-height: 96dvh; overflow-y: auto; background: var(--surface); color: var(--text); border-radius: 16px; padding: 14px; }
-.story-create-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 16px; }
-.story-x { width: 36px; height: 36px; border: none; border-radius: 50%; background: rgba(120,120,120,.25); color: inherit; cursor: pointer; font-size: 16px; }
-.story-create-preview { position: relative; height: 46dvh; max-height: 420px; border-radius: 14px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-.story-create-preview > img, .story-create-preview > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
-.story-create-preview textarea { position: relative; z-index: 2; width: 90%; height: 60%; resize: none; border: none; outline: none; background: transparent; color: #fff; font: inherit; font-size: 22px; font-weight: 700; text-align: center; }
-.story-create-preview textarea.over-media { position: absolute; bottom: 10px; height: 64px; background: rgba(0,0,0,.45); border-radius: 10px; font-size: 15px; }
-.story-create-preview textarea::placeholder { color: rgba(255,255,255,.7); }
-.story-bg-row { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
-.story-bg-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line-2); cursor: pointer; }
-.story-create-actions { display: flex; gap: 8px; }
-.story-create-actions .btn { flex: 1; font-size: 13px; }
-.story-note { text-align: center; font-size: 11.5px; color: var(--text-3); margin: 8px 0 0; }
-
-/* ---------- স্টোরি ভিউয়ার ---------- */
-.story-viewer { background: #000; padding: 0; }
-.story-stage { position: relative; width: 100%; max-width: 440px; height: 100dvh; background: #111; overflow: hidden; }
-.story-bars { position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: 8px; right: 8px; display: flex; gap: 4px; z-index: 6; }
-.story-bar { flex: 1; height: 3px; background: rgba(255,255,255,.35); border-radius: 3px; overflow: hidden; }
-.story-bar i { display: block; height: 100%; width: 0; background: #fff; }
-.story-bar i.full { width: 100%; }
-.story-viewer-head { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 10px; right: 10px; z-index: 7; display: flex; align-items: center; gap: 8px; color: #fff; }
-.story-viewer-head img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; }
-.story-viewer-who { flex: 1; display: flex; flex-direction: column; line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
-.story-viewer-who span { font-size: 11.5px; opacity: .85; }
-.story-viewer-head .story-x { background: rgba(0,0,0,.4); color: #fff; }
-.story-body { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.story-body img, .story-body video { width: 100%; height: 100%; object-fit: contain; }
-.story-textonly { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 30px; }
-.story-text { color: #fff; font-size: 24px; font-weight: 700; text-align: center; white-space: pre-wrap; word-break: break-word; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.story-text.on-media { position: absolute; left: 14px; right: 14px; bottom: 70px; font-size: 16px; background: rgba(0,0,0,.45); padding: 8px 12px; border-radius: 10px; }
-.story-tap { position: absolute; top: 70px; bottom: 60px; z-index: 5; }
-.story-tap-left { left: 0; width: 35%; }
-.story-tap-right { right: 0; width: 65%; }
-.story-footer { position: absolute; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6; text-align: center; color: #fff; font-size: 13px; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
-.story-sheet { position: absolute; z-index: 9; right: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); min-width: 210px; background: var(--surface); color: var(--text); border-radius: 12px; box-shadow: var(--shadow-pop); padding: 6px; }
-.story-sheet .sheet-title { padding: 8px 10px; font-size: 12px; color: var(--text-3); font-weight: 700; }
-.story-sheet button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: none; background: transparent; color: inherit; font: inherit; font-size: 14px; border-radius: 8px; cursor: pointer; text-align: left; }
-.story-sheet button:hover { background: var(--surface-2); }
-.story-sheet button.danger { color: var(--red); }
-
-/* ---------- অ্যাডমিন: স্টোরি ও স্টোরি-রিপোর্ট ---------- */
-.admin-story-row { display: flex; gap: 10px; align-items: flex-start; }
-.as-thumb { flex: 0 0 64px; height: 96px; border-radius: 8px; overflow: hidden; background: #000; }
-.as-thumb img, .as-thumb video { width: 100%; height: 100%; object-fit: cover; }
-.as-text { width: 100%; height: 100%; color: #fff; font-size: 10px; font-weight: 700; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; }
-.as-info { flex: 1; min-width: 0; }
-.as-info .ar-dismiss-btn { margin-top: 8px; }
-.ar-story { display: flex; gap: 10px; margin: 8px 0; padding: 8px; border-radius: 10px; background: var(--surface-2); font-size: 12.5px; align-items: flex-start; }
-.ar-story .as-thumb { flex-basis: 54px; height: 80px; }
-
-
-/* =====================================================================
-   মেইন ট্যাব লেআউট (ফোন + ল্যাপটপ)
-   ফোন: ব্র্যান্ড বার → ট্যাব বার (উপরে) → কনটেন্ট
-   ল্যাপটপ: ব্র্যান্ড বারের মাঝখানে আইকন ট্যাব, Messages-এ বামে চ্যাট লিস্ট + ডানে চ্যাট
-   ===================================================================== */
-body.dashboard-active .navbar { display: none; }
-body.dashboard-active .main-container { align-items: flex-start; padding: 0; min-height: 100dvh; }
-#dashboardScreen {
-  max-width: none; width: 100%; padding: 0 0 30px;
-  background: transparent; border: none; border-radius: 0; box-shadow: none;
-  text-align: left; animation: none;
-}
-#dashboardScreen::before { display: none; }
-.dash-topbar {
-  position: sticky; top: 0; z-index: 40; height: 52px; margin: 0; padding: 0 14px;
-  background: var(--surface); border-bottom: 1px solid var(--line);
-}
-.dash-topbar .direct-menu-container { display: none; }
-.dash-actions { display: none !important; }
-.dash-brand { font-size: 23px; }
-
-.main-tabs {
-  position: sticky; top: 52px; z-index: 39; display: flex;
-  background: var(--surface); border-bottom: 1px solid var(--line);
-}
-.mt-btn {
-  position: relative; flex: 1; min-width: 0; height: 52px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  border: none; background: none; color: var(--text-2); cursor: pointer;
-  border-bottom: 3px solid transparent; font-size: 18px;
-  transition: color .15s ease, background .15s ease;
-}
-.mt-btn span { font-size: 10px; font-weight: 600; }
-.mt-btn:hover { background: var(--surface-2); }
-.mt-btn.active { color: var(--tc); border-bottom-color: var(--tc); }
-.mt-badge {
-  position: absolute; top: 4px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px;
-  border-radius: 8px; background: #e41e3f; color: #fff; font-size: 10px; font-style: normal; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-}
-
-.tab-panel { display: none; width: 100%; max-width: 680px; margin: 0 auto; padding: 10px 10px 0; box-sizing: border-box; }
-.tab-panel.active { display: block; }
-#dashboardScreen .footer-text { text-align: center; margin-top: 24px; }
-
-/* Home */
-.home-composer {
-  display: flex; align-items: center; gap: 8px; padding: 10px; margin: 0 0 10px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
-}
-.home-composer img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
-.hc-input { flex: 1; text-align: left; border: none; background: var(--surface-2); color: var(--text-2); border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 14px; cursor: pointer; }
-.hc-ico { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--surface-2); font-size: 17px; cursor: pointer; }
-.home-feed .post-card { margin-bottom: 10px; }
-
-/* Friends / Messages: সাধারণ কম্পোনেন্ট */
-.tp-search { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 0 14px; margin-bottom: 10px; color: var(--text-3); }
-.tp-search input { flex: 1; border: none; outline: none; background: transparent; color: var(--text); font: inherit; font-size: 14px; padding: 11px 0; }
-.tp-title { margin: 14px 4px 8px; font-size: 15px; font-weight: 700; color: var(--text); }
-.tp-list { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.tp-list:empty { display: none; }
-.tp-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; }
-.tp-row:hover { background: var(--surface-2); }
-.tp-row > img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
-.tp-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; }
-.tp-row-info b { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tp-row-info span { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tp-actions { display: flex; gap: 6px; }
-.tp-btn { border: none; border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.tp-btn-primary { background: var(--brand); color: #fff; }
-.tp-btn-soft { background: var(--surface-3); color: var(--text); }
-.tp-btn:disabled { opacity: .65; cursor: default; }
-.tp-tag { font-size: 12px; color: #10b981; font-weight: 600; }
-.tp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-.tp-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; text-align: center; }
-.tp-card img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; cursor: pointer; }
-.tp-card b { font-size: 14px; font-weight: 600; cursor: pointer; }
-.tp-card .tp-btn { width: 100%; }
-.tp-empty { text-align: center; padding: 26px 14px; color: var(--text-3); font-size: 13.5px; }
-.tp-empty i { font-size: 30px; display: block; margin-bottom: 8px; opacity: .6; }
-.tp-dot { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #c026d3; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-.tp-chat.unread .tp-row-info b { color: #c026d3; }
-.tp-chat.current { background: #c026d31a; }
-.tp-head { display: flex; align-items: center; justify-content: space-between; margin: 2px 4px 10px; }
-.tp-head h3 { font-size: 22px; font-weight: 800; margin: 0; }
-.tp-head-btns { display: flex; gap: 8px; }
-.tp-head-btns button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--surface-3); color: var(--text); cursor: pointer; font-size: 15px; }
-.tm-empty-desktop { display: none; }
-
-/* Reels */
-.reels-list { max-width: 420px; margin: 0 auto; height: calc(100dvh - 190px); overflow-y: auto; scroll-snap-type: y mandatory; border-radius: 14px; scrollbar-width: none; }
-.reels-list::-webkit-scrollbar { display: none; }
-.reel-item { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; background: #000; border-radius: 14px; overflow: hidden; }
-.reel-item video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.reel-info { position: absolute; left: 0; right: 60px; bottom: 0; padding: 40px 12px 14px; color: #fff; text-align: left; background: linear-gradient(to top, rgba(0,0,0,.7), transparent); }
-.reel-owner { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.reel-owner img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid #f97316; }
-.reel-info p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
-.reel-side { position: absolute; right: 8px; bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
-.reel-side button { width: 42px; height: 42px; border-radius: 50%; border: none; background: rgba(255,255,255,.2); color: #fff; font-size: 16px; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-body.tab-reels .footer-text { display: none; }
-
-/* Menu */
-#tabMenu .profile-header { margin: 4px 0 12px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
-.menu-list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.menu-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer; text-align: left; }
-.menu-row:last-child { border-bottom: none; }
-.menu-row:hover { background: var(--surface-2); }
-.menu-row i { width: 34px; height: 34px; border-radius: 10px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; flex: 0 0 auto; }
-.menu-row-danger { color: var(--red); }
-
-/* ---------- ল্যাপটপ ---------- */
-@media (min-width: 900px) {
-  .main-tabs {
-    top: 0; margin: -52px auto 0; max-width: 560px; height: 52px; background: transparent; border: none; z-index: 41;
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const fs = require("fs");
+const { Server } = require("socket.io");
+const path = require("path");
+
+
+// ---------- Image host (Cloudinary primary CDN; imgbb legacy fallback) ----------
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "";
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || "";       // মুছতে দরকার (শুধু সার্ভারে)
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || ""; // মুছতে দরকার (শুধু সার্ভারে)
+const nodeCrypto = require("crypto");
+const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || "";
+const IMGBB_API_KEY = process.env.IMGBB_API_KEY || "";
+const MAX_FALLBACK_DATA_URL = 900000;
+// পুরোনো Node version-এ গ্লোবাল fetch না থাকলে node-fetch দিয়ে fallback করবে
+let _fetchImpl = (typeof fetch === "function") ? fetch : null;
+async function getFetch() {
+  if (_fetchImpl) return _fetchImpl;
+  try {
+    const mod = await import("node-fetch");
+    _fetchImpl = mod.default;
+    return _fetchImpl;
+  } catch (e) {
+    console.warn("⚠️ No global fetch and node-fetch not installed — remote image upload will fail. Run: npm i node-fetch");
+    return null;
   }
-  .mt-btn span { display: none; }
-  .mt-btn { font-size: 20px; border-radius: 0; }
-  .tab-panel { max-width: 640px; padding-top: 16px; }
-  #tabFriends { max-width: 820px; }
-  .reels-list { height: calc(100dvh - 130px); }
+}
 
-  /* Messages: বামে চ্যাট লিস্ট, ডানে চ্যাট (Messenger-এর মতো) */
-  body.tab-messages #tabMessages {
-    position: fixed; top: 52px; left: 0; bottom: 0; width: 360px; max-width: none; margin: 0;
-    padding: 14px 10px; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--line); z-index: 20;
+// প্রতিটি আপলোডের জন্য ইউনিক public_id — নাহলে একই নামের (story/post/photo) ফাইল একে অপরকে ওভাররাইট করে
+function uniquePublicId(name, fallback) {
+  const base = String(name || fallback || "file").replace(/\.[a-zA-Z0-9]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50) || "file";
+  return base + "_" + Date.now().toString(36) + "_" + nodeCrypto.randomBytes(4).toString("hex");
+}
+
+// ---- Cloudinary (unsigned upload) — এটাই প্রধান, imgbb-র চেয়ে server/automation-এর জন্য অনেক বেশি নির্ভরযোগ্য ----
+async function uploadToCloudinary(dataUrl, name) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) return null;
+  try {
+    const raw = String(dataUrl || "");
+    if (!raw.startsWith("data:") || raw.length < 32) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+    const form = new FormData();
+    form.append("file", raw);
+    form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    form.append("public_id", uniquePublicId(name, "img"));
+    const res = await doFetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+      method: "POST",
+      body: form,
+    });
+    const json = await res.json();
+    if (json && json.secure_url) {
+      console.log("Cloudinary upload OK:", json.secure_url);
+      return json.secure_url;
+    }
+    console.warn("Cloudinary upload failed:", JSON.stringify((json && json.error) || json));
+    return null;
+  } catch (e) {
+    console.warn("Cloudinary upload error:", e.message);
+    return null;
   }
-  body.tab-messages #tabMessages .tp-list { border: none; background: transparent; }
-  body.tab-messages .tm-empty-desktop {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    position: fixed; top: 52px; left: 360px; right: 0; bottom: 0; color: var(--text-3); z-index: 5;
+}
+
+// ---- Cloudinary VIDEO (Reels) — একই unsigned preset, শুধু /video/upload এন্ডপয়েন্ট ----
+async function uploadVideoToCloudinary(dataUrl, name) {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) return null;
+  try {
+    const raw = String(dataUrl || "");
+    if (!(raw.startsWith("data:video/") || raw.startsWith("data:audio/")) || raw.length < 32) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+    const form = new FormData();
+    form.append("file", raw);
+    form.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    form.append("public_id", uniquePublicId(name, "vid"));
+    const res = await doFetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, {
+      method: "POST",
+      body: form,
+    });
+    const json = await res.json();
+    if (json && json.secure_url) {
+      console.log("Cloudinary video upload OK:", json.secure_url);
+      return json.secure_url;
+    }
+    console.warn("Cloudinary video upload failed:", JSON.stringify((json && json.error) || json));
+    return null;
+  } catch (e) {
+    console.warn("Cloudinary video upload error:", e.message);
+    return null;
   }
-  .tm-empty-desktop i { font-size: 46px; margin-bottom: 10px; opacity: .5; }
-  body.tab-messages .direct-chat-screen { top: 52px; left: 360px; }
+}
+
+// ---- imgbb (legacy fallback — মাঝে মাঝে ওদের নিজস্ব bot-protection normal ব্যবহারকারীকেও ব্লক করে) ----
+async function uploadToImgbb(dataUrlOrBase64, name) {
+  if (!IMGBB_API_KEY) return null;
+  try {
+    let b64 = String(dataUrlOrBase64 || "");
+    if (b64.startsWith("data:")) {
+      const i = b64.indexOf(",");
+      if (i >= 0) b64 = b64.slice(i + 1);
+    }
+    if (!b64 || b64.length < 32) return null;
+    const doFetch = await getFetch();
+    if (!doFetch) return null;
+    const body = new URLSearchParams();
+    body.set("key", IMGBB_API_KEY);
+    body.set("image", b64);
+    if (name) body.set("name", String(name).slice(0, 80));
+    const res = await doFetch("https://api.imgbb.com/1/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://imgbb.com/",
+        "Origin": "https://imgbb.com",
+      },
+      body: body.toString(),
+    });
+    const json = await res.json();
+    if (json && json.success && json.data) {
+      console.log("imgbb upload OK:", json.data.display_url || json.data.url);
+      return json.data.display_url || json.data.url || null;
+    }
+    console.warn("Remote image upload failed:", JSON.stringify(json && (json.error || json.status_txt || json)));
+    return null;
+  } catch (e) {
+    console.warn("Remote image upload error:", e.message);
+    return null;
+  }
+}
+
+async function resolveImageSrc(dataUrlOrHttp, name) {
+  const raw = String(dataUrlOrHttp || "");
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return { src: raw, host: "url" };
+  if (!raw.startsWith("data:")) return null;
+  let remote = await uploadToCloudinary(raw, name);
+  if (!remote) remote = await uploadToImgbb(raw, name);
+  if (remote) return { src: remote, host: "cdn" };
+  if (raw.length <= MAX_FALLBACK_DATA_URL) return { src: raw, host: "local" };
+  return null;
+}
+if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) console.log("Image CDN: Cloudinary configured.");
+else if (IMGBB_API_KEY) console.log("Image CDN: imgbb key loaded (legacy).");
+else console.warn("⚠️ No image CDN configured — local data-URL fallback.");
+
+
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+  maxHttpBufferSize: 1e8, // allow base64 images/files through sockets
+
+  // ছবি/ফাইল base64 আকারে যায় বলে কম্প্রেশন চালু করলে ট্রান্সফার অনেক দ্রুত হয়
+  perMessageDeflate: { threshold: 1024 },
+  httpCompression: { threshold: 1024 },
+
+  // ওয়েবসকেট আগে চেষ্টা করা হবে — পোলিং-এ পড়ে গেলে মেসেজে দেরি হয়
+  transports: ["websocket", "polling"],
+  pingInterval: 20000,
+  pingTimeout: 25000,
+});
+
+app.use(cors());
+app.use(express.json({ limit: "50mb" }));
+
+// Serve the frontend files (index.html, app.js, style.css) from this same folder
+app.use(express.static(path.join(__dirname)));
+
+// ================= DATA STORE (now saved to disk) =================
+// আগে সব ডেটা শুধু মেমোরিতে ছিল, তাই সার্ভার রিস্টার্ট/স্লিপ হলেই ফ্রেন্ড লিস্ট
+// মুছে যেত। এখন ডেটা app-data.json ফাইলে সেভ হয় এবং সার্ভার চালু হলে আবার লোড হয়।
+//
+// ⚠️ গুরুত্বপূর্ণ: Render-এর ফ্রি/স্ট্যান্ডার্ড ওয়েব সার্ভিসের ডিস্ক "ephemeral" —
+// প্রতিবার নতুন ডিপ্লয় বা রিস্টার্ট হলে এই ফাইলটা মুছে যায়, ফলে আগে রেজিস্টার করা
+// সব ইউজার/পাসওয়ার্ড হারিয়ে যায় (এই কারণেই অন্য ডিভাইসে লগইন ফেইল করে, কারণ ওই
+// ডিভাইসের লোকাল ক্যাশ নেই আর সার্ভারেও ডেটা নেই)। এটা ঠিক করার আসল সমাধান হলো
+// Render Dashboard → এই সার্ভিস → "Disks" থেকে একটা Persistent Disk যোগ করে (যেমন
+// মাউন্ট পাথ "/data") এবং Environment ভ্যারিয়েবল DATA_DIR=/data সেট করে দেওয়া —
+// তাহলে ডিপ্লয়/রিস্টার্ট হলেও ইউজার ডেটা আর মুছে যাবে না।
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(DATA_DIR, "app-data.json");
+const MAX_SAVED_MESSAGES = 100; // প্রতি চ্যাটে সর্বশেষ কতগুলো মেসেজ ফাইলে রাখা হবে
+
+let users = {};              // phone -> { name, phone, password, pic }
+let profiles = {};           // phone -> { bio, location, work, education, relationship, items: [...] }
+let directThemes = {};       // "phoneA|phoneB" (sorted) -> themeData
+let friendships = {};        // phone -> Set(phone)
+let friendRequests = {};     // phone -> Set(phone)  (requests received BY this phone)
+let blockedUsers = {};       // phone -> Set(phone)  (phones THIS user has blocked)
+let directMessages = {};     // "phoneA|phoneB" (sorted) -> [ messages ]
+let roomMessages = {};       // roomCode -> [ messages ]
+const STORY_TTL = 24 * 60 * 60 * 1000; // ২৪ ঘণ্টা
+let stories = [];            // [ { id, phone, name, pic, media, text, bg, time, expires, views:[phone] } ]
+// ---- Cloudinary থেকে ফাইল মোছা (ইউজার কিছু ডিলিট করলে ক্লাউডেও মুছে যাবে) ----
+function parseCloudinaryUrl(url) {
+  const m = String(url || "").match(/^https?:\/\/res\.cloudinary\.com\/([^/]+)\/(image|video|raw)\/upload\/(.+)$/);
+  if (!m) return null;
+  let parts = m[3].split("/");
+  const vi = parts.findIndex((p) => /^v\d+$/.test(p));
+  if (vi >= 0) parts = parts.slice(vi + 1);
+  else parts = parts.filter((p) => p.indexOf(",") === -1 && !/^[a-z]{1,3}_[^/]+$/.test(p));
+  if (!parts.length) return null;
+  let publicId = parts.join("/");
+  try { publicId = decodeURIComponent(publicId); } catch (e) {}
+  if (m[2] !== "raw") publicId = publicId.replace(/\.[a-zA-Z0-9]+$/, "");
+  return { cloud: m[1], type: m[2], publicId };
+}
+
+async function deleteFromCloudinary(url) {
+  const info = parseCloudinaryUrl(url);
+  if (!info) return false; // Cloudinary-র ফাইল না (যেমন imgbb) — কিছু করার নেই
+  if (!CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    console.warn("Cloudinary delete skipped: CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET সেট করা নেই →", info.publicId);
+    return false;
+  }
+  if (CLOUDINARY_CLOUD_NAME && info.cloud !== CLOUDINARY_CLOUD_NAME) return false;
+  try {
+    const doFetch = await getFetch();
+    if (!doFetch) return false;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const toSign = "invalidate=true&public_id=" + info.publicId + "&timestamp=" + timestamp + CLOUDINARY_API_SECRET;
+    const signature = nodeCrypto.createHash("sha1").update(toSign).digest("hex");
+    const body = new URLSearchParams({ public_id: info.publicId, timestamp: String(timestamp), invalidate: "true", api_key: CLOUDINARY_API_KEY, signature });
+    const res = await doFetch(`https://api.cloudinary.com/v1_1/${info.cloud}/${info.type}/destroy`, { method: "POST", body });
+    const json = await res.json();
+    console.log("Cloudinary delete:", info.type, info.publicId, "→", (json && (json.result || (json.error && json.error.message))) || "?");
+    return !!(json && json.result === "ok");
+  } catch (e) {
+    console.warn("Cloudinary delete error:", e.message);
+    return false;
+  }
+}
+
+// অন্য কোথাও একই ফাইল ব্যবহার হচ্ছে কি? (থাকলে ক্লাউড থেকে মুছব না)
+function isMediaReferenced(url) {
+  if (!url) return false;
+  for (const ph of Object.keys(profiles)) {
+    const p = profiles[ph] || {};
+    if (p.cover === url) return true;
+    if ((p.posts || []).some((x) => x && x.media && x.media.src === url)) return true;
+    if ((p.items || []).some((x) => x && x.src === url)) return true;
+  }
+  if (stories.some((st) => (st.media && st.media.src === url) || (st.music && st.music.src === url))) return true;
+  if (Object.values(users).some((u) => u && u.pic === url)) return true;
+  return false;
+}
+function cleanupMedia(urls) {
+  Array.from(new Set((urls || []).filter(Boolean))).forEach((u) => {
+    if (!isMediaReferenced(u)) deleteFromCloudinary(u);
+  });
+}
+const storyUrls = (st) => (st ? [st.media && st.media.src, st.music && st.music.src] : []);
+
+// ---- পোস্ট ↔ ছবি/রিলস সংযোগ: যেভাবেই আপলোড হোক, সব জায়গায় দেখা যাবে ----
+// পোস্টে ছবি → Photos-এও, পোস্টে ভিডিও → Reels-এও; Photos/Reels-এ আপলোড → Posts-এও
+function syncMediaLinks(p) {
+  if (!p) return;
+  if (!Array.isArray(p.posts)) p.posts = [];
+  if (!Array.isArray(p.items)) p.items = [];
+  const itemIds = new Set(p.items.map((i) => i && i.id));
+  const postIds = new Set(p.posts.map((x) => x && x.id));
+  p.posts.forEach((post) => {
+    if (!post || post.itemId || !post.media || !post.media.src) return;
+    const src = String(post.media.src);
+    post.itemId = "lp_" + post.id;
+    if (src.startsWith("data:") || itemIds.has(post.itemId)) return;
+    const isVid = post.media.type === "video";
+    p.items.push({ id: post.itemId, kind: isVid ? "reel" : "photo", src, host: post.media.host, name: isVid ? "video" : "photo", caption: post.text || "", timestamp: post.timestamp || Date.now(), postId: post.id });
+    itemIds.add(post.itemId);
+  });
+  p.items.forEach((it) => {
+    if (!it || it.postId || (it.kind !== "photo" && it.kind !== "reel")) return;
+    const src = String(it.src || "");
+    it.postId = "pi_" + it.id;
+    if (!src || src.startsWith("data:") || postIds.has(it.postId)) return;
+    p.posts.push({ id: it.postId, text: it.caption || "", media: { type: it.kind === "reel" ? "video" : "image", src, host: it.host }, timestamp: it.timestamp || Date.now(), likes: [], comments: [], itemId: it.id });
+    postIds.add(it.postId);
+  });
+  const byTime = (a, b) => (b.timestamp || 0) - (a.timestamp || 0);
+  const photos = p.items.filter((i) => i && i.kind === "photo").sort(byTime).slice(0, 100);
+  const reels = p.items.filter((i) => i && i.kind === "reel").sort(byTime).slice(0, 30);
+  p.items = photos.concat(reels);
+  p.posts.sort(byTime);
+  p.posts = p.posts.slice(0, 100);
+}
+function syncAllMediaLinks() { Object.keys(profiles).forEach((ph) => syncMediaLinks(profiles[ph])); }
+
+// প্রোফাইল/কভার ছবি আপলোড হলে Photos ট্যাব ও পোস্ট ফিডেও দেখানো
+function publishProfileMediaAsPost(phone, src, host, kindLabel) {
+  if (!phone || !src) return;
+  if (!profiles[phone]) profiles[phone] = {};
+  if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+  if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
+  const ts = Date.now();
+  const itemId = "pm_" + ts.toString(36) + Math.random().toString(36).slice(2, 6);
+  const postId = "pp_" + ts.toString(36) + Math.random().toString(36).slice(2, 6);
+  const caption = kindLabel === "cover" ? "আমার নতুন কভার ছবি" : "আমার নতুন প্রোফাইল ছবি";
+  const item = {
+    id: itemId,
+    kind: "photo",
+    src,
+    host: host || "cdn",
+    name: kindLabel === "cover" ? "cover" : "profile",
+    caption,
+    timestamp: ts,
+    postId,
+    fromProfile: kindLabel === "cover" ? "cover" : "avatar",
+  };
+  const post = {
+    id: postId,
+    text: caption,
+    media: { type: "image", src, host: host || "cdn" },
+    timestamp: ts,
+    likes: [],
+    comments: [],
+    itemId,
+    fromProfile: item.fromProfile,
+  };
+  const keepReels = profiles[phone].items.filter((it) => it && it.kind === "reel");
+  const photos = [item].concat(profiles[phone].items.filter((it) => it && it.kind === "photo")).slice(0, 100);
+  profiles[phone].items = photos.concat(keepReels);
+  profiles[phone].posts.unshift(post);
+  profiles[phone].posts = profiles[phone].posts.slice(0, 100);
+  syncMediaLinks(profiles[phone]);
 }
 
 
-/* =====================================================================
-   প্রোফাইল খুললেও উপরের আইকন বার দেখা যাবে
-   ===================================================================== */
-body.dashboard-active .profile-modal-overlay {
-  top: 104px;               /* ফোন: ব্র্যান্ড বার (52) + ট্যাব বার (52) */
-  padding: 10px;
-  background: var(--bg);
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-  align-items: flex-start;
-  overflow-y: auto;
+function purgeExpiredStories() {
+  const before = stories.length;
+  const now = Date.now();
+  const expired = stories.filter((st) => st.expires <= now);
+  stories = stories.filter((st) => st.expires > now);
+  if (stories.length !== before) { saveData(); expired.forEach((st) => cleanupMedia(storyUrls(st))); }
 }
-body.dashboard-active .profile-modal {
-  max-height: none; min-height: calc(100dvh - 124px); margin: 0 auto;
-  border-radius: 18px; overflow: visible;
+setInterval(() => purgeExpiredStories(), 5 * 60 * 1000);
+setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.warn("sync media links:", e.message); } }, 1500); // প্রতি ৫ মিনিটে মেয়াদ-শেষ স্টোরি মুছে ফেলা
+let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
+let bannedUsers = {};        // phone -> { reason, time }
+let deletedHashes = {};      // sha256(id) -> 1  (শুধু হ্যাশ — মুছে ফেলা অ্যাকাউন্ট যেন পুরোনো ডিভাইস থেকে আবার তৈরি না হয়; আর কোনো তথ্য রাখা হয় না)
+let shortsData = {};         // YouTube ভিডিও আইডি -> { t, c, likes:[phone], comments:[...] }  (শুধু যেগুলোতে লাইক/কমেন্ট পড়েছে)
+let shortsPrefs = {};        // phone -> { w:{শব্দ:স্কোর}, ch:{চ্যানেল:স্কোর} }  (কার কী পছন্দ — সাজেশনের জন্য)
+let phoneAliases = {};       // পুরোনো নম্বর -> নতুন নম্বর (নম্বর বদলালে পুরোনো ডিভাইস যেন নকল অ্যাকাউন্ট না বানায়)
+
+// ================= অ্যাডমিন প্যানেল =================
+// অ্যাডমিন প্যানেলে ঢুকতে এই পাসওয়ার্ডটা লাগবে। চাইলে Render-এর Environment
+// ভ্যারিয়েবল ADMIN_PASSWORD সেট করে এটা পরিবর্তন করা যাবে (নিরাপত্তার জন্য উত্তম)।
+// ⚠️ আগে এখানে একটা ডিফল্ট পাসওয়ার্ড কোডে লেখা ছিল (GitHub-এ সবাই দেখতে পেত)। এখন ডিফল্ট নেই —
+// Render → Environment-এ ADMIN_PASSWORD সেট না করলে একটা এলোমেলো পাসওয়ার্ড তৈরি হয় যেটা কেউ অনুমান করতে পারবে না
+// (অর্থাৎ অ্যাডমিন প্যানেল কার্যত বন্ধ থাকবে)। অ্যাডমিন প্যানেল চালাতে ADMIN_PASSWORD সেট করুন।
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || nodeCrypto.randomBytes(24).toString("hex");
+if (!process.env.ADMIN_PASSWORD) console.warn("⚠️ ADMIN_PASSWORD সেট করা নেই — অ্যাডমিন প্যানেল বন্ধ। Render Environment-এ ADMIN_PASSWORD সেট করুন।");
+
+// ---------- পাসওয়ার্ড হ্যাশ (Node-এর নিজস্ব crypto.scrypt — নতুন কোনো প্যাকেজ লাগে না) ----------
+function hashPassword(pw) {
+  const salt = nodeCrypto.randomBytes(16);
+  const h = nodeCrypto.scryptSync(String(pw), salt, 32);
+  return "sc1$" + salt.toString("hex") + "$" + h.toString("hex");
 }
-@media (min-width: 900px) {
-  body.dashboard-active .profile-modal-overlay { top: 52px; padding: 16px; }
-  body.dashboard-active .profile-modal { min-height: calc(100dvh - 84px); }
+function isHashedPassword(v) {
+  return typeof v === "string" && /^sc1\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(v);
 }
-
-/* ---------- লোডিং স্প্ল্যাশ ---------- */
-#appSplash {
-  position: fixed; inset: 0; z-index: 500000; background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-  transition: opacity .3s ease;
-}
-#appSplash.hide { opacity: 0; pointer-events: none; }
-.splash-logo { font-size: 34px; font-weight: 800; letter-spacing: -1px; color: var(--brand); }
-.splash-logo span { color: var(--text); font-weight: 700; }
-.splash-spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid var(--surface-3); border-top-color: var(--brand); animation: splashSpin .8s linear infinite; }
-.splash-text { font-size: 13px; color: var(--text-3); }
-@keyframes splashSpin { to { transform: rotate(360deg); } }
-
-/* ---------- Create post ডায়ালগ ---------- */
-.cp-card { width: 100%; max-width: 480px; max-height: 96dvh; overflow-y: auto; background: var(--surface); color: var(--text); border-radius: 16px; padding: 14px; box-sizing: border-box; }
-.cp-who { display: flex; align-items: center; gap: 10px; margin: 6px 0 8px; }
-.cp-who img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-#cpText { width: 100%; box-sizing: border-box; resize: none; border: none; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; min-height: 90px; }
-.cp-preview { position: relative; border-radius: 12px; overflow: hidden; background: #000; margin: 8px 0; text-align: center; }
-.cp-preview img, .cp-preview video { max-width: 100%; max-height: 38vh; display: block; margin: 0 auto; }
-.cp-preview .post-preview-remove { position: absolute; top: 8px; right: 8px; }
-.cp-add { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 8px 0 12px; }
-.cp-add span { flex: 1; font-size: 14px; font-weight: 600; }
-.cp-add button { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--surface-2); font-size: 18px; cursor: pointer; }
-
-/* ---------- স্টোরি: সময় ও গান ---------- */
-.story-opts { margin: 4px 0 10px; display: flex; flex-direction: column; gap: 8px; }
-.story-opt-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.story-opt-row > span { flex: 0 0 auto; color: var(--text-2); font-weight: 600; }
-.story-opt-row button { border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); border-radius: 16px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.story-opt-row button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
-.story-music-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3) !important; font-weight: 500 !important; }
-#storyMusicClear { width: 28px; height: 28px; padding: 0; align-items: center; justify-content: center; border-radius: 50%; }
-.story-opts.is-video #storyDurRow, .story-opts.is-video #storyMusicRow, .story-opts.is-video audio { display: none !important; }
-.story-music-tag { position: absolute; left: 12px; top: calc(66px + env(safe-area-inset-top, 0px)); z-index: 6; color: #fff; font-size: 12px; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 12px; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-
-/* ড্যাশবোর্ড লোগো: আগের মতো বড় হাতের EKT CHATTER + টাইপ/মোছা অ্যানিমেশন + রঙিন গ্রেডিয়েন্ট */
-.dash-topbar .dash-logo { font-size: clamp(1.05rem, 4.2vw, 1.4rem); letter-spacing: 1px; }
-
-
-/* =====================================================================
-   REACTIONS (Like/Love/Care/Haha/Wow/Sad/Angry) · SHARE · REELS ACTIONS · STORY REACTIONS
-   ===================================================================== */
-.react-btn, .react-picker, .story-react-bar button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-.react-btn .rb-emoji { font-size: 17px; line-height: 1; display: inline-block; }
-.react-btn .rb-emoji.pop { animation: rbPop .35s cubic-bezier(.2, 1.6, .4, 1); }
-@keyframes rbPop { 0% { transform: scale(.4); } 60% { transform: scale(1.5); } 100% { transform: scale(1); } }
-.post-action-btn.reacted.rc-like { color: var(--brand); }
-.post-action-btn.reacted.rc-love { color: #f33e58; }
-.post-action-btn.reacted.rc-care, .post-action-btn.reacted.rc-haha, .post-action-btn.reacted.rc-wow, .post-action-btn.reacted.rc-sad { color: #f7b125; }
-.post-action-btn.reacted.rc-angry { color: #e9710f; }
-
-/* পোস্টের নিচের সামারি (ইমোজি + সংখ্যা) ও কাউন্ট */
-.react-sum { display: inline-flex; align-items: center; gap: 6px; min-height: 20px; }
-.react-sum:not(:empty) { cursor: pointer; }
-.react-sum:not(:empty):hover .rs-num { text-decoration: underline; }
-.rs-emojis { display: inline-flex; }
-.rs-emojis span { width: 20px; height: 20px; line-height: 20px; text-align: center; font-size: 13px; border-radius: 50%; background: var(--surface); border: 2px solid var(--surface); box-sizing: content-box; margin-left: -5px; }
-.rs-emojis span:first-child { margin-left: 0; }
-.post-counts { display: inline-flex; gap: 10px; }
-.post-counts span:empty { display: none; }
-
-/* ইমোজি পিকার */
-.react-picker { position: fixed; z-index: 600001; display: none; gap: 2px; padding: 6px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(8px) scale(.85); transform-origin: bottom left; transition: opacity .16s ease, transform .2s cubic-bezier(.2, 1.4, .4, 1); }
-.react-picker.show { opacity: 1; transform: none; }
-.react-picker::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 16px; }
-.rp-item { position: relative; border: none; background: none; padding: 0; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.rp-emoji { display: block; font-size: 28px; line-height: 1; transition: transform .15s cubic-bezier(.2, 1.6, .4, 1); }
-.react-picker.show .rp-emoji { animation: rpIn .32s cubic-bezier(.2, 1.6, .4, 1) both; }
-.react-picker.show .rp-item:nth-child(2) .rp-emoji { animation-delay: .03s; }
-.react-picker.show .rp-item:nth-child(3) .rp-emoji { animation-delay: .06s; }
-.react-picker.show .rp-item:nth-child(4) .rp-emoji { animation-delay: .09s; }
-.react-picker.show .rp-item:nth-child(5) .rp-emoji { animation-delay: .12s; }
-.react-picker.show .rp-item:nth-child(6) .rp-emoji { animation-delay: .15s; }
-.react-picker.show .rp-item:nth-child(7) .rp-emoji { animation-delay: .18s; }
-@keyframes rpIn { from { transform: translateY(14px) scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
-.rp-item:hover .rp-emoji, .rp-item:active .rp-emoji { transform: translateY(-9px) scale(1.4); }
-.rp-item.on .rp-emoji { transform: scale(1.18); }
-.rp-tip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px; background: rgba(0, 0, 0, .82); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; opacity: 0; pointer-events: none; white-space: nowrap; transition: opacity .12s ease; }
-.rp-item:hover .rp-tip { opacity: 1; }
-
-/* বটম-শিট (রিঅ্যাক্টর লিস্ট, শেয়ার, স্টোরি ভিউয়ার) */
-.ekt-sheet-overlay { position: fixed; inset: 0; z-index: 600000; background: rgba(0, 0, 0, .5); display: flex; align-items: flex-end; justify-content: center; }
-.ekt-sheet { width: 100%; max-width: 460px; max-height: 78dvh; background: var(--surface); color: var(--text); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; box-shadow: var(--shadow-pop); animation: ektUp .22s ease; }
-@keyframes ektUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (min-width: 700px) { .ekt-sheet-overlay { align-items: center; } .ekt-sheet { border-radius: 18px; } }
-.ekt-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; font-size: 16px; }
-.ekt-sheet-x { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--surface-3); color: var(--text); cursor: pointer; }
-.ekt-sheet-body { padding: 4px 14px 16px; overflow-y: auto; }
-.ekt-empty { text-align: center; color: var(--text-3); padding: 22px 8px; font-size: 13.5px; }
-.ekt-chips { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 10px; }
-.ekt-chips button { flex-shrink: 0; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.ekt-chips button.on { background: var(--brand); border-color: var(--brand); color: #fff; }
-.ekt-person { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-radius: 10px; cursor: pointer; }
-.ekt-person:hover { background: var(--input-bg); }
-.ekt-person b { flex: 1; font-size: 14.5px; }
-.ekt-pic { position: relative; width: 42px; height: 42px; flex-shrink: 0; }
-.ekt-pic img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: var(--surface-3); }
-.ekt-pic em { position: absolute; right: -4px; bottom: -4px; font-style: normal; font-size: 15px; line-height: 20px; width: 20px; height: 20px; text-align: center; border-radius: 50%; background: var(--surface); }
-
-/* শেয়ার শিট */
-.ekt-share-text { width: 100%; box-sizing: border-box; resize: none; border: 1px solid var(--line); background: var(--input-bg); color: var(--text); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 14px; outline: none; }
-.ekt-share-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; margin-top: 12px; }
-.ekt-share-opts button { display: flex; flex-direction: column; align-items: center; gap: 6px; border: none; background: var(--surface-2); color: var(--text); border-radius: 14px; padding: 12px 4px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.ekt-share-opts button i { width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: var(--brand); color: #fff; font-size: 16px; }
-.ekt-share-opts button:disabled { opacity: .5; }
-.ekt-share-friends { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; max-height: 240px; overflow-y: auto; }
-.ekt-send-btn { border: none; background: var(--brand); color: #fff; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.ekt-send-btn:disabled { background: var(--surface-3); color: var(--text-2); }
-
-/* শেয়ার করা পোস্টের হেডার */
-.shared-from { margin: 0 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: 10px; background: var(--input-bg); font-size: 13px; color: var(--text-2); }
-.shared-from-text { margin-top: 6px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
-
-/* মেসেজে শেয়ার করা পোস্ট/Reel কার্ড */
-.shared-card { width: 232px; max-width: 100%; border-radius: 12px; overflow: hidden; background: rgba(0, 0, 0, .14); margin-top: 4px; }
-.shared-thumb { position: relative; background: #000; cursor: pointer; }
-.shared-thumb img, .shared-thumb video { width: 100%; max-height: 220px; object-fit: cover; display: block; }
-.shared-meta { padding: 8px 10px; font-size: 13px; line-height: 1.35; }
-.shared-meta span { display: block; margin-top: 2px; font-size: 12px; opacity: .85; white-space: pre-wrap; word-break: break-word; }
-
-/* Reels: লাইক / কমেন্ট / শেয়ার */
-.reel-side { align-items: center; gap: 10px; }
-.reel-act { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.reel-count { color: #fff; font-size: 11px; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, .8); }
-.reel-round .rb-emoji { font-size: 21px; }
-.reel-round.reacted { background: rgba(255, 255, 255, .38) !important; }
-@media (max-height: 640px) { .reel-side { gap: 6px; } .reel-side button { width: 36px; height: 36px; } }
-.reel-comments { position: absolute; left: 0; right: 0; bottom: 0; height: 68%; z-index: 6; background: var(--surface); color: var(--text); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; text-align: left; animation: ektUp .22s ease; }
-.reel-cm-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; font-size: 15px; }
-.reel-comments .reel-cm-x { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--surface-3); color: var(--text); cursor: pointer; font-size: 14px; }
-.reel-cm-list { flex: 1; overflow-y: auto; padding: 4px 14px; }
-.reel-cm-empty { text-align: center; color: var(--text-3); font-size: 13px; padding: 26px 10px; }
-.reel-cm-input { display: flex; align-items: center; gap: 8px; padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
-.reel-cm-input input { flex: 1; min-width: 0; border: none; outline: none; background: var(--input-bg); color: var(--text); border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 14px; }
-.reel-comments .reel-cm-send { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--brand); color: #fff; cursor: pointer; }
-
-/* Story: রিঅ্যাকশন বার */
-.story-viewer .story-tap { bottom: 84px; }
-.story-react-bar { position: absolute; left: 0; right: 0; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 8; display: none; justify-content: center; gap: 4px; padding: 0 8px; }
-.story-react-bar button { width: 42px; height: 42px; border-radius: 50%; border: none; background: rgba(0, 0, 0, .38); font-size: 26px; line-height: 1; cursor: pointer; padding: 0; transition: transform .15s cubic-bezier(.2, 1.6, .4, 1), background .15s ease; }
-.story-react-bar button:hover, .story-react-bar button:active { transform: scale(1.25); }
-.story-react-bar button.on { background: rgba(255, 255, 255, .35); transform: scale(1.15); }
-.story-fly { position: absolute; z-index: 9; font-size: 30px; line-height: 1; pointer-events: none; animation: storyFly 1.4s ease-out both; }
-@keyframes storyFly { 0% { transform: translate(0, 0) scale(.6); opacity: 1; } 100% { transform: translate(var(--dx, 0), -320px) scale(1.5); opacity: 0; } }
-.story-foot-btn { background: rgba(0, 0, 0, .5); color: #fff; border: none; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; cursor: pointer; }
-.story-foot-btn i { font-size: 10px; margin-left: 4px; }
-
-
-/* =====================================================================
-   উন্নত টপ নেভিগেশন আইকন + Create story লেখা
-   ===================================================================== */
-.main-tabs { -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 4px 18px rgba(0, 0, 0, .10); padding: 0 4px; gap: 2px; }
-.mt-btn { border-bottom: none !important; border-radius: 14px; font-size: 19px; }
-.mt-btn i {
-  width: 46px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 17px;
-  transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
-}
-.mt-btn:hover { background: transparent; }
-.mt-btn:hover i { background: rgba(127, 127, 127, .14); transform: translateY(-1px) scale(1.06); }
-.mt-btn:active i { transform: scale(.92); }
-.mt-btn.active i {
-  background: rgba(127, 127, 127, .16);
-  background: color-mix(in srgb, var(--tc) 18%, transparent);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--tc) 35%, transparent);
-}
-.mt-btn::after {
-  content: ""; position: absolute; left: 28%; right: 28%; bottom: 0; height: 3px; border-radius: 3px 3px 0 0;
-  background: var(--tc); transform: scaleX(0); transition: transform .22s ease;
-}
-.mt-btn.active::after { transform: scaleX(1); }
-.mt-badge { left: calc(50% + 8px); top: 2px; box-shadow: 0 0 0 2px var(--surface); }
-
-.story-add .story-name {
-  left: 8px; right: 8px; bottom: 8px; padding: 5px 6px; border-radius: 999px; text-align: center;
-  background: var(--brand-grad); color: #fff; font-size: 11.5px; font-weight: 800; letter-spacing: .2px;
-  text-shadow: none; box-shadow: 0 3px 10px rgba(79, 140, 255, .45);
+function verifyPassword(pw, stored) {
+  if (typeof stored !== "string" || !stored || pw == null) return false;
+  if (isHashedPassword(stored)) {
+    const parts = stored.split("$");
+    const calc = nodeCrypto.scryptSync(String(pw), Buffer.from(parts[1], "hex"), 32);
+    return nodeCrypto.timingSafeEqual(calc, Buffer.from(parts[2], "hex"));
+  }
+  // পুরোনো (হ্যাশ হয়নি এমন) পাসওয়ার্ড — লগইনের সময় নিজে থেকেই হ্যাশে বদলে যাবে
+  const a = Buffer.from(String(pw));
+  const b = Buffer.from(stored);
+  return a.length === b.length && nodeCrypto.timingSafeEqual(a, b);
 }
 
 
-/* কভার ফ্রেম সবার জন্য একই অনুপাত (৩:১) — কারও স্ক্রিনে আলাদা অংশ কাটা পড়বে না */
-.profile-modal-cover { height: auto; aspect-ratio: 3 / 1; }
-.profile-cover-img { height: 100%; object-fit: cover; }
-
-
-/* ---------- কমেন্ট: এডিট / ডিলিট / হাইড ---------- */
-.post-comment-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.post-comment-bubble.cm-is-hidden { opacity: 0.55; border: 1px dashed var(--line-2); }
-.cm-hidden-tag, .cm-edited-tag {
-  display: inline-block; font-style: normal; font-size: 10px; font-weight: 700;
-  margin-left: 4px; padding: 1px 6px; border-radius: 999px;
-  background: var(--surface-3); color: var(--text-3); vertical-align: middle;
+// ================= অ্যাকাউন্ট সেটিংস: ইমেইল / ডিভাইস হিস্ট্রি / স্থায়ী ডিলিট =================
+function idHash(id) {
+  return nodeCrypto.createHash("sha256").update("ekt:" + String(id || "").trim().toLowerCase()).digest("hex");
 }
-.cm-hidden-tag { background: rgba(245, 158, 11, 0.18); color: var(--amber); }
-.cm-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 4px; }
-.cm-act {
-  border: none; background: transparent; color: var(--text-3);
-  font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
-  padding: 0 4px; border-radius: 6px;
+function isDeletedId(id) { return !!deletedHashes[idHash(id)]; }
+function normalizeEmail(e) {
+  const v = String(e || "").trim().toLowerCase();
+  if (!v || v.length > 120) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) ? v : "";
 }
-.cm-act:hover { color: var(--brand); background: var(--input-bg); }
-.cm-act.cm-danger:hover { color: var(--red); background: rgba(239, 68, 68, 0.1); }
-
-/* ================= Auth: Phone / Email switch ================= */
-.auth-id-switch { display: flex; gap: 6px; width: 100%; padding: 4px; margin: 4px 0 12px; border-radius: 14px; background: var(--input-bg, rgba(127,127,127,.12)); }
-.auth-id-switch button { flex: 1; border: none; padding: 9px 10px; border-radius: 10px; background: transparent; color: var(--text-2); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s; }
-.auth-id-switch button.active { background: var(--brand-grad, linear-gradient(135deg,#4f8cff,#7c5cff)); color: #fff; box-shadow: 0 4px 14px rgba(79,140,255,.35); }
-
-/* ================= Theme popup (Light / Dark) ================= */
-.thm-ov { position: fixed; inset: 0; z-index: 350000; display: flex; align-items: center; justify-content: center; padding: 18px; background: var(--overlay, rgba(0,0,0,.55)); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
-.thm-card { width: 100%; max-width: 340px; padding: 18px; border-radius: 22px; background: var(--surface); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow-card, 0 18px 50px rgba(0,0,0,.4)); }
-.thm-card h3 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
-.thm-card p { margin: 0 0 14px; font-size: 13px; color: var(--text-2); }
-.thm-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.thm-opt { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 10px 14px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface-2, transparent); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; transition: transform .12s, border-color .15s; }
-.thm-opt:active { transform: scale(.97); }
-.thm-opt .thm-ico { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-.thm-opt[data-theme="light"] .thm-ico { background: #fff4d6; color: #f59e0b; }
-.thm-opt[data-theme="dark"] .thm-ico { background: #1e2740; color: #9db4ff; }
-.thm-opt.selected { border-color: var(--brand, #4f8cff); box-shadow: 0 0 0 3px rgba(79,140,255,.22); }
-.thm-opt .thm-tick { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 50%; background: var(--brand, #4f8cff); color: #fff; font-size: 11px; display: none; align-items: center; justify-content: center; }
-.thm-opt.selected .thm-tick { display: flex; }
-
-/* ================= Settings screen ================= */
-.stg-ov { position: fixed; inset: 0; z-index: 300000; display: none; align-items: stretch; justify-content: center; background: var(--overlay, rgba(0,0,0,.55)); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
-.stg-card { width: 100%; max-width: 560px; height: 100%; display: flex; flex-direction: column; background: var(--bg, var(--surface)); color: var(--text); }
-.stg-top { display: flex; align-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) 14px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.stg-top h2 { margin: 0; font-size: 19px; font-weight: 800; }
-.stg-back { width: 38px; height: 38px; border: none; border-radius: 50%; background: var(--surface-2, rgba(127,127,127,.15)); color: var(--text); font-size: 15px; cursor: pointer; }
-.stg-body { flex: 1; overflow-y: auto; padding: 8px 14px 30px; }
-.stg-sec { margin: 18px 4px 8px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
-.stg-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.stg-row:hover { background: var(--surface-2, var(--surface)); }
-.stg-row > i:first-child { width: 36px; height: 36px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; flex: none; }
-.stg-lbl { font-size: 14.5px; font-weight: 600; flex: none; }
-.stg-val { flex: 1; min-width: 0; text-align: right; font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stg-chev { font-size: 11px; color: var(--text-3, var(--text-2)); }
-.stg-note { margin: 0 4px 10px; font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
-.stg-muted { padding: 14px; font-size: 13px; color: var(--text-2); text-align: center; }
-.stg-dev { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
-.stg-dev-ico { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--surface-2, rgba(127,127,127,.15)); color: var(--brand, #4f8cff); flex: none; }
-.stg-dev-name { font-size: 14px; font-weight: 700; }
-.stg-dev-sub { margin-top: 2px; font-size: 12px; color: var(--text-2); }
-.stg-badge { margin-left: 6px; padding: 2px 8px; border-radius: 999px; font-style: normal; font-size: 10.5px; font-weight: 800; background: rgba(34,197,94,.16); color: #16a34a; }
-
-/* ================= Small form dialog ================= */
-.ekt-form-ov { position: fixed; inset: 0; z-index: 360000; display: flex; align-items: center; justify-content: center; padding: 18px; background: var(--overlay, rgba(0,0,0,.6)); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
-.ekt-form-card { width: 100%; max-width: 380px; padding: 20px; border-radius: 22px; background: var(--surface); color: var(--text); border: 1px solid var(--line); box-shadow: var(--shadow-card, 0 18px 50px rgba(0,0,0,.4)); }
-.ekt-form-card h3 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
-.ekt-form-sub { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
-.ekt-field { display: block; margin-bottom: 12px; }
-.ekt-field span { display: block; margin-bottom: 5px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
-.ekt-field input { width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2, var(--line)); background: var(--input-bg, transparent); color: var(--text); font: inherit; font-size: 15px; outline: none; box-sizing: border-box; }
-.ekt-field input:focus { border-color: var(--brand, #4f8cff); box-shadow: var(--ring, 0 0 0 3px rgba(79,140,255,.25)); }
-.ekt-form-err { margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; background: rgba(239,68,68,.12); color: #ef4444; font-size: 13px; font-weight: 600; }
-.ekt-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
-.ekt-form-actions .btn { width: auto; min-width: 92px; margin: 0; }
-
-/* ===== বন্ধু না হলে প্রোফাইল লক ===== */
-.pm-locked-box {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; text-align: center; padding: 30px 18px; margin: 14px 0 4px;
-  border-radius: 14px; background: var(--bg-2, rgba(127,127,127,.08));
-  border: 1px dashed rgba(127,127,127,.35);
+function normalizePhoneInput(p) {
+  const v = String(p || "").replace(/[\s-]/g, "");
+  return /^\+?[0-9]{6,18}$/.test(v) ? v : "";
 }
-.pm-locked-box i { font-size: 30px; color: var(--text-3, #8a8d91); }
-.pm-locked-box b { font-size: 15px; }
-.pm-locked-box span { font-size: 12.5px; color: var(--text-3, #8a8d91); line-height: 1.5; max-width: 280px; }
-
-
-/* ===== প্রোফাইল ট্যাব সারির ⋯ মেনু (Copy link) ===== */
-.profile-tabs-row { display: flex; align-items: center; gap: 8px; margin: 16px 0 14px; }
-.profile-tabs-row .profile-tabs { margin: 0; flex: 1; min-width: 0; }
-.pm-more-wrap { position: relative; flex: none; }
-.pm-more-wrap .dots-btn { width: 38px; height: 38px; }
-.pm-more-wrap .direct-dropdown-menu { z-index: 200; min-width: 180px; }
-
-/* ===== Settings: Personal details / অপশন-শিট / ডিভাইস পপআপ ===== */
-.stg-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 14px; margin-bottom: 8px; border: 1.5px dashed var(--line-2, var(--line)); border-radius: 16px; background: transparent; color: var(--brand, #4f8cff); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.stg-add:hover { background: var(--surface-2, rgba(127,127,127,.1)); }
-.stg-add i { font-style: normal; }
-.stg-sheet { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 10px; }
-.stg-sheet-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2, var(--surface)); color: var(--text); font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; text-align: left; }
-.stg-sheet-btn i { width: 18px; text-align: center; color: var(--text-2); }
-.stg-sheet-btn.danger, .stg-sheet-btn.danger i { color: #ef4444; }
-.stg-dev-card { max-width: 440px; }
-.stg-dev-list { max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
-
-
-/* ===== প্রোফাইল: উপরে ব্যাক-অ্যারো বার (Facebook-এর মতো) + বাটন উপরে ===== */
-.pm-topbar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 18px 18px 0 0; }
-.pm-back-btn { width: 38px; height: 38px; flex: none; border: none; border-radius: 50%; background: var(--surface-2, rgba(127,127,127,.15)); color: var(--text); font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: transform .15s ease, background .2s ease; }
-.pm-back-btn:hover { background: var(--surface-3, var(--surface-2)); }
-.pm-back-btn:active { transform: scale(.92); }
-.pm-top-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pm-actions-top { margin: 12px 0 4px; }
-.pm-more-wrap { margin-left: auto; }
-
-
-/* ===== Settings ফর্মে পাসওয়ার্ড দেখার চোখ ===== */
-.ekt-field-box { position: relative; }
-.ekt-field-box input { padding-right: 46px; }
-.ekt-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--text-2); font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-.ekt-eye:hover { color: var(--text); background: var(--surface-2, rgba(127,127,127,.15)); }
-
-
-/* ===== ডিভাইস তালিকায় Log out বাটন ===== */
-.stg-dev { align-items: center; }
-.stg-dev-main { flex: 1; min-width: 0; }
-.stg-dev-out { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid rgba(239,68,68,.35); border-radius: 12px; background: rgba(239,68,68,.1); color: #ef4444; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-.stg-dev-out:hover { background: rgba(239,68,68,.18); }
-.stg-dev-out i { font-size: 12px; }
-
-
-/* ===== Reels | Shorts সুইচ ===== */
-.reel-switch { display: flex; gap: 6px; max-width: 420px; margin: 0 auto 10px; padding: 4px; background: var(--surface-3, var(--surface)); border-radius: 999px; }
-.reel-switch button { flex: 1; padding: 8px 12px; border: none; border-radius: 999px; background: transparent; color: var(--text-2); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s ease, color .2s ease; }
-.reel-switch button.active { background: linear-gradient(135deg, #f97316, #ef4444); color: #fff; box-shadow: 0 4px 14px rgba(249,115,22,.35); }
-
-/* ===== YouTube Shorts আইটেম ===== */
-.short-item .short-thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(0); background: #000; }
-.short-item .short-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
-.short-item .short-shield { position: absolute; left: 0; top: 0; right: 0; bottom: 0; z-index: 2; cursor: pointer; }
-.short-item .reel-info, .short-item .reel-side { z-index: 3; }
-.short-item .reel-info { pointer-events: none; }
-.short-yt { color: #ff0000; font-size: 26px; }
-.short-info .reel-owner { cursor: default; }
-.short-info p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.short-pause { position: absolute; z-index: 3; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: none; align-items: center; justify-content: center; font-size: 24px; pointer-events: none; }
-.short-item.paused .short-pause { display: flex; }
-
-
-/* ===== Reels / Shorts: ফোন ও ল্যাপটপে ঠিকঠাক ফিট (app.js --rh সেট করে; স্ক্রল করে নামাতে হবে না) ===== */
-#tabReels { --rh: min(calc(100dvh - 200px), 760px); }
-body.tab-reels { overflow: hidden; }
-.reel-stage { position: relative; }
-#tabReels .reels-list { height: var(--rh); width: min(100%, calc(var(--rh) * 0.5625)); max-width: 100%; margin: 0 auto; overscroll-behavior: contain; }
-#shortsList .short-item, #reelsList .reel-item { background: #000; }
-#shortsList .tp-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-
-/* YouTube প্লেয়ার: মাঝের বাটন/টাইটেল বার/লোগো লুকানো + দুই পাশের কালো দাগ ছাড়া পুরো কার্ড ভরা */
-.short-item .short-frame { pointer-events: none; transition: opacity .15s ease; }
-.short-item.paused .short-frame { opacity: 0; }
-.short-item .short-frame { inset: 0; width: 100%; height: 100%; }
-
-/* Shorts: লাইক / কমেন্ট */
-.reel-round.reacted i { color: #f97316; }
-.reel-cm-list { overscroll-behavior: contain; }
-.sh-cm { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; }
-.sh-cm-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; }
-.sh-cm-b { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.4; word-break: break-word; }
-.sh-cm-b b { display: block; font-size: 12.5px; }
-.sh-cm-del { flex: none; border: none; background: transparent; color: var(--text-3); cursor: pointer; padding: 4px 6px; }
-@media (max-height: 560px) {
-  #tabReels .reel-side { gap: 5px; bottom: 10px; }
-  #tabReels .reel-side button { width: 34px; height: 34px; font-size: 14px; }
+// লগইনে ফোন নম্বর বা ইমেইল — যেটাই দেওয়া হোক, অ্যাকাউন্টের আসল key (phone) ফেরত দেয়
+function resolveLoginPhone(idf) {
+  const s = String(idf || "").trim();
+  if (!s) return null;
+  if (users[s]) return s;
+  // দ্বিতীয় (অতিরিক্ত) নম্বর দিয়েও লগইন চলবে
+  const compact = s.replace(/[\s-]/g, "");
+  if (/^\+?[0-9]{6,18}$/.test(compact)) {
+    if (users[compact]) return compact;
+    const ua = Object.values(users).find((x) => x && x.altNum === compact);
+    if (ua) return ua.phone;
+  }
+  const em = s.toLowerCase();
+  if (em.indexOf("@") > 0) {
+    const u = Object.values(users).find((x) => x && x.email === em);
+    if (u) return u.phone;
+  }
+  return null;
+}
+// কোনো অ্যাকাউন্টের দ্বিতীয় নম্বর হিসেবে এই নম্বর আছে কি না (exceptPhone-এর নিজেরটা বাদে)
+function altTaken(num, exceptPhone) {
+  if (!num) return false;
+  return Object.values(users).some((x) => x && x.altNum === num && x.phone !== exceptPhone);
+}
+function emailTaken(em, exceptPhone) {
+  if (!em) return false;
+  if (users[em] && users[em].phone !== exceptPhone) return true;
+  return Object.values(users).some((x) => x && x.email === em && x.phone !== exceptPhone);
+}
+function selfUserPayload(user, password) {
+  const copy = { ...user };
+  delete copy.loginHistory;
+  delete copy.revoked;
+  copy.password = String(password);
+  copy.pid = pidOf(user.phone); // নিজের প্রোফাইল লিংক বানাতে
+  return copy;
 }
 
-/* Shorts: ভিডিওর ভেতরে কোনো বাটনই দেখা যাবে না — শুধু ট্যাপে বন্ধ/চালু */
-.short-item .short-pause { display: none !important; }
-.short-item .short-frame { pointer-events: none !important; }
+function getClientIp(sock) {
+  try {
+    const h = sock.handshake || {};
+    const xf = (h.headers && h.headers["x-forwarded-for"]) || "";
+    const ip = String(xf).split(",")[0].trim() || h.address || "";
+    return String(ip).replace(/^::ffff:/, "").slice(0, 64);
+  } catch (e) { return ""; }
+}
+function parseDevice(ua) {
+  ua = String(ua || "");
+  let os = "Unknown OS";
+  if (/Android/i.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = "iOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = "macOS";
+  else if (/CrOS/i.test(ua)) os = "ChromeOS";
+  else if (/Linux/i.test(ua)) os = "Linux";
+  let br = "Browser";
+  if (/Edg\//i.test(ua)) br = "Edge";
+  else if (/OPR\/|Opera/i.test(ua)) br = "Opera";
+  else if (/SamsungBrowser/i.test(ua)) br = "Samsung Internet";
+  else if (/Firefox\//i.test(ua)) br = "Firefox";
+  else if (/Chrome\//i.test(ua) || /CriOS/i.test(ua)) br = "Chrome";
+  else if (/Safari\//i.test(ua)) br = "Safari";
+  return br + " · " + os;
+}
+// প্রতিটা ডিভাইস একবার করে থাকে (deviceId দিয়ে); লগইন/সাইনআপ হলে "lastLogin" বদলায়, অ্যাপ খুললে "lastSeen"
+function recordDevice(user, sock, deviceId, method) {
+  if (!user) return;
+  if (!Array.isArray(user.loginHistory)) user.loginHistory = [];
+  const ua = (sock && sock.handshake && sock.handshake.headers && sock.handshake.headers["user-agent"]) || "";
+  const id = String(deviceId || "").slice(0, 64) || ("ua_" + idHash(ua).slice(0, 12));
+  const now = Date.now();
+  if (method !== "session" && user.revoked) delete user.revoked[id]; // নতুন করে লগইন করলে আবার অনুমতি
+  const ip = getClientIp(sock);
+  const device = parseDevice(ua);
+  let e = user.loginHistory.find((x) => x && x.deviceId === id);
+  if (e) {
+    e.ip = ip; e.device = device; e.lastSeen = now;
+    if (method !== "session") { e.lastLogin = now; e.method = method; }
+  } else {
+    user.loginHistory.push({ deviceId: id, device, ip, method, firstLogin: now, lastLogin: now, lastSeen: now });
+  }
+  user.loginHistory.sort((a, b) => (b.lastLogin || 0) - (a.lastLogin || 0));
+  user.loginHistory = user.loginHistory.slice(0, 20);
+}
+// ডিভাইস -> তার চালু সকেটগুলো (রিমোট লগআউটে ওই ডিভাইসকে সাথে সাথে বের করে দিতে)
+const deviceSockets = {};    // "phone|deviceId" -> Set(socket.id)
+const socketDevice = {};     // socket.id -> "phone|deviceId"
+function devKey(phone, did) { return String(phone) + "|" + String(did || "").slice(0, 64); }
+function bindDeviceSocket(socket, phone, did) {
+  const d = String(did || "").slice(0, 64);
+  if (!phone || !d) return;
+  const k = devKey(phone, d);
+  const old = socketDevice[socket.id];
+  if (old && old !== k && deviceSockets[old]) { deviceSockets[old].delete(socket.id); if (!deviceSockets[old].size) delete deviceSockets[old]; }
+  if (!deviceSockets[k]) deviceSockets[k] = new Set();
+  deviceSockets[k].add(socket.id);
+  socketDevice[socket.id] = k;
+}
+function unbindDeviceSocket(socket) {
+  const k = socketDevice[socket.id];
+  if (k && deviceSockets[k]) { deviceSockets[k].delete(socket.id); if (!deviceSockets[k].size) delete deviceSockets[k]; }
+  delete socketDevice[socket.id];
+}
+function isRevokedDevice(phone, did) {
+  const u = users[phone];
+  return !!(u && did && u.revoked && u.revoked[String(did).slice(0, 64)]);
+}
+function devRef(did) { return idHash("dev:" + did).slice(0, 16); }
 
-/* Reels স্ক্রিন বড় করা: "Reels" লেখা সরানো, আপলোড বাটন ওপরে ডানে — পুরো জায়গা কার্ড পাবে */
-#tabReels { position: relative; padding-top: 6px; }
-#tabReels .tp-head h3 { display: none; }
-#tabReels .tp-head { margin: 0 4px 6px; justify-content: flex-end; }
-#tabReels .tp-head-btns button { width: 32px; height: 32px; font-size: 14px; }
-#tabReels .reel-switch { margin-bottom: 8px; }
-@media (min-width: 900px) {
-  #tabReels { padding-top: 8px; }
-  #tabReels .tp-head { position: absolute; right: 6px; top: 12px; margin: 0; z-index: 5; }
+function touchDevice(phone, deviceId) {
+  const u = users[phone];
+  if (!u || !deviceId || !Array.isArray(u.loginHistory)) return;
+  const e = u.loginHistory.find((x) => x && x.deviceId === String(deviceId).slice(0, 64));
+  if (!e) return;
+  const now = Date.now();
+  if (now - (e.lastSeen || 0) > 5 * 60 * 1000) { e.lastSeen = now; saveData(); }
 }
 
-/* ===== শেষ আপডেট: সাউন্ড বাটন উপরের কোণায়, ডানে শুধু Like / Comment / Share ===== */
-.reel-item .reel-sound-top { position: absolute; top: 10px; right: 10px; z-index: 5; width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(0,0,0,.42); color: #fff; font-size: 15px; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.short-info { padding-right: 70px; }
+// ---------- নম্বর বদলালে: সব জায়গায় পুরোনো নম্বর -> নতুন নম্বর ----------
+function renamePhoneEverywhere(oldP, newP) {
+  const swap = (v) => (v === oldP ? newP : v);
+  const swapKey = (obj) => {
+    if (obj && Object.prototype.hasOwnProperty.call(obj, oldP)) { obj[newP] = obj[oldP]; delete obj[oldP]; }
+  };
+  const u = users[oldP];
+  delete users[oldP];
+  u.phone = newP;
+  users[newP] = u;
 
-/* Reels | Shorts সুইচ: ছোট ও উপরে চাপানো */
-#tabReels .reel-switch { max-width: 280px; padding: 3px; margin: 0 auto 6px; }
-#tabReels .reel-switch button { padding: 5px 10px; font-size: 13px; }
-#tabReels { padding-top: 4px; }
-@media (min-width: 900px) { #tabReels { padding-top: 4px; } }
+  delete profiles[newP];
+  [friendships, friendRequests, blockedUsers].forEach((st) => delete st[newP]);
+  swapKey(profiles);
+  swapKey(bannedUsers);
+  [friendships, friendRequests, blockedUsers].forEach((st) => {
+    swapKey(st);
+    Object.keys(st).forEach((k) => {
+      const set = st[k];
+      if (set && set.has && set.has(oldP)) { set.delete(oldP); set.add(newP); }
+    });
+  });
 
-/* Shorts: শুরুর কয়েক সেকেন্ড (YouTube-এর নিজের বাটন/টাইটেল ভেসে থাকার সময়) প্লেয়ার লুকানো, থাম্বনেইল দেখা যায় */
-.short-item .short-frame.hold { opacity: 0; }
-.short-item .short-frame { transition: opacity .25s ease; }
+  Object.keys(directMessages).forEach((key) => {
+    const parts = key.split("|");
+    if (!parts.includes(oldP)) return;
+    const list = directMessages[key] || [];
+    delete directMessages[key];
+    list.forEach((m) => {
+      if (!m) return;
+      m.senderPhone = swap(m.senderPhone);
+      m.receiverPhone = swap(m.receiverPhone);
+      if (m.shared && m.shared.ownerPhone === oldP) m.shared.ownerPhone = newP;
+    });
+    const nk = directKey(...parts.map(swap));
+    directMessages[nk] = (directMessages[nk] || []).concat(list).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  });
+  Object.keys(directThemes).forEach((key) => {
+    const parts = key.split("|");
+    if (!parts.includes(oldP)) return;
+    const t = directThemes[key];
+    delete directThemes[key];
+    directThemes[directKey(...parts.map(swap))] = t;
+  });
 
-/* Shorts: YouTube-এর মাঝের প্লে/পজ বাটন ঢাকার জন্য — ঝুঁকির সময়টুকুতে মাঝখানে ছোট গোল অংশ কেটে নিচের থাম্বনেইল দেখানো হয় */
-.short-item .short-frame.nobtn {
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
-  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
+  Object.values(profiles).forEach((pr) => {
+    ((pr && pr.posts) || []).forEach((post) => {
+      if (!post) return;
+      if (Array.isArray(post.likes)) post.likes = post.likes.map(swap);
+      swapKey(post.reacts);
+      (post.comments || []).forEach((c) => { if (c && c.authorPhone === oldP) c.authorPhone = newP; });
+      if (post.sharedFrom && post.sharedFrom.ownerPhone === oldP) post.sharedFrom.ownerPhone = newP;
+    });
+  });
+  stories.forEach((st) => {
+    st.phone = swap(st.phone);
+    if (Array.isArray(st.views)) st.views = st.views.map(swap);
+    if (Array.isArray(st.likes)) st.likes = st.likes.map(swap);
+    swapKey(st.reacts);
+  });
+  reports.forEach((r) => { r.fromPhone = swap(r.fromPhone); r.storyOwner = swap(r.storyOwner); });
+
+  if (phoneToSocket[oldP]) { phoneToSocket[newP] = phoneToSocket[oldP]; delete phoneToSocket[oldP]; }
+  Object.keys(socketToPhone).forEach((k) => { if (socketToPhone[k] === oldP) socketToPhone[k] = newP; });
+  Object.keys(roomMembers).forEach((rc) => {
+    roomMembers[rc].forEach((m) => { if (m && m.user && m.user.phone === oldP) m.user = { ...m.user, phone: newP }; });
+  });
+
+  Object.keys(phoneAliases).forEach((k) => { if (phoneAliases[k] === oldP) phoneAliases[k] = newP; });
+  phoneAliases[oldP] = newP;
+  delete phoneAliases[newP];
+  delete deletedHashes[idHash(newP)];
 }
+
+// ---------- অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলা (কোনো হিস্ট্রি/ডেটা রাখা হয় না) ----------
+function purgeUserCompletely(phone) {
+  const delPid = pidOf(phone); // মুছে ফেলার আগেই pid নিয়ে রাখা — বন্ধুদের ক্লায়েন্ট এটা দিয়েই চিনবে
+  const u = users[phone] || {};
+  const p = profiles[phone] || {};
+  const urls = [u.pic, p.cover];
+  (p.posts || []).forEach((x) => { if (x && x.media) urls.push(x.media.src); });
+  (p.items || []).forEach((x) => { if (x) urls.push(x.src); });
+  stories.filter((st) => st.phone === phone).forEach((st) => storyUrls(st).forEach((x) => urls.push(x)));
+  const formerFriends = Array.from(ensureSet(friendships, phone));
+
+  delete users[phone];
+  delete profiles[phone];
+  delete bannedUsers[phone];
+  [friendships, friendRequests, blockedUsers].forEach((st) => {
+    delete st[phone];
+    Object.keys(st).forEach((k) => { if (st[k] && st[k].delete) st[k].delete(phone); });
+  });
+  Object.keys(directMessages).forEach((key) => { if (key.split("|").includes(phone)) delete directMessages[key]; });
+  Object.keys(directThemes).forEach((key) => { if (key.split("|").includes(phone)) delete directThemes[key]; });
+
+  stories = stories.filter((st) => st.phone !== phone);
+  delete shortsPrefs[phone];
+  Object.keys(shortsData).forEach((id) => { const d = shortsData[id]; d.likes = (d.likes || []).filter((x) => x !== phone); d.comments = (d.comments || []).filter((c) => c.authorPhone !== phone); });
+  stories.forEach((st) => {
+    if (Array.isArray(st.views)) st.views = st.views.filter((x) => x !== phone);
+    if (Array.isArray(st.likes)) st.likes = st.likes.filter((x) => x !== phone);
+    if (st.reacts) delete st.reacts[phone];
+  });
+  Object.values(profiles).forEach((pr) => {
+    ((pr && pr.posts) || []).forEach((post) => {
+      if (!post) return;
+      if (Array.isArray(post.likes)) post.likes = post.likes.filter((x) => x !== phone);
+      if (post.reacts) delete post.reacts[phone];
+      if (Array.isArray(post.comments)) post.comments = post.comments.filter((c) => !c || c.authorPhone !== phone);
+      if (post.sharedFrom && post.sharedFrom.ownerPhone === phone) post.sharedFrom.ownerName = "Deleted user";
+    });
+  });
+  reports = reports.filter((r) => r && r.fromPhone !== phone && r.storyOwner !== phone);
+
+  const sid = phoneToSocket[phone];
+  delete phoneToSocket[phone];
+  Object.keys(socketToPhone).forEach((k) => { if (socketToPhone[k] === phone) delete socketToPhone[k]; });
+  Object.keys(roomMembers).forEach((rc) => {
+    const mp = roomMembers[rc];
+    let changed = false;
+    mp.forEach((m, k) => { if (m && m.user && m.user.phone === phone) { mp.delete(k); changed = true; } });
+    if (changed) broadcastRoomMembers(rc);
+  });
+  Object.keys(phoneAliases).forEach((k) => { if (k === phone || phoneAliases[k] === phone) delete phoneAliases[k]; });
+
+  // শুধু একটা এক-মুখী হ্যাশ — যাতে মুছে ফেলা অ্যাকাউন্ট পুরোনো ডিভাইস থেকে আবার জীবিত না হয়
+  deletedHashes[idHash(phone)] = 1;
+  if (u.email) deletedHashes[idHash(u.email)] = 1;
+  if (u.altNum) deletedHashes[idHash(u.altNum)] = 1;
+
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  enqueueSave();
+  cleanupMedia(urls);
+  formerFriends.forEach((fp) => {
+    sendFriendData(fp);
+    const fs2 = phoneToSocket[fp];
+    if (fs2) { sendTo(fs2, "friend-profile-updated", { phone: delPid }); sendTo(fs2, "stories-updated"); }
+  });
+  return sid;
+}
+
+// ক্লায়েন্ট থেকে আসা ইউজার-ডেটা মার্জ করার নিরাপদ উপায়:
+// শুধু name/pic/phone নেওয়া হয়। পাসওয়ার্ড শুধু তখনই সেট হয় যখন ওই অ্যাকাউন্টে আগে থেকে পাসওয়ার্ড নেই
+// (নতুন রেজিস্ট্রেশন বা সার্ভার ডেটা হারালে রিকভারি)। আগে যে কেউ অন্যের ফোন নম্বর দিয়ে তার পাসওয়ার্ড বদলে দিতে পারত।
+function mergeClientUser(u) {
+  if (!u || typeof u.phone !== "string" || !u.phone) return null;
+  if (isDeletedId(u.phone) || phoneAliases[u.phone]) return null; // মুছে ফেলা / নম্বর-বদলানো অ্যাকাউন্ট আর তৈরি হবে না
+  const existing = users[u.phone] || {};
+  const merged = { ...existing, phone: u.phone };
+  if (typeof u.name === "string") merged.name = u.name.slice(0, 80);
+  if (typeof u.pic === "string") merged.pic = u.pic;
+  if (!existing.password && typeof u.password === "string" && u.password) {
+    merged.password = hashPassword(u.password);
+  }
+  if (!existing.email) {
+    const em = normalizeEmail(u.email);
+    if (em && !emailTaken(em, u.phone)) merged.email = em;
+  }
+  users[u.phone] = merged;
+  return merged;
+}
+
+const roomMembers = {};      // roomCode -> Map(socket.id -> { user, peerId })
+const phoneToSocket = {};    // phone -> socket.id
+const socketToPhone = {};    // socket.id -> phone
+const socketToRoom = {};     // socket.id -> roomCode
+
+// ================= গোপনীয়তা: ফোন নম্বর / ইমেইল অন্য ইউজারকে দেখানো হয় না =================
+// প্রতিটা ইউজারের একটা এলোমেলো পাবলিক আইডি (pid) থাকে। সার্ভার যা-ই পাঠাক, প্রাপকের নিজের
+// নম্বর/ইমেইল ছাড়া বাকি সব নম্বর-ইমেইল pid দিয়ে বদলে যায় (শুধু অ্যাডমিন আসল তথ্য দেখে)।
+// ক্লায়েন্ট থেকে pid এলে সার্ভার আবার আসল নম্বরে ফিরিয়ে নেয় — তাই ফ্রেন্ড/চ্যাট/কল আগের মতোই চলে।
+const PID_RE = /^u[0-9a-f]{16}$/;
+const PHONE_KEY_RE = /phone/i;
+const EMAIL_KEY_RE = /^e-?mail/i;
+const FREE_TEXT_KEYS = new Set(["text", "message", "caption", "content", "bio", "about", "reason", "fileContent"]);
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+let pidToPhone = {};
+const selfPhoneBySocket = {};   // socket.id -> এই সকেটের নিজের ফোন/ইমেইল-আইডি
+const adminSockets = new Set(); // সফলভাবে অ্যাডমিন-লগইন করা সকেট
+
+function pidOf(id) {
+  const s = String(id);
+  if (PID_RE.test(s)) return s;
+  const u = hasOwn(users, s) ? users[s] : null;
+  if (u) {
+    if (!u.pid || !PID_RE.test(u.pid)) u.pid = "u" + nodeCrypto.randomBytes(8).toString("hex");
+    pidToPhone[u.pid] = s;
+    return u.pid;
+  }
+  return "x" + idHash(s).slice(0, 16); // মুছে ফেলা/অজানা — আর ফেরত যায় না
+}
+function rebuildPidMap() {
+  pidToPhone = {};
+  Object.keys(users).forEach((k) => { if (users[k]) pidOf(k); });
+}
+function phoneFromPid(pid) {
+  let p = pidToPhone[pid];
+  if (!(p && hasOwn(users, p) && users[p].pid === pid)) {
+    rebuildPidMap();
+    p = pidToPhone[pid];
+  }
+  return p && hasOwn(users, p) && users[p].pid === pid ? p : null;
+}
+
+// ক্লায়েন্ট → সার্ভার: pid থাকলে আসল ফোনে ফিরিয়ে নেওয়া (জায়গাতেই বদলায়)
+function unscrubIn(v, depth) {
+  if (typeof v === "string") return v.length === 17 && PID_RE.test(v) ? (phoneFromPid(v) || v) : v;
+  if (!v || typeof v !== "object" || depth > 10 || Buffer.isBuffer(v)) return v;
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = unscrubIn(v[i], depth + 1); return v; }
+  Object.keys(v).forEach((k) => { v[k] = unscrubIn(v[k], depth + 1); });
+  return v;
+}
+
+// সার্ভার → ক্লায়েন্ট: প্রাপকের নিজেরটা ছাড়া সব নম্বর/ইমেইল সরানো
+function scrubWalk(v, key, self, depth) {
+  if (typeof v === "string") {
+    if (v.length > 128 || v === self || PID_RE.test(v)) return v;
+    if (hasOwn(users, v) && !FREE_TEXT_KEYS.has(key)) return pidOf(v);
+    if (key && PHONE_KEY_RE.test(key) && v && v !== "unknown") return pidOf(v);
+    return v;
+  }
+  if (!v || typeof v !== "object" || depth > 12 || Buffer.isBuffer(v)) return v;
+  if (Array.isArray(v)) return v.map((x) => scrubWalk(x, key, self, depth + 1));
+  const selfObj = !!self && v.phone === self;
+  const out = {};
+  Object.keys(v).forEach((k) => {
+    if (EMAIL_KEY_RE.test(k) && !selfObj) return; // অন্যের ইমেইল কখনোই না
+    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId" || k === "altNum" || k === "revoked") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
+    const nk = hasOwn(users, k) && k !== self ? pidOf(k) : k; // reacts ইত্যাদি map-এর key
+    out[nk] = scrubWalk(v[k], k, self, depth + 1);
+  });
+  return out;
+}
+// এই সকেটের আসল ইউজার (ক্লায়েন্টের পাঠানো viewerPhone বিশ্বাস করা হয় না — নকল করা যায়)
+function viewerOf(sock) { return selfPhoneBySocket[sock.id] || socketToPhone[sock.id] || ""; }
+function areFriends(a, b) { return !!a && !!b && ensureSet(friendships, a).has(b); }
+function canSeeContent(sock, ownerPhone) {
+  if (adminSockets.has(sock.id)) return true;
+  const v = viewerOf(sock);
+  return !!v && (v === ownerPhone || areFriends(v, ownerPhone));
+}
+function recipientPhone(sid) { return selfPhoneBySocket[sid] || socketToPhone[sid] || ""; }
+function outboundFor(sid, data, forceRaw) {
+  if (forceRaw || adminSockets.has(sid)) return data;
+  return scrubWalk(data, "", recipientPhone(sid), 0);
+}
+function setSelf(sock, phone) { if (phone) selfPhoneBySocket[sock.id] = phone; }
+function sendTo(sid, ev, data) {
+  if (data === undefined) io.to(sid).emit(ev);
+  else io.to(sid).emit(ev, outboundFor(sid, data));
+}
+function emitRoom(roomCode, ev, data, exceptSid) {
+  const room = io.sockets.adapter.rooms.get(roomCode);
+  if (!room) return;
+  Array.from(room).forEach((sid) => { if (sid !== exceptSid) sendTo(sid, ev, data); });
+}
+function emitAdmins(ev, data) {
+  adminSockets.forEach((sid) => io.to(sid).emit(ev, data));
+}
+
+function setsToArrays(obj) {
+  const out = {};
+  for (const key in obj) out[key] = Array.from(obj[key]);
+  return out;
+}
+
+function arraysToSets(obj) {
+  const out = {};
+  if (!obj) return out;
+  for (const key in obj) out[key] = new Set(obj[key] || []);
+  return out;
+}
+
+function trimMessages(store) {
+  const out = {};
+  for (const key in store) {
+    const list = store[key] || [];
+    out[key] = list.slice(-MAX_SAVED_MESSAGES);
+  }
+  return out;
+}
+
+// ================= স্থায়ী স্টোরেজ (MongoDB Atlas — ফ্রি) =================
+// MONGODB_URI সেট করা থাকলে সব ডেটা MongoDB-তে সেভ হবে, তাই Render রিস্টার্ট/ডিপ্লয় হলেও
+// ইউজার অ্যাকাউন্ট, ফ্রেন্ড লিস্ট, প্রোফাইল, মেসেজ মুছবে না — এবং যেকোনো ফোন থেকে লগইন চলবে।
+// সেট করা না থাকলে আগের মতোই app-data.json ফাইলে সেভ হবে।
+const MONGODB_URI = process.env.MONGODB_URI || "";
+let mongoCol = null;
+const lastSavedJson = {}; // key -> শেষবার যে JSON সেভ হয়েছে (বদলায়নি এমন অংশ আবার লেখা এড়াতে)
+
+async function connectMongo() {
+  if (!MONGODB_URI) return;
+  const { MongoClient } = require("mongodb");
+  const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 15000 });
+  await client.connect();
+  mongoCol = client.db(process.env.MONGODB_DB || "ektchatter").collection("appdata");
+  console.log("✅ MongoDB connected — user data is now persistent.");
+}
+
+async function readStoredData() {
+  if (mongoCol) {
+    const docs = await mongoCol.find({}).toArray();
+    if (docs.length) {
+      const raw = {};
+      docs.forEach((d) => {
+        try {
+          raw[d._id] = JSON.parse(d.json);
+          lastSavedJson[d._id] = d.json;
+        } catch (e) {
+          console.error("Bad stored doc for key", d._id, e.message);
+        }
+      });
+      return raw;
+    }
+    console.log("MongoDB is empty — trying to seed from local app-data.json (if any).");
+  }
+  if (!fs.existsSync(DATA_FILE)) return null;
+  return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+}
+
+async function loadData() {
+  const raw = await readStoredData();
+  if (!raw) return;
+  users = raw.users || {};
+  // আগে সেভ হওয়া পুরোনো প্লেইন-টেক্সট পাসওয়ার্ডগুলো একবার হ্যাশে বদলে ফেলা
+  let migrated = 0;
+  Object.keys(users).forEach((p) => {
+    const u = users[p];
+    if (u && typeof u.password === "string" && u.password && !isHashedPassword(u.password)) {
+      u.password = hashPassword(u.password);
+      migrated++;
+    }
+  });
+  if (migrated) { console.log("Password hashed for " + migrated + " existing users."); setTimeout(saveData, 0); }
+  friendships = arraysToSets(raw.friendships);
+  friendRequests = arraysToSets(raw.friendRequests);
+  blockedUsers = arraysToSets(raw.blockedUsers);
+  directMessages = raw.directMessages || {};
+  roomMessages = raw.roomMessages || {};
+  profiles = raw.profiles || {};
+  directThemes = raw.directThemes || {};
+  reports = raw.reports || [];
+  stories = raw.stories || [];
+  bannedUsers = raw.bannedUsers || {};
+  deletedHashes = raw.deletedIds || {};
+  phoneAliases = raw.phoneAliases || {};
+  shortsData = raw.shortsData || {};
+  shortsPrefs = raw.shortsPrefs || {};
+  try { rebuildPidMap(); setTimeout(saveData, 0); } catch (e) { console.warn("pid init:", e.message); }
+  console.log("Saved data loaded successfully.");
+  try {
+    const postCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).posts) || []).length, 0);
+    const itemCount = Object.keys(profiles).reduce((n, p) => n + (((profiles[p] || {}).items) || []).length, 0);
+    console.log(`📊 Loaded: users=${Object.keys(users).length}, profiles=${Object.keys(profiles).length}, posts=${postCount}, photos=${itemCount}, stories=${stories.length}`);
+  } catch (e) {}
+}
+
+function buildPayload() {
+  return {
+    users,
+    friendships: setsToArrays(friendships),
+    friendRequests: setsToArrays(friendRequests),
+    blockedUsers: setsToArrays(blockedUsers),
+    directMessages: trimMessages(directMessages),
+    roomMessages: trimMessages(roomMessages),
+    profiles,
+    directThemes,
+    stories,
+    reports: reports.slice(-300), // সর্বশেষ ৩০০টা রিপোর্ট রাখা হয়
+    bannedUsers,
+    deletedIds: deletedHashes,
+    phoneAliases,
+    shortsData,
+    shortsPrefs,
+  };
+}
+
+async function persistPayload() {
+  const payload = buildPayload();
+  if (mongoCol) {
+    const ops = [];
+    const pending = {};
+    for (const key of Object.keys(payload)) {
+      const json = JSON.stringify(payload[key]);
+      if (lastSavedJson[key] === json) continue;
+      pending[key] = json;
+      ops.push({
+        replaceOne: {
+          filter: { _id: key },
+          replacement: { json, updated: new Date() },
+          upsert: true,
+        },
+      });
+    }
+    if (ops.length) {
+      await mongoCol.bulkWrite(ops);
+      Object.assign(lastSavedJson, pending);
+      console.log("💾 Saved to MongoDB:", Object.keys(pending).join(", "));
+    }
+    return;
+  }
+  fs.writeFileSync(DATA_FILE, JSON.stringify(payload));
+}
+
+// একসাথে দুটো সেভ যেন ওভারল্যাপ না করে — লাইন ধরে একটার পর একটা চলবে
+let saveChain = Promise.resolve();
+function enqueueSave() {
+  saveChain = saveChain
+    .then(persistPayload)
+    .catch((e) => console.error("Could not save data:", e.message));
+  return saveChain;
+}
+
+let saveTimer = null;
+function saveData() {
+  // বারবার ডিস্কে/ডাটাবেসে লেখা এড়াতে অল্প সময় অপেক্ষা করে একসাথে সেভ করা হয়
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    enqueueSave();
+  }, 1500);
+}
+
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch (e) {
+  console.error("Could not prepare DATA_DIR:", e.message);
+}
+console.log(
+  MONGODB_URI
+    ? "Using MongoDB for persistent storage."
+    : process.env.DATA_DIR
+    ? `Using persistent DATA_DIR: ${DATA_DIR} (user data will survive redeploys)`
+    : `⚠️ No DATA_DIR set — using ephemeral local folder for app-data.json. ` +
+      `User accounts WILL be lost on redeploy/restart unless you add a Render ` +
+      `Persistent Disk and set the DATA_DIR env var to its mount path.`
+);
+
+// সার্ভার বন্ধ হওয়ার আগে শেষবার সেভ করা
+["SIGINT", "SIGTERM"].forEach((sig) => {
+  process.on(sig, async () => {
+    setTimeout(() => process.exit(0), 8000).unref(); // আটকে গেলে জোর করে বন্ধ
+    try {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      await enqueueSave();
+    } catch (e) {}
+    process.exit(0);
+  });
+});
+
+function ensureSet(obj, key) {
+  if (!obj[key]) obj[key] = new Set();
+  return obj[key];
+}
+
+function directKey(phoneA, phoneB) {
+  return [phoneA, phoneB].sort().join("|");
+}
+
+function publicUser(phone) {
+  const u = users[phone];
+  if (!u) return { phone, name: "Unknown", pic: "https://via.placeholder.com/100" };
+  return { name: u.name, phone: u.phone, pic: u.pic };
+}
+
+function getFriendPayload(phone) {
+  return {
+    requests: Array.from(ensureSet(friendRequests, phone)).map(publicUser),
+    friends: Array.from(ensureSet(friendships, phone)).map(publicUser),
+  };
+}
+
+function sendFriendData(phone) {
+  const socketId = phoneToSocket[phone];
+  if (!socketId) return;
+  sendTo(socketId, "friend-list-updated", getFriendPayload(phone));
+}
+
+function broadcastRoomMembers(roomCode) {
+  const membersMap = roomMembers[roomCode];
+  const members = membersMap
+    ? Array.from(membersMap.values()).map((m) => ({
+        name: m.user.name,
+        phone: m.user.phone,
+        pic: m.user.pic,
+      }))
+    : [];
+  emitRoom(roomCode, "room-members-update", members);
+}
+
+// ---------- YouTube Shorts ফিড ----------
+// ভিডিও আমাদের সার্ভারে আসে না — শুধু ভিডিও আইডি + টাইটেল মনে রাখা হয় (কয়েক বাইট)। ভিডিও চলে সরাসরি
+// YouTube-এর প্লেয়ার থেকে। YOUTUBE_API_KEY Render-এর Environment-এ সেট করতে হয়।
+// খরচ: প্রতি রিফ্রেশে ৪টা সার্চ (৪০০ কোটা) — ছয় ঘণ্টায় একবার, তাই দিনের ১০,০০০ কোটার অনেক নিচে থাকে।
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || "";
+// টপিক লেখার নিয়ম: "ভাষা:সার্চ-লেখা" (bn = বাংলা, hi = হিন্দি, en = ইংরেজি)। ভাষা না দিলে সব ভাষা।
+// Render-এ SHORTS_TOPICS দিলে কমা দিয়ে আলাদা করে নিজের টপিক বসানো যায়।
+const SHORTS_TOPICS = (process.env.SHORTS_TOPICS
+  ? process.env.SHORTS_TOPICS.split(",").map((x) => x.trim()).filter(Boolean)
+  : [
+    // টপিকের নিয়ম: bn:/hi: = বাংলা/হিন্দি · x: = বিদেশি (চীন/কোরিয়া ইত্যাদি) — গান/ইমোশন/অ্যাকশন · a: = অ্যানিমে (যেকোনো ভাষা) · বিনা প্রিফিক্স = বাংলা/হিন্দি/উর্দু অডিও বা গানের ভিডিও
+    // বাংলাদেশের টিকটক-ধাঁচের ভিডিও
+    "bn:bangladeshi tiktok viral shorts", "bn:bangla tiktok video shorts", "bn:bd tiktok trending shorts", "bn:bangla tiktok funny shorts",
+    // বাংলাদেশের কমেডিয়ান / কমেডি
+    "bn:bangla comedy shorts", "bn:bangladeshi comedian funny shorts", "bn:bangla funny video shorts", "bn:bangla natok funny shorts", "bn:বাংলা ফানি ভিডিও", "bn:bangla funny dubbing shorts",
+    // গানে টিকটক / নাচ (মেয়েদের)
+    "bn:bangla song tiktok dance shorts", "bn:bangladeshi girl dance song tiktok shorts", "bn:bangla lip sync song shorts", "bn:bangla viral dance shorts", "viral tiktok dance song shorts", "bollywood song dance shorts",
+    // নতুন ভাইরাল টিকটক (ইউটিউবে)
+    "viral tiktok trend shorts", "new viral tiktok shorts", "hi:viral reels hindi shorts", "bn:new viral bangla shorts",
+    // ওমর
+    "bn:omor on fire shorts", "bn:omor funny shorts",
+    // কাপল / প্রেম
+    "bn:bangla romantic couple video shorts", "bn:bangladeshi romantic couple shorts", "bn:bangla couple romantic song shorts", "hi:romantic couple video shorts", "hi:romantic couple song status shorts", "x:chinese romantic couple shorts", "x:korean romantic couple shorts", "romantic couple shorts", "bn:bangla couple video shorts", "bn:bangladeshi couple cute shorts", "bn:bangla love story shorts", "bn:bangla romantic song status shorts", "hi:couple goals shorts", "hi:love song status shorts",
+    // স্যাড / ইমোশনাল / শায়ারি
+    "bn:bangla sad status shorts", "bn:bangla sad song status shorts", "bn:bangla emotional status shorts", "bn:bangla shayari status shorts",
+    "hi:sad shayari shorts", "hi:love shayari status shorts", "hi:shayari shorts", "hi:sad song status shorts", "hi:jealousy love song status shorts", "hi:emotional status shorts",
+    // হালকা মজা / গেমিং (বাংলা-হিন্দি)
+    "hi:hindi comedy shorts", "hi:funny hindi video shorts", "hi:desi comedy shorts", "bn:bangla gaming shorts", "hi:free fire hindi shorts", "hi:gta funny hindi shorts",
+    // বিদেশি (চীন/কোরিয়া ইত্যাদি) — একই ধরনের টপিক: গান, ভালোবাসা, ইমোশন, কাপল, অ্যাকশন
+    "x:chinese sad love song shorts", "x:chinese jealousy love song shorts", "x:mandarin emotional song edit shorts", "x:chinese drama couple shorts", "x:chinese drama fight scene shorts", "x:chinese drama action edit shorts",
+    "x:korean drama couple shorts", "x:korean sad love song shorts", "x:kdrama emotional edit shorts", "x:korean girl dance song shorts", "x:chinese girl dance song shorts",
+    // অ্যানিমে — অ্যাকশন, ইমোশন, লাভ, স্যাড
+    "a:anime action edit shorts", "a:anime sad edit shorts", "a:anime love edit shorts", "a:anime emotional amv shorts", "a:anime fight scene shorts", "a:anime couple edit shorts",
+  ]);
+console.log(YOUTUBE_API_KEY ? "▶️ YOUTUBE_API_KEY পাওয়া গেছে — Shorts চালু" : "⚠️ YOUTUBE_API_KEY সেট করা নেই — Shorts বন্ধ");
+let shortsPool = [];       // { id, title, channel }
+let shortsAt = 0;          // শেষ সফল রিফ্রেশ
+let shortsFailAt = 0;      // শেষ ব্যর্থ চেষ্টা (বারবার চেষ্টা ঠেকাতে)
+let shortsErr = "";
+let shortsBusy = null;     // চলতে থাকা রিফ্রেশের Promise
+
+function isoSecs(d) {
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(d || "");
+  if (!m) return 0;
+  return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+}
+async function ytJson(url) {
+  const r = await fetch(url);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error && j.error.message) || "YouTube API status " + r.status);
+  return j;
+}
+// ---------- ভাষা ফিল্টার: বিদেশি কথা-বলা ভিডিও বাদ; গান/ভিজ্যুয়াল হলে বিদেশিও চলবে ----------
+const OK_LANGS = new Set(["bn", "hi", "ur", "ne", "as", "or", "pa", "gu", "mr", "ta", "te", "kn", "ml", "si", "sa", "bho", "mai"]);
+const SA_SCRIPT = /[\u0980-\u09FF\u0900-\u097F\u0600-\u06FF\u0A00-\u0A7F\u0B80-\u0BFF]/; // বাংলা/দেবনাগরী/আরবি-উর্দু/গুরমুখী/তামিল
+function shortLangOk(base, sn) {
+  sn = sn || {};
+  const lang = String(sn.defaultAudioLanguage || sn.defaultLanguage || "").toLowerCase().split("-")[0];
+  const music = String(sn.categoryId || "") === "10";
+  const text = (base.title || "") + " " + (base.channel || "");
+  if (base.foreignOk === "any") return true;   // a: অ্যানিমে — যেকোনো ভাষা
+  if (base.foreignOk) return music || !lang || !["en", "ja", "es", "fr", "de", "pt", "ru", "id", "th", "vi", "tr"].includes(lang); // x: টপিক — চীন/কোরিয়ান ইত্যাদি চলবে; ইংরেজি-জাপানি ইত্যাদি কথা নয়
+  if (lang && OK_LANGS.has(lang)) return true;
+  if (music) return true;                       // গানের ভিডিও — ভাষা যাই হোক, কথা নয়
+  if (lang) return false;                       // অন্য ভাষার কথা-বলা ভিডিও
+  if (SA_SCRIPT.test(text)) return true;        // ভাষা লেখা নেই কিন্তু বাংলা/হিন্দি হরফে লেখা
+  return base.tl === "bn" || base.tl === "hi" || base.tl === "ur"; // বাংলা/হিন্দি সার্চে পাওয়া, ভাষা অজানা
+}
+function refreshShorts(extraTopics) {
+  if (!YOUTUBE_API_KEY) return Promise.resolve();
+  if (shortsBusy) return shortsBusy;
+  if (Date.now() - shortsFailAt < 10 * 60 * 1000) return Promise.resolve();
+  shortsBusy = (async () => {
+    try {
+      // প্রতিবার ৪টা আলাদা টপিক — সব ধরন ঘুরে ঘুরে মিশবে
+      // কারো পছন্দের টপিক থাকলে (সর্বোচ্চ ২টা) সেগুলো আগে, বাকিটা এলোমেলো
+      const extra = Array.isArray(extraTopics) ? extraTopics.slice(0, 2) : [];
+      const picks = extra.concat(SHORTS_TOPICS.slice().sort(() => Math.random() - 0.5)).slice(0, 4);
+      const found = new Map();
+      for (const topic of picks) {
+        const lm = /^(bn|hi|en|ur|ar|x|a):(.*)$/.exec(topic);
+        const lang = lm && lm[1] !== "x" && lm[1] !== "a" ? lm[1] : "";
+        const foreignOk = lm && lm[1] === "a" ? "any" : (lm && lm[1] === "x" ? "yes" : "");
+        const q = lm ? lm[2].trim() : topic;
+        const u = new URL("https://www.googleapis.com/youtube/v3/search");
+        u.searchParams.set("part", "snippet");
+        u.searchParams.set("type", "video");
+        u.searchParams.set("videoDuration", "short");
+        u.searchParams.set("videoEmbeddable", "true");
+        u.searchParams.set("safeSearch", "moderate");
+        u.searchParams.set("maxResults", "50");
+        if (lang) u.searchParams.set("relevanceLanguage", lang);
+        u.searchParams.set("order", ["relevance", "viewCount", "date"][Math.floor(Math.random() * 3)]);
+        u.searchParams.set("q", q);
+        u.searchParams.set("key", YOUTUBE_API_KEY);
+        const j = await ytJson(u);
+        (j.items || []).forEach((it) => {
+          const id = it && it.id && it.id.videoId;
+          if (id && /^[\w-]{11}$/.test(id) && !found.has(id)) {
+            found.set(id, { id, title: String((it.snippet && it.snippet.title) || "").slice(0, 150), channel: String((it.snippet && it.snippet.channelTitle) || "").slice(0, 60), foreignOk, tl: lang });
+          }
+        });
+      }
+      // আসল শর্টস কি না (৬৫ সেকেন্ডের মধ্যে), embed চলে কি না, পাবলিক কি না — এক কোটায় যাচাই
+      const ids = Array.from(found.keys());
+      const good = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const u = new URL("https://www.googleapis.com/youtube/v3/videos");
+        u.searchParams.set("part", "contentDetails,status,snippet");
+        u.searchParams.set("id", ids.slice(i, i + 50).join(","));
+        u.searchParams.set("key", YOUTUBE_API_KEY);
+        const j = await ytJson(u);
+        (j.items || []).forEach((v) => {
+          const secs = isoSecs(v.contentDetails && v.contentDetails.duration);
+          if (!(v.status && v.status.embeddable && v.status.privacyStatus === "public" && secs > 0 && secs <= 65)) return;
+          const base = found.get(v.id);
+          if (!base || !shortLangOk(base, v.snippet)) return; // ইংরেজি/জাপানি/চাইনিজ ইত্যাদি কথাবলা ভিডিও বাদ
+          good.push({ id: base.id, title: base.title, channel: base.channel, d: secs });
+        });
+      }
+      const have = new Set(shortsPool.map((x) => x.id));
+      shortsPool = good.filter((x) => x && !have.has(x.id)).concat(shortsPool).slice(0, 500);
+      shortsAt = Date.now();
+      shortsErr = "";
+      console.log("✅ YouTube Shorts রিফ্রেশ সফল: নতুন " + good.length + "টা, মোট পুল " + shortsPool.length + "টা");
+    } catch (e) {
+      shortsFailAt = Date.now();
+      shortsErr = String((e && e.message) || e).slice(0, 200);
+      console.warn("⚠️ YouTube Shorts রিফ্রেশ ব্যর্থ:", shortsErr);
+    } finally {
+      shortsBusy = null;
+    }
+  })();
+  return shortsBusy;
+}
+
+// ---------- Shorts: পছন্দ শেখা (লাইক/কমেন্ট/বেশি দেখা) ----------
+const SHORT_STOP = new Set(["shorts", "short", "video", "videos", "viral", "new", "best", "the", "and", "for", "with", "you", "your", "this", "that", "from", "are", "not", "youtube", "ytshorts", "subscribe", "like", "comment", "share", "official", "full", "part", "reels", "trending"]);
+function shortWords(title) {
+  const out = new Set();
+  String(title || "").toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).forEach((w) => {
+    if (w.length >= 3 && w.length <= 24 && !SHORT_STOP.has(w) && !/^\d+$/.test(w)) out.add(w);
+  });
+  return Array.from(out).slice(0, 12);
+}
+function pruneMap(m, keep) {
+  const ks = Object.keys(m);
+  if (ks.length <= keep * 1.5) return;
+  ks.sort((a, b) => Math.abs(m[b]) - Math.abs(m[a])).slice(keep).forEach((k) => { delete m[k]; });
+}
+function bumpShortPref(phone, title, channel, w) {
+  if (!phone || !users[phone]) return;
+  const p = shortsPrefs[phone] || (shortsPrefs[phone] = { w: {}, ch: {} });
+  const clamp = (v) => Math.round(Math.max(-12, Math.min(40, v)) * 100) / 100;
+  shortWords(title).forEach((x) => { p.w[x] = clamp((p.w[x] || 0) + w); if (!p.w[x]) delete p.w[x]; });
+  const c = String(channel || "").slice(0, 60);
+  if (c) { p.ch[c] = clamp((p.ch[c] || 0) + w); if (!p.ch[c]) delete p.ch[c]; }
+  pruneMap(p.w, 80);
+  pruneMap(p.ch, 30);
+  saveData();
+}
+function shortScore(p, v) {
+  if (!p) return 0;
+  let sc = 0;
+  shortWords(v.title).forEach((x) => { sc += p.w[x] || 0; });
+  sc += (p.ch[v.channel] || 0) * 1.5;
+  return sc;
+}
+function topShortWords(p, n) {
+  if (!p) return [];
+  return Object.keys(p.w).filter((k) => p.w[k] >= 3).sort((a, b) => p.w[b] - p.w[a]).slice(0, n);
+}
+// কারো পছন্দের টপিক ধরে YouTube-এ নতুন সার্চ: প্রতিটা শব্দ ৩ ঘণ্টায় একবার, আর দিনে সর্বোচ্চ ৬ বার (কোটা বাঁচাতে)
+const interestFetchedAt = {};
+const interestBudget = { day: "", n: 0 };
+function interestTopicsFor(p) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (interestBudget.day !== today) { interestBudget.day = today; interestBudget.n = 0; }
+  if (interestBudget.n >= 6) return [];
+  const out = topShortWords(p, 2).filter((t) => Date.now() - (interestFetchedAt[t] || 0) > 3 * 60 * 60 * 1000);
+  if (!out.length) return [];
+  out.forEach((t) => { interestFetchedAt[t] = Date.now(); });
+  interestBudget.n++;
+  return out.map((t) => t + " shorts");
+}
+const YT_ID_OK = /^[\w-]{11}$/;
+function shortInfo(id, phone) {
+  const d = shortsData[id];
+  return { id, likes: d ? (d.likes || []).length : 0, comments: d ? (d.comments || []).length : 0, my: !!(d && phone && (d.likes || []).includes(phone)) };
+}
+function shortEntry(id, title, channel) {
+  const d = shortsData[id] || (shortsData[id] = { t: "", c: "", likes: [], comments: [] });
+  if (title && !d.t) d.t = String(title).slice(0, 150);
+  if (channel && !d.c) d.c = String(channel).slice(0, 60);
+  return d;
+}
+function shortCleanup(id) {
+  const d = shortsData[id];
+  if (d && !(d.likes || []).length && !(d.comments || []).length) delete shortsData[id];
+}
+
+io.on("connection", (socket) => {
+  // প্রতিটা ইভেন্টে: ইনকামিং pid → আসল ফোন, আর ack/callback-এর উত্তর থেকে অন্যের নম্বর-ইমেইল সরানো
+  socket.use((packet, next) => {
+    try {
+      const ev = String(packet[0] || "");
+      const first = packet[1];
+      const adminCall = ev.indexOf("admin-") === 0 && first && typeof first === "object" && first.password === ADMIN_PASSWORD;
+      for (let i = 1; i < packet.length; i++) {
+        if (typeof packet[i] === "function") {
+          const cb = packet[i];
+          packet[i] = (...a) => cb(...a.map((x) => outboundFor(socket.id, x, adminCall)));
+        } else {
+          packet[i] = unscrubIn(packet[i], 0);
+        }
+      }
+    } catch (e) { console.warn("privacy middleware:", e.message); }
+    next();
+  });
+
+  // ---------- USER / SESSION ----------
+  socket.on("set-user-socket", ({ phone, deviceId }) => {
+    if (!phone) return;
+    // অন্য ডিভাইস থেকে লগআউট করে দেওয়া ডিভাইস আবার ঢুকতে চাইলে বের করে দেওয়া
+    if (isRevokedDevice(phone, deviceId)) { socket.emit("force-logout"); return; }
+    bindDeviceSocket(socket, phone, deviceId);
+    socketToPhone[socket.id] = phone;
+    setSelf(socket, phone);
+    phoneToSocket[phone] = socket.id;
+    touchDevice(phone, deviceId);
+  });
+
+  socket.on("register-user", (newUser, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (newUser && newUser.phone) {
+      if (bannedUsers[newUser.phone]) return reply({ success: false, banned: true });
+      if (newUser.fresh) {
+        // নতুন সাইনআপ: আগে থেকে থাকা নম্বর/ইমেইলে সাইনআপ করা যাবে না
+        const key = String(newUser.phone).trim();
+        if ((users[key] && users[key].password) || altTaken(key, key)) return reply({ success: false, error: "exists" });
+        const em = normalizeEmail(newUser.email);
+        if (newUser.email && !em) return reply({ success: false, error: "bad_email" });
+        if (em && emailTaken(em, key)) return reply({ success: false, error: "email_taken" });
+        // একই নম্বর দিয়ে নতুন করে সাইনআপ করলে পুরোনো ডিলিট/অ্যালিয়াস চিহ্ন সরে যায়
+        delete deletedHashes[idHash(key)];
+        delete phoneAliases[key];
+        newUser.phone = key;
+        if (em) newUser.email = em; else delete newUser.email;
+        const merged = mergeClientUser(newUser);
+        if (merged) { recordDevice(merged, socket, newUser.deviceId, "signup"); setSelf(socket, merged.phone); }
+        saveData();
+        return reply({ success: true });
+      }
+      if (isDeletedId(newUser.phone)) return reply({ success: false, deleted: true });
+      if (phoneAliases[newUser.phone]) return reply({ success: false, renamed: true });
+      mergeClientUser(newUser);
+      saveData();
+    }
+    reply({ success: true });
+  });
+
+  socket.on("login-user", (payload, callback) => {
+    if (typeof callback !== "function") return;
+    const { phone: loginId, password, deviceId } = payload || {};
+    const phone = (typeof loginId === "string" ? resolveLoginPhone(loginId) : null) || loginId;
+    if (bannedUsers[phone]) {
+      callback({
+        success: false,
+        banned: true,
+        reason: (bannedUsers[phone] && bannedUsers[phone].reason) || "আপনার অ্যাকাউন্ট ব্যান করা হয়েছে।",
+      });
+      return;
+    }
+    const user = typeof phone === "string" ? users[phone] : null;
+    if (user && verifyPassword(password, user.password)) {
+      if (!isHashedPassword(user.password)) user.password = hashPassword(password);
+      recordDevice(user, socket, deviceId, String(loginId).indexOf("@") > 0 ? "email" : "phone");
+      setSelf(socket, user.phone);
+      saveData();
+      // ক্লায়েন্ট আগের মতোই পাসওয়ার্ড সহ ইউজার অবজেক্ট আশা করে (লোকাল ক্যাশের জন্য) — তাই যেটা টাইপ করা হয়েছে সেটাই ফেরত যায়
+      callback({ success: true, user: selfUserPayload(user, password) });
+    } else {
+      callback({ success: false });
+    }
+  });
+
+  // ---------- সেটিংস: পাসওয়ার্ড / ইমেইল / নম্বর / লগইন হিস্ট্রি ----------
+  socket.on("change-password", ({ phone, oldPassword, newPassword }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(oldPassword, u.password)) return reply({ success: false, error: "wrong_password" });
+    const np = String(newPassword || "").trim();
+    if (np.length < 6) return reply({ success: false, error: "too_short" });
+    if (np === String(oldPassword)) return reply({ success: false, error: "same" });
+    u.password = hashPassword(np);
+    saveData();
+    reply({ success: true });
+  });
+
+  socket.on("get-login-history", ({ phone, deviceId }, callback) => {
+    if (typeof callback !== "function") return;
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || socketToPhone[socket.id] !== phone) return callback({ success: false });
+    const did = String(deviceId || "").slice(0, 64);
+    const list = (u.loginHistory || []).map((e) => ({
+      ref: devRef(e.deviceId), device: e.device, ip: e.ip, method: e.method,
+      lastLogin: e.lastLogin, lastSeen: e.lastSeen, firstLogin: e.firstLogin,
+      current: !!did && e.deviceId === did,
+    }));
+    callback({ success: true, list });
+  });
+
+  socket.on("change-email", ({ phone, password, email }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(password, u.password)) return reply({ success: false, error: "wrong_password" });
+    const em = normalizeEmail(email);
+    if (!em) return reply({ success: false, error: "bad_email" });
+    if (emailTaken(em, phone)) return reply({ success: false, error: "email_taken" });
+    if (isDeletedId(em) && !users[em]) delete deletedHashes[idHash(em)];
+    const oldKey = u.phone;
+    // শুধু ইমেইল দিয়ে খোলা অ্যাকাউন্টে ইমেইলই ছিল লগইন-আইডি — তাই নতুন ইমেইলেই আইডি বদলায়
+    if (u.email && u.email === oldKey && em !== oldKey) {
+      renamePhoneEverywhere(oldKey, em);
+      users[em].email = em;
+      saveData();
+      Array.from(ensureSet(friendships, em)).forEach((fp) => sendFriendData(fp));
+      return reply({ success: true, email: em, phone: em, renamed: true });
+    }
+    u.email = em;
+    saveData();
+    reply({ success: true, email: em, phone: oldKey });
+  });
+
+  socket.on("change-phone", ({ phone, password, newPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    if (!u || !verifyPassword(password, u.password)) return reply({ success: false, error: "wrong_password" });
+    const np = normalizePhoneInput(newPhone);
+    if (!np) return reply({ success: false, error: "bad_phone" });
+    if (np === phone) return reply({ success: false, error: "same" });
+    if (u.altNum && np === u.altNum) return reply({ success: false, error: "dup_own" });
+    if (users[np] || bannedUsers[np] || altTaken(np, phone)) return reply({ success: false, error: "phone_taken" });
+    renamePhoneEverywhere(phone, np);
+    saveData();
+    setSelf(socket, np);
+    socket.emit("account-phone-changed", { phone: np });
+    Array.from(ensureSet(friendships, np)).forEach((fp) => sendFriendData(fp));
+    reply({ success: true, phone: np, user: selfUserPayload(users[np], password) });
+  });
+
+  // ---------- সেটিংস: পার্সোনাল ডিটেইলস (পাসওয়ার্ড যাচাই, দ্বিতীয় নম্বর, নম্বর/ইমেইল রিমুভ) ----------
+  // ভুল পাসওয়ার্ড বারবার দিলে এই সকেটে কিছুক্ষণ আটকে দেওয়া হয় (পাসওয়ার্ড আন্দাজ ঠেকাতে)
+  let pwFails = 0, pwBlockedUntil = 0;
+  const pwGate = (u, password) => {
+    const now = Date.now();
+    if (now < pwBlockedUntil) return "too_many";
+    if (u && verifyPassword(password, u.password)) { pwFails = 0; return ""; }
+    pwFails++;
+    if (pwFails >= 6) { pwBlockedUntil = now + 60 * 1000; pwFails = 0; return "too_many"; }
+    return "wrong_password";
+  };
+  const contactInfo = (u) => ({
+    phone: EMAIL_KEY_ONLY(u) ? "" : u.phone,
+    altNum: u.altNum || "",
+    email: u.email || (EMAIL_KEY_ONLY(u) ? u.phone : ""),
+    key: u.phone,
+  });
+  const EMAIL_KEY_ONLY = (u) => String(u.phone || "").indexOf("@") > 0;
+
+  socket.on("verify-password", ({ phone, password }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  socket.on("set-alt-phone", ({ phone, password, newPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "need_primary" }); // আগে মূল নম্বর যোগ করতে হবে
+    const np = normalizePhoneInput(newPhone);
+    if (!np) return reply({ success: false, error: "bad_phone" });
+    if (np === u.phone || np === u.altNum) return reply({ success: false, error: "dup_own" });
+    if (users[np] || bannedUsers[np] || altTaken(np, u.phone)) return reply({ success: false, error: "phone_taken" });
+    u.altNum = np;
+    saveData();
+    reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  // which: "primary" | "alt"
+  socket.on("remove-phone", ({ phone, password, which }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (which === "alt") {
+      if (!u.altNum) return reply({ success: false, error: "not_found" });
+      delete u.altNum;
+      saveData();
+      return reply(Object.assign({ success: true }, contactInfo(u)));
+    }
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "not_found" });
+    // মূল নম্বর সরালে: দ্বিতীয় নম্বর থাকলে সেটাই মূল হয়, না থাকলে ইমেইল থাকতে হবে
+    let nextKey = "";
+    if (u.altNum) nextKey = u.altNum;
+    else if (u.email) nextKey = u.email;
+    else return reply({ success: false, error: "last_id" });
+    if (users[nextKey] && nextKey !== u.altNum) return reply({ success: false, error: "phone_taken" });
+    const oldKey = u.phone;
+    if (nextKey === u.altNum) delete u.altNum;
+    renamePhoneEverywhere(oldKey, nextKey);
+    saveData();
+    setSelf(socket, nextKey);
+    socket.emit("account-phone-changed", { phone: nextKey });
+    Array.from(ensureSet(friendships, nextKey)).forEach((fp) => sendFriendData(fp));
+    reply(Object.assign({ success: true, renamed: true, newKey: nextKey }, contactInfo(users[nextKey]), { user: selfUserPayload(users[nextKey], password) }));
+  });
+
+  socket.on("remove-email", ({ phone, password }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    if (EMAIL_KEY_ONLY(u)) return reply({ success: false, error: "last_id" }); // ইমেইলই লগইন-আইডি
+    if (!u.email) return reply({ success: false, error: "not_found" });
+    delete u.email;
+    saveData();
+    reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  // অন্য ডিভাইস থেকে লগআউট: পাসওয়ার্ড লাগে। ওই ডিভাইস অনলাইনে থাকলে সাথে সাথে বের হয়ে যায়,
+  // অফলাইনে থাকলে পরের বার অ্যাপ খুললেই বের হবে (আবার লগইন করলে ঠিক হয়ে যায়)।
+  socket.on("logout-device", ({ phone, password, ref }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    const e = (u.loginHistory || []).find((x) => x && devRef(x.deviceId) === String(ref || ""));
+    if (!e) return reply({ success: false, error: "not_found" });
+    const did = e.deviceId;
+    u.loginHistory = u.loginHistory.filter((x) => x !== e);
+    if (!u.revoked) u.revoked = {};
+    u.revoked[did] = Date.now();
+    const keys = Object.keys(u.revoked);
+    if (keys.length > 50) keys.sort((a, b) => u.revoked[a] - u.revoked[b]).slice(0, keys.length - 50).forEach((k) => delete u.revoked[k]);
+    saveData();
+    const set = deviceSockets[devKey(u.phone, did)];
+    if (set) Array.from(set).forEach((sid) => { io.to(sid).emit("force-logout"); if (phoneToSocket[u.phone] === sid) delete phoneToSocket[u.phone]; });
+    reply({ success: true });
+  });
+
+  // নিজের এই ডিভাইস থেকে লগআউট করলে তালিকা থেকে এই ডিভাইসটা সরানো (নিজের সকেট থেকেই আসতে হবে)
+  socket.on("device-signout", ({ phone, deviceId }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const did = String(deviceId || "").slice(0, 64);
+    if (!u || !did || socketDevice[socket.id] !== devKey(u.phone, did)) return reply({ success: false });
+    u.loginHistory = (u.loginHistory || []).filter((x) => x && x.deviceId !== did);
+    saveData();
+    reply({ success: true });
+  });
+
+  // ---------- YouTube Shorts: সামনের কয়েকটা ভিডিও (আগে দেখা আইডি বাদ দিয়ে) ----------
+  socket.on("get-shorts", async (data, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!YOUTUBE_API_KEY) return reply({ success: false, error: "no_key" });
+    const seen = new Set(Array.isArray(data && data.seen) ? data.seen.slice(-300).map(String) : []);
+    const ph = String((data && data.phone) || "");
+    const pref = users[ph] ? shortsPrefs[ph] : null;
+    const stale = Date.now() - shortsAt > 6 * 60 * 60 * 1000;
+    let fresh = shortsPool.filter((v) => !seen.has(v.id));
+    const mine = pref ? interestTopicsFor(pref) : [];
+    if (!shortsPool.length || !fresh.length) await refreshShorts(mine);
+    else if (stale || fresh.length < 12 || mine.length) refreshShorts(mine); // পেছনে চলবে, অপেক্ষা করাবে না
+    fresh = shortsPool.filter((v) => !seen.has(v.id));
+    if (!shortsPool.length) return reply({ success: false, error: shortsErr ? "api_error" : "empty", detail: shortsErr });
+    const list = fresh.length ? fresh : shortsPool; // সব দেখা হয়ে গেলে আবার শুরু
+    // পছন্দের সাথে মিললে আগে আসবে, তবে কিছুটা এলোমেলোও থাকবে যেন একঘেয়ে না হয়
+    const out = list
+      .map((v) => ({ v, k: Math.max(-12, Math.min(shortScore(pref, v), 12)) + Math.random() * 6 }))
+      .sort((x, y) => y.k - x.k)
+      .slice(0, 12)
+      .map((x) => x.v);
+    reply({ success: true, shorts: out });
+  });
+
+  // ---------- Shorts: লাইক / কমেন্ট / পছন্দ ----------
+  socket.on("short-state", ({ ids, phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const list = (Array.isArray(ids) ? ids : []).slice(0, 40).filter((id) => YT_ID_OK.test(String(id))).map((id) => shortInfo(String(id), String(phone || "")));
+    callback({ success: true, list });
+  });
+
+  socket.on("short-like", ({ id, phone, like, title, channel }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    if (!YT_ID_OK.test(id) || !users[phone] || bannedUsers[phone]) return reply({ success: false });
+    const d = shortEntry(id, title, channel);
+    const has = d.likes.includes(phone);
+    const want = like !== false;
+    if (want && !has) { d.likes.push(phone); bumpShortPref(phone, title || d.t, channel || d.c, 3); }
+    else if (!want && has) { d.likes = d.likes.filter((x) => x !== phone); bumpShortPref(phone, title || d.t, channel || d.c, -3); }
+    shortCleanup(id);
+    saveData();
+    reply(Object.assign({ success: true }, shortInfo(id, phone)));
+  });
+
+  socket.on("short-comments", ({ id }, callback) => {
+    if (typeof callback !== "function") return;
+    id = String(id || "");
+    if (!YT_ID_OK.test(id)) return callback({ success: false });
+    const d = shortsData[id];
+    callback({ success: true, comments: d ? (d.comments || []).filter((c) => !bannedUsers[c.authorPhone]).slice(-100) : [] });
+  });
+
+  socket.on("short-comment", ({ id, phone, text, title, channel }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    const clean = String(text || "").trim().slice(0, 500);
+    if (!YT_ID_OK.test(id) || !users[phone] || bannedUsers[phone] || !clean) return reply({ success: false });
+    const d = shortEntry(id, title, channel);
+    const u = users[phone];
+    const c = { id: "cm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), authorPhone: phone, authorName: u.name, authorPic: u.pic, text: clean, timestamp: Date.now() };
+    d.comments.push(c);
+    if (d.comments.length > 300) d.comments = d.comments.slice(-300);
+    bumpShortPref(phone, title || d.t, channel || d.c, 2);
+    saveData();
+    reply({ success: true, comment: c, count: d.comments.length });
+  });
+
+  socket.on("short-comment-delete", ({ id, commentId, phone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    id = String(id || ""); phone = String(phone || "");
+    const d = shortsData[id];
+    if (!d || !users[phone]) return reply({ success: false });
+    const i = d.comments.findIndex((c) => c && c.id === commentId && c.authorPhone === phone); // শুধু নিজের কমেন্ট
+    if (i < 0) return reply({ success: false });
+    d.comments.splice(i, 1);
+    const count = d.comments.length;
+    shortCleanup(id);
+    saveData();
+    reply({ success: true, count });
+  });
+
+  // কতক্ষণ দেখেছে: পুরো দেখলে/বারবার দেখলে ঐ ধরনের ভিডিও বেশি আসবে; শুরুতেই স্কিপ করলে কম আসবে
+  socket.on("short-watch", ({ phone, title, channel, watched, dur, loops }) => {
+    phone = String(phone || "");
+    if (!users[phone] || bannedUsers[phone]) return;
+    const w = Math.max(0, Math.min(Number(watched) || 0, 900));
+    const d = Math.max(0, Math.min(Number(dur) || 0, 120));
+    let r = d > 0 ? w / d : (w >= 8 ? 1 : 0);
+    if ((Number(loops) || 0) >= 1) r = Math.max(r, 1);
+    let delta = 0;
+    if (r >= 0.9) delta = r >= 1.8 ? 3 : 2;     // পুরো দেখেছে (বা আবার দেখেছে)
+    else if (r >= 0.6) delta = 0.5;              // বেশিরভাগ দেখেছে
+    else if (r < 0.35) delta = w < 2.5 ? -2 : -1; // মাঝপথে/শুরুতেই স্কিপ
+    if (delta) bumpShortPref(phone, title, channel, delta);
+  });
+
+  // কয়েক সেকেন্ড ধরে দেখলে ছোট সংকেত (লাইকের চেয়ে কম ওজন)
+  socket.on("short-signal", ({ phone, title, channel }) => {
+    phone = String(phone || "");
+    if (!users[phone] || bannedUsers[phone]) return;
+    bumpShortPref(phone, title, channel, 1);
+  });
+
+  // ---------- রিপোর্ট সিস্টেম ----------
+  // যে কেউ একটা সমস্যা রিপোর্ট করলে সেটা লিস্টে যোগ হয় এবং সাথে সাথে
+  // অ্যাডমিন প্যানেল খোলা থাকলে সেখানে রিয়েল-টাইমে নোটিফিকেশন যায়।
+  socket.on("submit-report", ({ fromPhone, fromName, message }, callback) => {
+    const text = (message || "").toString().trim();
+    if (!text) {
+      if (typeof callback === "function") callback({ success: false, error: "Empty report" });
+      return;
+    }
+    const report = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      fromPhone: fromPhone || "unknown",
+      fromName: fromName || "Unknown",
+      message: text.slice(0, 1000),
+      time: Date.now(),
+      status: "pending", // pending | resolved | dismissed
+    };
+    reports.push(report);
+    saveData();
+    emitAdmins("admin-new-report", report); // অ্যাডমিন প্যানেল খোলা থাকলে সে-ই কেবল দেখাবে
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // ---------- HOME ফিড / REELS / সাজেশন ----------
+  function ownerInfo(p) {
+    const u = users[p] || {};
+    return { ownerPhone: p, ownerName: u.name || "User", ownerPic: u.pic || "" };
+  }
+
+  // আমার + বন্ধুদের পোস্ট, নতুন আগে
+  socket.on("get-feed", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const allowed = Array.from(ensureSet(friendships, phone)).concat([phone]);
+    let out = [];
+    allowed.forEach((p) => {
+      if (bannedUsers[p]) return;
+      const posts = (profiles[p] && profiles[p].posts) || [];
+      posts.forEach((post) => out.push({ ...post, reacts: reactsOf(post), ...ownerInfo(p) }));
+    });
+    out.sort((a, b) => b.timestamp - a.timestamp);
+    if (!out.length) console.log(`get-feed: 0 posts for ${phone} (friends=${allowed.length - 1}, ownPosts=${(((profiles[phone] || {}).posts) || []).length}, userExists=${!!users[phone]})`);
+    callback({ success: true, posts: out.slice(0, 40) });
+  });
+
+  // সবার Reels (কেউ আপলোড করলেই সবাই দেখবে)
+  socket.on("get-reels", (payload, callback) => {
+    if (typeof callback !== "function") return;
+    const out = [];
+    Object.keys(profiles).forEach((p) => {
+      if (bannedUsers[p]) return;
+      if (!canSeeContent(socket, p)) return; // বন্ধু না হলে রিলসও দেখা যাবে না
+      ((profiles[p] && profiles[p].items) || []).forEach((it) => {
+        if (it && it.kind === "reel" && it.src) {
+          // রিলস সাধারণত একটা পোস্টের সাথে যুক্ত — রিঅ্যাকশন/কমেন্ট/শেয়ার সেই পোস্টেই জমা হয়
+          const t = resolveTarget("reel", p, it.id);
+          const o = t ? t.obj : it;
+          out.push({ id: it.id, src: it.src, caption: it.caption || "", timestamp: it.timestamp || 0, reacts: reactsOf(o), comments: (o.comments || []).slice(-100), commentCount: (o.comments || []).length, shares: o.shares || 0, ...ownerInfo(p) });
+        }
+      });
+    });
+    out.sort((a, b) => b.timestamp - a.timestamp);
+    callback({ success: true, reels: out.slice(0, 40) });
+  });
+
+  // "People you may know": যারা বন্ধু না, রিকোয়েস্টও পেন্ডিং না
+  socket.on("suggest-users", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    const myFriends = ensureSet(friendships, phone);
+    const list = Object.values(users)
+      .filter((u) => u && u.phone && u.phone !== phone && !bannedUsers[u.phone] && !myFriends.has(u.phone)
+        && !ensureSet(friendRequests, u.phone).has(phone) && !ensureSet(friendRequests, phone).has(u.phone))
+      .slice(0, 12)
+      .map((u) => publicUser(u.phone));
+    callback(list);
+  });
+
+  // ---------- STORY (২৪ ঘণ্টা পর অটো ডিলিট) ----------
+  function notifyStoryChange(phone) {
+    Array.from(ensureSet(friendships, phone)).concat([phone]).forEach((p) => {
+      const sid = phoneToSocket[p];
+      if (sid) sendTo(sid, "stories-updated");
+    });
+  }
+
+  socket.on("add-story", async ({ phone, text, bg, media, music, duration }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const cleanText = String(text || "").slice(0, 300);
+    if (!phone || (!cleanText && !media)) return reply({ success: false, message: "খালি স্টোরি দেওয়া যাবে না।" });
+    const u = users[phone] || {};
+    let mediaOut = null;
+    if (media && media.src) {
+      const src = String(media.src);
+      if (media.type === "video") {
+        if (!src.startsWith("data:video/")) return reply({ success: false, message: "ভিডিও ঠিক নেই।" });
+        const remote = await uploadVideoToCloudinary(src, "story");
+        if (!remote) return reply({ success: false, message: "ভিডিও আপলোড হয়নি।" });
+        mediaOut = { type: "video", src: remote };
+      } else {
+        const resolved = src.startsWith("data:") ? await resolveImageSrc(src, "story") : { src };
+        if (!resolved || !resolved.src) return reply({ success: false, message: "ছবি আপলোড হয়নি।" });
+        mediaOut = { type: "image", src: resolved.src };
+      }
+    }
+    let musicOut = null;
+    if (music && music.src && !mediaOut || (music && music.src && mediaOut && mediaOut.type === "image")) {
+      const msrc = String(music.src);
+      if (!msrc.startsWith("data:audio/") || msrc.length > 14e6) return reply({ success: false, message: "গানের ফাইল ঠিক নেই বা অনেক বড়।" });
+      const remote = await uploadVideoToCloudinary(msrc, "story-music");
+      if (!remote) return reply({ success: false, message: "গান আপলোড হয়নি।" });
+      musicOut = { src: remote, name: String(music.name || "music").slice(0, 80) };
+    }
+    const dur = Math.max(3000, Math.min(15000, parseInt(duration, 10) || 5000)); // ছবি/লেখার স্টোরি সর্বোচ্চ ১৫ সেকেন্ড
+    const now = Date.now();
+    const story = {
+      id: "st_" + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      phone, name: u.name || "User", pic: u.pic || "",
+      media: mediaOut, music: musicOut, duration: dur, text: cleanText, bg: String(bg || "").slice(0, 60),
+      time: now, expires: now + STORY_TTL, views: [],
+    };
+    stories.push(story);
+    saveData();
+    notifyStoryChange(phone);
+    reply({ success: true, story });
+  });
+
+  // আমার + বন্ধুদের চলমান স্টোরি
+  socket.on("get-stories", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    purgeExpiredStories();
+    const allowed = new Set(Array.from(ensureSet(friendships, phone)).concat([phone]));
+    callback({ success: true, stories: stories.filter((st) => allowed.has(st.phone)) });
+  });
+
+  socket.on("view-story", ({ phone, storyId }) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (st && phone && st.phone !== phone && !st.views.includes(phone)) { st.views.push(phone); saveData(); }
+  });
+
+  socket.on("delete-story", ({ phone, storyId }, callback) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (st && st.phone === phone) { stories = stories.filter((x) => x.id !== storyId); saveData(); notifyStoryChange(phone); cleanupMedia(storyUrls(st)); }
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // স্টোরি রিপোর্ট → সাধারণ রিপোর্ট লিস্টেই যায় (type: "story")
+  socket.on("report-story", ({ fromPhone, fromName, storyId, reason }, callback) => {
+    const st = stories.find((x) => x.id === storyId);
+    if (!st) { if (typeof callback === "function") callback({ success: false }); return; }
+    const report = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      fromPhone: fromPhone || "unknown", fromName: fromName || "Unknown",
+      message: ("Story report: " + String(reason || "অনুপযুক্ত স্টোরি")).slice(0, 300),
+      type: "story", storyId: st.id, storyOwner: st.phone, storyOwnerName: st.name,
+      storyPreview: st.media ? { type: st.media.type, src: st.media.src } : null,
+      storyText: st.text || "",
+      time: Date.now(), status: "pending",
+    };
+    reports.push(report);
+    saveData();
+    emitAdmins("admin-new-report", report);
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  socket.on("admin-delete-story", ({ password, storyId }, callback) => {
+    if (password !== ADMIN_PASSWORD) { if (typeof callback === "function") callback({ success: false }); return; }
+    const st = stories.find((x) => x.id === storyId);
+    stories = stories.filter((x) => x.id !== storyId);
+    reports.forEach((r) => { if (r.storyId === storyId && r.status === "pending") r.status = "resolved"; });
+    saveData();
+    cleanupMedia(storyUrls(st));
+    if (st) notifyStoryChange(st.phone);
+    if (typeof callback === "function") callback({ success: true, stories: stories.slice().reverse(), reports: reports.slice().reverse() });
+  });
+
+  // ---------- অ্যাডমিন প্যানেল ----------
+  socket.on("admin-login", ({ password }, callback) => {
+    if (typeof callback !== "function") return;
+    if (password === ADMIN_PASSWORD) {
+      adminSockets.add(socket.id);
+      const userList = Object.values(users).map((u) => {
+        const p = profiles[u.phone] || {};
+        const ban = bannedUsers[u.phone] || null;
+        const friendPhones = Array.from(ensureSet(friendships, u.phone));
+        const friends = friendPhones.map((fp) => publicUser(fp));
+        return {
+          name: u.name,
+          phone: u.phone,
+          email: u.email || "",
+          pic: u.pic || "https://via.placeholder.com/80",
+          bio: p.bio || "",
+          location: p.location || "",
+          work: p.work || "",
+          education: p.education || "",
+          relationship: p.relationship || "",
+          about: p.about || "",
+          friendCount: friendPhones.length,
+          friends: friends,
+          banned: !!ban,
+          banReason: ban ? (ban.reason || "") : "",
+          banTime: ban ? ban.time : null,
+        };
+      });
+      // banned users who were deleted from users map still show? only active users
+      purgeExpiredStories();
+      callback({ success: true, users: userList, reports: reports.slice().reverse(), stories: stories.slice().reverse() });
+    } else {
+      callback({ success: false });
+    }
+  });
+
+  // ---------- অ্যাডমিন: ব্যান / আনব্যান / ডিলিট ----------
+  socket.on("admin-ban-user", ({ password, phone, reason }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    bannedUsers[phone] = { reason: (reason || "").toString().slice(0, 200), time: Date.now() };
+    saveData();
+    const sid = phoneToSocket[phone];
+    if (sid) {
+      sendTo(sid, "account-banned", { reason: bannedUsers[phone].reason });
+    }
+    if (typeof callback === "function") callback({ success: true, banned: true });
+  });
+
+  socket.on("admin-unban-user", ({ password, phone }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    delete bannedUsers[phone];
+    saveData();
+    if (typeof callback === "function") callback({ success: true, banned: false });
+  });
+
+  socket.on("admin-delete-user", ({ password, phone }, callback) => {
+    if (password !== ADMIN_PASSWORD || !phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    const sid = purgeUserCompletely(phone);
+    if (sid) {
+      sendTo(sid, "account-deleted");
+      try { io.sockets.sockets.get(sid)?.disconnect(true); } catch (e) {}
+    }
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  socket.on("admin-report-action", ({ password, reportId, action }, callback) => {
+    if (password !== ADMIN_PASSWORD) {
+      if (typeof callback === "function") callback({ success: false, error: "Unauthorized" });
+      return;
+    }
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) {
+      if (typeof callback === "function") callback({ success: false, error: "Not found" });
+      return;
+    }
+    if (action === "remove-story" && report.storyId) {
+      const st = stories.find((x) => x.id === report.storyId);
+      stories = stories.filter((x) => x.id !== report.storyId);
+      if (st) { notifyStoryChange(st.phone); cleanupMedia(storyUrls(st)); }
+      action = "resolve";
+    }
+    report.status = action === "resolve" ? "resolved" : "dismissed";
+    saveData();
+
+    // যে ইউজার রিপোর্ট করেছিল, তাকে জানিয়ে দেওয়া (সে অনলাইনে থাকলে)
+    const reporterSocket = phoneToSocket[report.fromPhone];
+    if (reporterSocket) {
+      sendTo(reporterSocket, "report-status-update", { reportId: report.id, status: report.status });
+    }
+
+    if (typeof callback === "function") callback({ success: true, report });
+  });
+
+  // ---------- FRIEND RESTORE / SYNC ----------
+  // ক্লায়েন্ট তার ব্রাউজারে সেভ থাকা ফ্রেন্ড লিস্ট পাঠায়। সার্ভারের ডেটা কোনো
+  // কারণে মুছে গেলে এখান থেকেই আবার তৈরি হয়ে যায় — তাই ফ্রেন্ড হারায় না।
+  socket.on("sync-user-data", ({ user, friends, profile }, callback) => {
+    if (!user || !user.phone) {
+      if (typeof callback === "function") callback({ requests: [], friends: [] });
+      return;
+    }
+
+    if (isDeletedId(user.phone)) {
+      if (typeof callback === "function") callback({ requests: [], friends: [], deleted: true });
+      return;
+    }
+    if (phoneAliases[user.phone]) {
+      if (typeof callback === "function") callback({ requests: [], friends: [], renamed: true });
+      return;
+    }
+    if (isRevokedDevice(user.phone, user.deviceId)) {
+      socket.emit("force-logout");
+      if (typeof callback === "function") callback({ requests: [], friends: [], revoked: true });
+      return;
+    }
+    const hadAccount = !!(users[user.phone] && users[user.phone].password);
+    bindDeviceSocket(socket, user.phone, user.deviceId);
+    mergeClientUser(user);
+    socketToPhone[socket.id] = user.phone;
+    setSelf(socket, user.phone);
+    phoneToSocket[user.phone] = socket.id;
+    // এই ডিভাইস আগে লগইন-হিস্ট্রিতে না থাকলে (পুরোনো সেশন) পাসওয়ার্ড মিললে যোগ করা
+    if (hadAccount && users[user.phone]) {
+      const su = users[user.phone];
+      const did = String(user.deviceId || "").slice(0, 64);
+      const known = did && Array.isArray(su.loginHistory) && su.loginHistory.some((x) => x && x.deviceId === did);
+      if (known) touchDevice(user.phone, did);
+      else if (did && verifyPassword(user.password, su.password)) recordDevice(su, socket, did, "session");
+    }
+
+    // ক্লায়েন্টের ব্যাকআপ প্রোফাইল (bio/location + ছোট গ্যালারি) সার্ভারে ফেরত আনা —
+    // Render রিস্টার্টে ephemeral ডিস্ক মুছে গেলেও ইউজার লগইন করলেই ডেটা ফিরে আসে (ফ্রি)
+    if (profile && typeof profile === "object") {
+      const existing = profiles[user.phone] || {};
+      const merged = { ...existing };
+      ["bio", "location", "work", "education", "relationship", "about"].forEach((k) => {
+        if (profile[k] && !merged[k]) merged[k] = String(profile[k]).slice(0, 2000);
+      });
+      // গ্যালারি আইটেম: সর্বোচ্চ ৬টা, প্রতিটা ছোট রাখা (base64 খুব বড় হলে স্কিপ)
+      if (Array.isArray(profile.items) && (!merged.items || !merged.items.length)) {
+        merged.items = profile.items
+          .filter((it) => it && it.src && String(it.src).length < 400000)
+          .slice(0, 6);
+      }
+      profiles[user.phone] = merged;
+    }
+
+    if (Array.isArray(friends)) {
+      friends.forEach((f) => {
+        if (!f || !f.phone) return;
+        let fp = f.phone;
+        if (phoneAliases[fp]) fp = phoneAliases[fp]; // বন্ধু নম্বর বদলালে নতুন নম্বরে মিলিয়ে নেওয়া
+        if (fp === user.phone || isDeletedId(fp)) return; // মুছে ফেলা অ্যাকাউন্ট আর ফিরবে না
+        if (!users[fp]) {
+          if (fp !== f.phone || PID_RE.test(fp)) return;
+          users[fp] = { name: f.name, phone: fp, pic: f.pic };
+        }
+        ensureSet(friendships, user.phone).add(fp);
+        ensureSet(friendships, fp).add(user.phone);
+      });
+    }
+
+    saveData();
+    if (typeof callback === "function") callback(getFriendPayload(user.phone));
+  });
+
+  // ---------- FRIENDS ----------
+  socket.on("get-friend-data", ({ phone }, callback) => {
+    if (typeof callback === "function") callback(getFriendPayload(phone));
+  });
+
+  socket.on("send-friend-request", ({ fromUser, toUserPhone }) => {
+    if (!fromUser || !toUserPhone || fromUser.phone === toUserPhone) return;
+    mergeClientUser(fromUser);
+    ensureSet(friendRequests, toUserPhone).add(fromUser.phone);
+    saveData();
+
+    const targetSocket = phoneToSocket[toUserPhone];
+    if (targetSocket) sendTo(targetSocket, "receive-friend-request");
+  });
+
+  socket.on("accept-friend-request", ({ currentUser, friendUser }) => {
+    if (!currentUser || !friendUser) return;
+    ensureSet(friendships, currentUser.phone).add(friendUser.phone);
+    ensureSet(friendships, friendUser.phone).add(currentUser.phone);
+    ensureSet(friendRequests, currentUser.phone).delete(friendUser.phone);
+    saveData();
+
+    sendFriendData(currentUser.phone);
+    sendFriendData(friendUser.phone);
+  });
+
+  socket.on("reject-friend-request", ({ currentUser, fromPhone }) => {
+    if (!currentUser || !fromPhone) return;
+    ensureSet(friendRequests, currentUser.phone).delete(fromPhone);
+    saveData();
+    sendFriendData(currentUser.phone);
+  });
+
+  socket.on("remove-friend", ({ currentPhone, friendPhone }, callback) => {
+    if (!currentPhone || !friendPhone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    ensureSet(friendships, currentPhone).delete(friendPhone);
+    ensureSet(friendships, friendPhone).delete(currentPhone);
+    saveData();
+    sendFriendData(currentPhone);
+    sendFriendData(friendPhone);
+    if (typeof callback === "function") callback({ success: true });
+  });
+
+  // নাম বা ফোন দিয়ে ইউজার সার্চ (ফ্রেন্ড রিকোয়েস্ট পাঠানোর জন্য)
+  socket.on("search-users", ({ query, myPhone }, callback) => {
+    if (typeof callback !== "function") return;
+    const q = (query || "").toString().trim().toLowerCase();
+    if (!q || q.length < 1) {
+      callback([]);
+      return;
+    }
+    myPhone = viewerOf(socket) || myPhone;
+    // প্রোফাইল লিংক (…/u/<id>) বা শুধু আইডি পেস্ট করলে সরাসরি সেই ইউজার
+    const pm = q.match(/(?:^|[\/=#])(u[0-9a-f]{16})(?:[\/?#]|$)/);
+    if (pm) {
+      const lp = phoneFromPid(pm[1]);
+      if (!lp || lp === myPhone || bannedUsers[lp]) return callback([]);
+      return callback([{
+        ...publicUser(lp),
+        isFriend: ensureSet(friendships, myPhone).has(lp),
+        requestPending: ensureSet(friendRequests, lp).has(myPhone),
+      }]);
+    }
+    const myFriends = ensureSet(friendships, myPhone);
+    const myOutgoing = []; // optional: track pending outbound — skip for now
+    const results = Object.values(users)
+      .filter((u) => {
+        if (!u || !u.phone || u.phone === myPhone) return false;
+        if (bannedUsers[u.phone]) return false;
+        const name = (u.name || "").toLowerCase();
+        const phone = (u.phone || "").toLowerCase();
+        const qCompact = q.replace(/[\s-]/g, "");
+        // নাম দিয়ে আংশিক সার্চ চলবে; নম্বর/ইমেইল শুধু হুবহু মিললে (আংশিক মিলিয়ে নম্বর খুঁজে বের করা যাবে না)
+        return name.includes(q) || phone === q || phone === qCompact || (!!u.email && u.email === q);
+      })
+      .slice(0, 25)
+      .map((u) => ({
+        ...publicUser(u.phone),
+        isFriend: myFriends.has(u.phone),
+        requestPending: ensureSet(friendRequests, u.phone).has(myPhone),
+      }));
+    callback(results);
+  });
+
+  // ---------- DIRECT MESSAGES ----------
+  socket.on("get-direct-history", ({ senderPhone, receiverPhone }, callback) => {
+    const key = directKey(senderPhone, receiverPhone);
+    if (typeof callback === "function") callback(directMessages[key] || []);
+  });
+
+  // Render sleep/restart হলে ephemeral ডিস্ক থেকে app-data.json মুছে গেলে ফ্রেন্ডের
+  // সাথে করা মেসেজ যেন হারিয়ে না যায় — ক্লায়েন্ট নিজের ব্রাউজার-ক্যাশে রাখা মেসেজ
+  // এখানে পাঠায়, সার্ভার সেগুলো নিজের স্টোরের সাথে মার্জ করে ফিরিয়ে দেয়/সেভ করে
+  // রাখে, ঠিক যেমনটা "sync-user-data" ফ্রেন্ড-লিস্টের জন্য করে।
+  function mergeDirectMessageLists(a, b) {
+    const seen = new Set();
+    const out = [];
+    (a || []).concat(b || []).forEach((m) => {
+      if (!m || !m.senderPhone) return;
+      const key = m.clientId || [m.senderPhone, m.timestamp, m.text || m.fileContent || ""].join("|");
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(m);
+    });
+    out.sort((x, y) => (x.timestamp || 0) - (y.timestamp || 0));
+    return out;
+  }
+
+  socket.on("sync-direct-messages", ({ myPhone, friendPhone, cachedMessages }, callback) => {
+    if (!myPhone || !friendPhone) {
+      if (typeof callback === "function") callback([]);
+      return;
+    }
+    const key = directKey(myPhone, friendPhone);
+    const existing = directMessages[key] || [];
+    const safeCache = Array.isArray(cachedMessages) ? cachedMessages.slice(-200) : [];
+    const merged = mergeDirectMessageLists(existing, safeCache);
+    if (merged.length !== existing.length) {
+      directMessages[key] = merged;
+      saveData();
+    }
+    if (typeof callback === "function") callback(directMessages[key] || []);
+  });
+
+  socket.on("send-direct-message", (msgData, callback) => {
+    const { senderPhone, receiverPhone } = msgData;
+
+    if (bannedUsers[senderPhone]) {
+      if (typeof callback === "function") callback({ success: false, error: "banned" });
+      return;
+    }
+    if (ensureSet(blockedUsers, senderPhone).has(receiverPhone)) {
+      if (typeof callback === "function") callback({ success: false, error: "blocked_by_you" });
+      return;
+    }
+    if (ensureSet(blockedUsers, receiverPhone).has(senderPhone)) {
+      if (typeof callback === "function") callback({ success: false, error: "blocked_by_them" });
+      return;
+    }
+
+    const key = directKey(senderPhone, receiverPhone);
+    if (!directMessages[key]) directMessages[key] = [];
+    directMessages[key].push(msgData);
+    saveData();
+
+    const targetSocket = phoneToSocket[receiverPhone];
+    if (targetSocket) sendTo(targetSocket, "receive-direct-message", msgData);
+
+    // Messenger-এর মতো স্ট্যাটাস: রিসিভার অনলাইনে থাকলে "Delivered"
+    if (typeof callback === "function") {
+      callback({ success: true, delivered: !!targetSocket });
+    }
+  });
+
+  // রিসিভার চ্যাট খুললে সব মেসেজ "Seen" হিসেবে মার্ক হয় এবং সেন্ডার জানতে পারে
+  socket.on("mark-direct-seen", ({ viewerPhone, friendPhone }) => {
+    if (!viewerPhone || !friendPhone) return;
+    const key = directKey(viewerPhone, friendPhone);
+    const list = directMessages[key] || [];
+    let changed = false;
+    list.forEach((m) => {
+      if (m.senderPhone === friendPhone && !m.seen) {
+        m.seen = true;
+        changed = true;
+      }
+    });
+    if (changed) saveData();
+
+    const senderSocket = phoneToSocket[friendPhone];
+    if (senderSocket) {
+      sendTo(senderSocket, "direct-messages-seen", { byPhone: viewerPhone });
+    }
+  });
+
+  socket.on("clear-direct-history", ({ senderPhone, receiverPhone }, callback) => {
+    const key = directKey(senderPhone, receiverPhone);
+    delete directMessages[key];
+    saveData();
+    if (typeof callback === "function") callback();
+  });
+
+  socket.on("toggle-block-user", ({ currentPhone, targetPhone }, callback) => {
+    const set = ensureSet(blockedUsers, currentPhone);
+    let isBlocked;
+    if (set.has(targetPhone)) {
+      set.delete(targetPhone);
+      isBlocked = false;
+    } else {
+      set.add(targetPhone);
+      isBlocked = true;
+    }
+    saveData();
+    if (typeof callback === "function") callback({ success: true, isBlocked });
+  });
+
+  // ---------- ROOMS / GROUP CHAT ----------
+  socket.on("join-room", ({ roomCode, user, peerId }) => {
+    if (!roomCode || !user) return;
+    socket.join(roomCode);
+    socketToRoom[socket.id] = roomCode;
+
+    if (user.phone) {
+      mergeClientUser(user);
+      phoneToSocket[user.phone] = socket.id;
+      socketToPhone[socket.id] = user.phone;
+      setSelf(socket, user.phone);
+    }
+
+    if (!roomMembers[roomCode]) roomMembers[roomCode] = new Map();
+    roomMembers[roomCode].set(socket.id, { user, peerId });
+
+    emitRoom(roomCode, "user-joined-notify", { user }, socket.id);
+    broadcastRoomMembers(roomCode);
+  });
+
+  socket.on("leave-room", ({ roomCode }) => {
+    if (!roomCode) return;
+    socket.leave(roomCode);
+    if (roomMembers[roomCode]) {
+      roomMembers[roomCode].delete(socket.id);
+    }
+    delete socketToRoom[socket.id];
+    broadcastRoomMembers(roomCode);
+  });
+
+  socket.on("get-room-history", (roomCode, callback) => {
+    if (typeof callback === "function") callback(roomMessages[roomCode] || []);
+  });
+
+  socket.on("send-message", (msgData, callback) => {
+    const { roomCode } = msgData;
+    if (!roomCode) return;
+    if (!roomMessages[roomCode]) roomMessages[roomCode] = [];
+    roomMessages[roomCode].push(msgData);
+    saveData();
+
+    emitRoom(roomCode, "receive-message", msgData, socket.id);
+    if (typeof callback === "function") callback();
+  });
+
+  socket.on("set-room-theme", ({ roomCode, themeData }) => {
+    if (!roomCode) return;
+    emitRoom(roomCode, "room-theme-update", themeData, socket.id);
+  });
+
+  // ---------- DIRECT CHAT THEME (দুই পাশেই একসাথে বদলাবে) ----------
+  socket.on("set-direct-theme", ({ fromPhone, toPhone, themeData }) => {
+    if (!fromPhone || !toPhone) return;
+    directThemes[directKey(fromPhone, toPhone)] = themeData || {};
+    saveData();
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) {
+      sendTo(targetSocket, "direct-theme-update", { fromPhone, themeData });
+    }
+  });
+
+  socket.on("get-direct-theme", ({ myPhone, friendPhone }, callback) => {
+    if (typeof callback === "function") {
+      callback(directThemes[directKey(myPhone, friendPhone)] || null);
+    }
+  });
+
+  // ---------- USER PROFILE (তথ্য + ছবি/ভিডিও/অডিও) ----------
+  socket.on("get-profile", ({ phone }, callback) => {
+    if (typeof callback !== "function") return;
+    if (typeof phone !== "string" || !hasOwn(users, phone) || bannedUsers[phone]) return callback(null);
+    const viewerPhone = viewerOf(socket);
+    const isAdmin = adminSockets.has(socket.id);
+    const base = publicUser(phone);
+    let relation = "none"; // none | friends | outgoing | incoming | self
+    if (viewerPhone && viewerPhone === phone) relation = "self";
+    else if (viewerPhone && phone) {
+      if (ensureSet(friendships, viewerPhone).has(phone)) relation = "friends";
+      else if (ensureSet(friendRequests, phone).has(viewerPhone)) relation = "outgoing";
+      else if (ensureSet(friendRequests, viewerPhone).has(phone)) relation = "incoming";
+    }
+    // বন্ধু (বা নিজে/অ্যাডমিন) না হলে কিছুই দেখা যাবে না — শুধু নাম আর প্রোফাইল ছবি, যাতে চিনে ফ্রেন্ড রিকোয়েস্ট পাঠানো যায়
+    if (relation !== "self" && relation !== "friends" && !isAdmin) {
+      return callback({ name: base.name, phone: base.phone, pic: base.pic, relation, locked: true });
+    }
+    const p = profiles[phone] || {};
+    callback({ ...base, ...p, relation, friendCount: ensureSet(friendships, phone).size });
+  });
+
+  // নিজের প্রোফাইল লিংকের আইডি (শুধু নিজেরটাই পাওয়া যায়)
+  socket.on("get-my-link", (_p, callback) => {
+    if (typeof callback !== "function") return;
+    const me = viewerOf(socket);
+    if (!me || !hasOwn(users, me)) return callback({ success: false });
+    callback({ success: true, linkId: pidOf(me) });
+  });
+
+  socket.on("update-avatar", async ({ phone, dataUrl, name }, callback) => {
+    if (!phone || !dataUrl) {
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
+      return;
+    }
+    const resolved = await resolveImageSrc(dataUrl, name || "avatar");
+    if (!resolved || !resolved.src) {
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+      return;
+    }
+    if (!users[phone]) users[phone] = { phone };
+    const oldPic = users[phone].pic;
+    users[phone].pic = resolved.src;
+    // প্রোফাইল ছবি Photos + পোস্ট ফিডেও দেখাবে
+    publishProfileMediaAsPost(phone, resolved.src, resolved.host, "avatar");
+    saveData();
+    try { notifyFriendsOfProfile(phone); } catch (e) {}
+    if (oldPic && oldPic !== resolved.src) cleanupMedia([oldPic]);
+    if (typeof callback === "function") callback({ success: true, pic: resolved.src });
+  });
+
+  socket.on("update-cover", async ({ phone, dataUrl, name }, callback) => {
+    if (!phone || !dataUrl) {
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
+      return;
+    }
+    const resolved = await resolveImageSrc(dataUrl, name || "cover");
+    if (!resolved || !resolved.src) {
+      if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+      return;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    const oldCover = profiles[phone].cover;
+    profiles[phone].cover = resolved.src;
+    // কভার ছবি Photos + পোস্ট ফিডেও দেখাবে
+    publishProfileMediaAsPost(phone, resolved.src, resolved.host, "cover");
+    saveData();
+    try { notifyFriendsOfProfile(phone); } catch (e) {}
+    if (oldCover && oldCover !== resolved.src) cleanupMedia([oldCover]);
+    if (typeof callback === "function") callback({ success: true, cover: resolved.src });
+  });
+
+  socket.on("update-display-name", ({ phone, name }, callback) => {
+    const clean = (name || "").toString().trim().slice(0, 40);
+    if (!phone || !clean) {
+      if (typeof callback === "function") callback({ success: false, error: "invalid" });
+      return;
+    }
+    if (!users[phone]) users[phone] = { phone };
+    users[phone].name = clean;
+    saveData();
+    if (typeof callback === "function") callback({ success: true, name: clean });
+  });
+
+  socket.on("save-profile", ({ phone, profile }, callback) => {
+    if (!phone) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    const existing = profiles[phone] || {};
+    profiles[phone] = { ...existing, ...(profile || {}) };
+    saveData();
+    if (typeof callback === "function") callback({ success: true, profile: profiles[phone] });
+  });
+
+  socket.on("add-profile-item", async ({ phone, item }, callback) => {
+    if (!phone || !item) {
+      if (typeof callback === "function") callback({ success: false, error: "missing", message: "ছবি পাওয়া যায়নি।" });
+      return;
+    }
+    if (item.kind && item.kind !== "photo") {
+      if (typeof callback === "function") callback({ success: false, error: "photos_only", message: "শুধু ছবি।" });
+      return;
+    }
+    item.kind = "photo";
+    item.caption = String(item.caption || "").slice(0, 500);
+    if (item.src && String(item.src).startsWith("data:")) {
+      const resolved = await resolveImageSrc(item.src, item.name || "photo");
+      if (!resolved || !resolved.src) {
+        if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+        return;
+      }
+      item.src = resolved.src;
+      item.host = resolved.host;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+    // ছবি (সর্বোচ্চ ১০০) + বিদ্যমান reels আলাদা রাখা
+    {
+      const keepReels = profiles[phone].items.filter((it) => it && it.kind === "reel");
+      const photos = [item].concat(profiles[phone].items.filter((it) => it && it.kind === "photo")).slice(0, 100);
+      profiles[phone].items = photos.concat(keepReels);
+    }
+    syncMediaLinks(profiles[phone]);
+    saveData();
+
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
+    });
+
+    if (typeof callback === "function") callback({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
+  });
+
+  // ---------- Reels (শুধু ভিডিও) ----------
+  socket.on("add-profile-reel", async ({ phone, item }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!phone || !item || !item.src) return reply({ success: false, error: "missing", message: "ভিডিও পাওয়া যায়নি।" });
+
+    let src = String(item.src);
+    if (src.startsWith("data:")) {
+      if (!src.startsWith("data:video/")) return reply({ success: false, error: "videos_only", message: "Reels-এ শুধু ভিডিও।" });
+      const remote = await uploadVideoToCloudinary(src, item.name || "reel");
+      if (!remote) return reply({ success: false, error: "upload_failed", message: "রিলস আপলোড হয়নি।" });
+      src = remote;
+    } else if (!/^https?:\/\//.test(src)) {
+      return reply({ success: false, error: "invalid", message: "ভিডিও ঠিক নেই।" });
+    }
+
+    const reel = {
+      id: String(item.id || ("r" + Date.now().toString(36))).slice(0, 60),
+      kind: "reel",
+      src,
+      name: String(item.name || "reel").slice(0, 120),
+      caption: String(item.caption || "").slice(0, 500),
+      timestamp: Date.now(),
+    };
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].items)) profiles[phone].items = [];
+    const photos = profiles[phone].items.filter((it) => it && it.kind === "photo");
+    const reels = [reel].concat(profiles[phone].items.filter((it) => it && it.kind === "reel")).slice(0, 30);
+    profiles[phone].items = photos.concat(reels);
+    syncMediaLinks(profiles[phone]);
+    saveData();
+
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
+    });
+    reply({ success: true, items: profiles[phone].items, posts: profiles[phone].posts });
+  });
+
+  socket.on("delete-profile-item", ({ phone, itemId }, callback) => {
+    if (profiles[phone] && Array.isArray(profiles[phone].items)) {
+      const it = profiles[phone].items.find((x) => x.id === itemId);
+      const gone = [it && it.src];
+      profiles[phone].items = profiles[phone].items.filter((x) => x.id !== itemId);
+      if (it && it.postId && Array.isArray(profiles[phone].posts)) {
+        const linked = profiles[phone].posts.find((p) => p.id === it.postId);
+        if (linked && linked.media) gone.push(linked.media.src);
+        profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== it.postId);
+      }
+      saveData();
+      cleanupMedia(gone);
+      notifyFriendsOfProfile(phone);
+    }
+    const pr = profiles[phone] || {};
+    if (typeof callback === "function") callback({ success: true, items: pr.items || [], posts: pr.posts || [] });
+  });
+
+  // ---------- FACEBOOK-স্টাইল টাইমলাইন পোস্ট (ছবি/ভিডিও/টেক্সট + লাইক + কমেন্ট) ----------
+  function notifyFriendsOfProfile(phone) {
+    Array.from(ensureSet(friendships, phone)).forEach((friendPhone) => {
+      const sid = phoneToSocket[friendPhone];
+      if (sid) sendTo(sid, "friend-profile-updated", { phone });
+    });
+  }
+
+  socket.on("create-post", async ({ phone, text, media }, callback) => {
+    if (!phone || (!text && !media)) {
+      if (typeof callback === "function") callback({ success: false });
+      return;
+    }
+    if (!profiles[phone]) profiles[phone] = {};
+    if (!Array.isArray(profiles[phone].posts)) profiles[phone].posts = [];
+
+    let mediaOut = media || null;
+    if (mediaOut) {
+      if (mediaOut.type === "video") {
+        let vsrc = String(mediaOut.src || "");
+        if (vsrc.startsWith("data:video/")) {
+          const remote = await uploadVideoToCloudinary(vsrc, "post-video");
+          if (!remote) {
+            if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ভিডিও আপলোড হয়নি।" });
+            return;
+          }
+          vsrc = remote;
+        } else if (!/^https?:\/\//.test(vsrc)) {
+          if (typeof callback === "function") callback({ success: false, error: "invalid", message: "ভিডিও ঠিক নেই।" });
+          return;
+        }
+        mediaOut = { type: "video", src: vsrc };
+      } else {
+        mediaOut.type = "image";
+        if (mediaOut.src && String(mediaOut.src).startsWith("data:")) {
+          const resolved = await resolveImageSrc(mediaOut.src, "post");
+          if (!resolved || !resolved.src) {
+            if (typeof callback === "function") callback({ success: false, error: "upload_failed", message: "ছবি আপলোড হয়নি।" });
+            return;
+          }
+          mediaOut = { type: "image", src: resolved.src, host: resolved.host };
+        }
+      }
+    }
+
+    const post = {
+      id: "post_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      text: (text || "").slice(0, 2000),
+      media: mediaOut,
+      timestamp: Date.now(),
+      likes: [],
+      comments: []
+    };
+
+    profiles[phone].posts.unshift(post);
+    // সর্বোচ্চ ৬০টি পোস্ট রাখা হয়, তার বেশি হলে পুরনোগুলো বাদ যাবে
+    profiles[phone].posts = profiles[phone].posts.slice(0, 100);
+    syncMediaLinks(profiles[phone]);
+    saveData();
+    notifyFriendsOfProfile(phone);
+
+    if (typeof callback === "function") callback({ success: true, post, items: profiles[phone].items, posts: profiles[phone].posts });
+  });
+
+  socket.on("delete-post", ({ phone, postId }, callback) => {
+    if (profiles[phone] && Array.isArray(profiles[phone].posts)) {
+      const post = profiles[phone].posts.find((p) => p.id === postId);
+      const gone = [post && post.media && post.media.src];
+      profiles[phone].posts = profiles[phone].posts.filter((p) => p.id !== postId);
+      if (post && post.itemId && Array.isArray(profiles[phone].items)) {
+        const linked = profiles[phone].items.find((i) => i.id === post.itemId);
+        if (linked) gone.push(linked.src);
+        profiles[phone].items = profiles[phone].items.filter((i) => i.id !== post.itemId);
+      }
+      saveData();
+      cleanupMedia(gone);
+      notifyFriendsOfProfile(phone);
+    }
+    const pr = profiles[phone] || {};
+    if (typeof callback === "function") callback({ success: true, items: pr.items || [], posts: pr.posts || [] });
+  });
+
+  // ---------- REACTIONS (Like/Love/Care/Haha/Wow/Sad/Angry) · COMMENTS · SHARE ----------
+  // পোস্ট, রিলস আর স্টোরি — তিন জায়গার জন্যই একই লজিক।
+  // ডেটা: obj.reacts = { phone: "love" }, obj.likes = [phone...] (পুরনো কোডের সাথে মিল রাখতে), obj.shares = সংখ্যা
+  const REACT_TYPES = ["like", "love", "care", "haha", "wow", "sad", "angry"];
+
+  function reactsOf(o) {
+    const r = Object.assign({}, (o && o.reacts) || {});
+    ((o && o.likes) || []).forEach((ph) => { if (!r[ph]) r[ph] = "like"; }); // পুরনো লাইক = "like"
+    return r;
+  }
+
+  // kind: "post" | "reel" | "story" → আসল অবজেক্ট খুঁজে দেয়
+  function resolveTarget(kind, ownerPhone, id) {
+    if (kind === "story") {
+      const st = stories.find((x) => x.id === id);
+      return st ? { obj: st, kind: "story", owner: st.phone, media: st.media || null, caption: st.text || "" } : null;
+    }
+    const pr = profiles[ownerPhone];
+    if (!pr) return null;
+    if (kind === "reel") {
+      const item = (pr.items || []).find((i) => i && i.id === id && i.kind === "reel");
+      if (!item) return null;
+      const post = item.postId ? (pr.posts || []).find((x) => x && x.id === item.postId) : null;
+      return { obj: post || item, kind: "reel", owner: ownerPhone, postId: post ? post.id : null, reelId: item.id, media: { type: "video", src: item.src }, caption: item.caption || (post && post.text) || "" };
+    }
+    const post = (pr.posts || []).find((x) => x && x.id === id);
+    if (!post) return null;
+    const item = post.itemId ? (pr.items || []).find((i) => i && i.id === post.itemId && i.kind === "reel") : null;
+    return { obj: post, kind: "post", owner: ownerPhone, postId: post.id, reelId: item ? item.id : null, media: post.media || null, caption: post.text || "" };
+  }
+
+  function itemPayload(t, id) {
+    const o = t.obj;
+    return {
+      kind: t.kind, ownerPhone: t.owner, id,
+      postId: t.postId || null, reelId: t.reelId || null,
+      reacts: reactsOf(o), likes: o.likes || [],
+      commentCount: (o.comments || []).length, shares: o.shares || 0,
+    };
+  }
+
+  // মালিক + মালিকের বন্ধুরা (+ যে করল সে) সাথে সাথে আপডেট পাবে
+  function broadcastItem(t, id, extra, alsoPhone) {
+    const payload = Object.assign(itemPayload(t, id), extra || {});
+    if (t.kind === "story") return payload;
+    const targets = new Set(Array.from(ensureSet(friendships, t.owner)).concat([t.owner]));
+    if (alsoPhone) targets.add(alsoPhone);
+    targets.forEach((ph) => { const sid = phoneToSocket[ph]; if (sid) sendTo(sid, "item-updated", payload); });
+    return payload;
+  }
+
+  function setReaction(t, phone, type) {
+    const o = t.obj;
+    const reacts = reactsOf(o);
+    if (REACT_TYPES.includes(type)) reacts[phone] = type; else delete reacts[phone];
+    o.reacts = reacts;
+    o.likes = Object.keys(reacts);
+    return reacts;
+  }
+
+  function applyReaction(kind, ownerPhone, id, reactorPhone, type, callback) {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!reactorPhone || bannedUsers[reactorPhone] || !["post", "reel", "story"].includes(kind)) return reply({ success: false });
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return reply({ success: false });
+    const reacts = setReaction(t, reactorPhone, type);
+    saveData();
+    const payload = broadcastItem(t, id, {}, reactorPhone);
+    if (t.kind === "story" && t.owner !== reactorPhone) {
+      const u = users[reactorPhone] || {};
+      const sid = phoneToSocket[t.owner];
+      if (sid) sendTo(sid, "story-reacted", { storyId: id, phone: reactorPhone, name: u.name || "Someone", type: reacts[reactorPhone] || null, reacts });
+    }
+    reply({ success: true, reacts, likes: t.obj.likes, my: reacts[reactorPhone] || null, payload });
+  }
+
+  socket.on("react-item", ({ kind, ownerPhone, id, reactorPhone, type }, callback) => {
+    applyReaction(kind, ownerPhone, id, reactorPhone, type, callback);
+  });
+
+  // পুরনো "লাইক" বাটনের সাথে সামঞ্জস্য
+  socket.on("toggle-like-post", ({ phone, postId, likerPhone }, callback) => {
+    const t = resolveTarget("post", phone, postId);
+    if (!t) { if (typeof callback === "function") callback({ success: false }); return; }
+    const had = !!reactsOf(t.obj)[likerPhone];
+    applyReaction("post", phone, postId, likerPhone, had ? null : "like", (res) => {
+      if (typeof callback === "function") callback(res && res.success ? Object.assign({ liked: !had }, res) : res);
+    });
+  });
+
+  // কারা রিঅ্যাক্ট করেছে (পোস্ট/রিলস/স্টোরি)
+  socket.on("get-reactors", ({ kind, ownerPhone, id }, callback) => {
+    if (typeof callback !== "function") return;
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return callback({ success: false });
+    const r = reactsOf(t.obj);
+    callback({ success: true, list: Object.keys(r).map((ph) => Object.assign({}, publicUser(ph), { phone: ph, type: r[ph] })) });
+  });
+
+  // স্টোরির ভিউয়ার + তাদের রিঅ্যাকশন (শুধু মালিক দেখতে পাবে)
+  socket.on("get-story-viewers", ({ phone, storyId }, callback) => {
+    if (typeof callback !== "function") return;
+    const st = stories.find((x) => x.id === storyId);
+    if (!st || st.phone !== phone) return callback({ success: false });
+    const r = reactsOf(st);
+    const all = Array.from(new Set((st.views || []).concat(Object.keys(r))));
+    callback({ success: true, list: all.map((ph) => Object.assign({}, publicUser(ph), { phone: ph, type: r[ph] || null })) });
+  });
+
+  socket.on("add-comment", ({ phone, postId, comment, kind }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", phone, postId);
+    if (!t || !comment || !String(comment.text || "").trim() || bannedUsers[comment.authorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) o.comments = [];
+
+    const newComment = {
+      id: "cm_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      authorPhone: comment.authorPhone,
+      authorName: comment.authorName,
+      authorPic: comment.authorPic,
+      text: String(comment.text || "").slice(0, 500),
+      timestamp: Date.now()
+    };
+    o.comments.push(newComment);
+    saveData();
+
+    // মালিক, তার বন্ধুরা আর কমেন্টকারী — সবার স্ক্রিনে সাথে সাথে কমেন্ট দেখা যাবে
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, comment.authorPhone);
+    reply({ success: true, comment: newComment });
+  });
+
+  // ---------- COMMENT: এডিট / ডিলিট / হাইড ----------
+  socket.on("edit-comment", ({ kind, ownerPhone, postId, commentId, editorPhone, text }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !editorPhone || bannedUsers[editorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const c = o.comments.find((x) => x && x.id === commentId);
+    if (!c || c.authorPhone !== editorPhone) return reply({ success: false, message: "শুধু নিজের কমেন্ট এডিট করা যায়।" });
+    const clean = String(text || "").trim().slice(0, 500);
+    if (!clean) return reply({ success: false, message: "খালি কমেন্ট রাখা যায় না।" });
+    c.text = clean;
+    c.edited = true;
+    c.editedAt = Date.now();
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, editorPhone);
+    reply({ success: true, comment: c, comments: o.comments });
+  });
+
+  socket.on("delete-comment", ({ kind, ownerPhone, postId, commentId, actorPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !actorPhone || bannedUsers[actorPhone]) return reply({ success: false });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const idx = o.comments.findIndex((x) => x && x.id === commentId);
+    if (idx < 0) return reply({ success: false });
+    const c = o.comments[idx];
+    // কমেন্টকারী নিজে ডিলিট করতে পারে, অথবা পোস্টের মালিক
+    if (c.authorPhone !== actorPhone && t.owner !== actorPhone) {
+      return reply({ success: false, message: "এই কমেন্ট ডিলিট করার অনুমতি নেই।" });
+    }
+    o.comments.splice(idx, 1);
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100), commentCount: o.comments.length }, actorPhone);
+    reply({ success: true, comments: o.comments });
+  });
+
+  socket.on("hide-comment", ({ kind, ownerPhone, postId, commentId, actorPhone, hide }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const t = resolveTarget(kind === "reel" ? "reel" : "post", ownerPhone, postId);
+    if (!t || !commentId || !actorPhone) return reply({ success: false });
+    // শুধু পোস্টের মালিক হাইড করতে পারে
+    if (t.owner !== actorPhone) return reply({ success: false, message: "শুধু পোস্টের মালিক কমেন্ট হাইড করতে পারে।" });
+    const o = t.obj;
+    if (!Array.isArray(o.comments)) return reply({ success: false });
+    const c = o.comments.find((x) => x && x.id === commentId);
+    if (!c) return reply({ success: false });
+    c.hidden = hide !== false;
+    c.hiddenBy = actorPhone;
+    saveData();
+    broadcastItem(t, postId, { comments: o.comments.slice(-100) }, actorPhone);
+    reply({ success: true, comment: c, comments: o.comments });
+  });
+
+  // ---------- SHARE ----------
+  // mode: "feed" = নিজের ফিডে শেয়ার · "friend" = বন্ধুকে মেসেজে পাঠানো · "link" = লিংক কপি/সিস্টেম শেয়ার (শুধু গণনা)
+  socket.on("share-item", ({ kind, ownerPhone, id, sharerPhone, mode, text, toPhone }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    if (!sharerPhone || bannedUsers[sharerPhone] || (kind !== "post" && kind !== "reel")) return reply({ success: false });
+    const t = resolveTarget(kind, ownerPhone, id);
+    if (!t) return reply({ success: false, message: "এটি আর পাওয়া যাচ্ছে না।" });
+    const owner = users[t.owner] || {};
+    const sharer = users[sharerPhone] || {};
+    const note = String(text || "").slice(0, 2000);
+    const cap = String(t.caption || "").replace(/\s+/g, " ").trim();
+    const mediaOut = t.media && t.media.src ? { type: t.media.type === "video" ? "video" : "image", src: t.media.src } : null;
+
+    if (mode === "feed") {
+      if (!profiles[sharerPhone]) profiles[sharerPhone] = {};
+      if (!Array.isArray(profiles[sharerPhone].posts)) profiles[sharerPhone].posts = [];
+      const post = {
+        id: "post_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        text: note,
+        media: mediaOut ? Object.assign({}, mediaOut, t.media && t.media.host ? { host: t.media.host } : {}) : null,
+        timestamp: Date.now(), likes: [], comments: [],
+        itemId: "shared", // Photos/Reels-এ ডুপ্লিকেট আইটেম তৈরি হবে না
+        sharedFrom: { ownerPhone: t.owner, ownerName: owner.name || "User", text: cap.slice(0, 500), kind },
+      };
+      profiles[sharerPhone].posts.unshift(post);
+      profiles[sharerPhone].posts = profiles[sharerPhone].posts.slice(0, 100);
+      t.obj.shares = (t.obj.shares || 0) + 1;
+      saveData();
+      notifyFriendsOfProfile(sharerPhone);
+      const payload = broadcastItem(t, id, {}, sharerPhone);
+      return reply({ success: true, post, shares: t.obj.shares, payload });
+    }
+
+    if (mode === "friend") {
+      if (!toPhone || toPhone === sharerPhone) return reply({ success: false });
+      if (ensureSet(blockedUsers, sharerPhone).has(toPhone)) return reply({ success: false, message: "আপনি এই ইউজারকে ব্লক করে রেখেছেন।" });
+      if (ensureSet(blockedUsers, toPhone).has(sharerPhone)) return reply({ success: false, message: "মেসেজ পাঠানো যায়নি।" });
+      const label = kind === "reel" ? "Reel" : "পোস্ট";
+      const msg = {
+        clientId: "sh" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        senderPhone: sharerPhone, senderName: sharer.name || "User", senderPic: sharer.pic || "",
+        receiverPhone: toPhone, timestamp: Date.now(),
+        text: "↪️ " + (owner.name || "User") + " এর " + label + (cap ? ": " + cap.slice(0, 80) : ""),
+        shared: { kind, ownerPhone: t.owner, ownerName: owner.name || "User", caption: cap.slice(0, 200), note: note.slice(0, 500), mediaType: mediaOut ? mediaOut.type : "", mediaSrc: mediaOut ? mediaOut.src : "" },
+      };
+      const key = directKey(sharerPhone, toPhone);
+      if (!directMessages[key]) directMessages[key] = [];
+      directMessages[key].push(msg);
+      t.obj.shares = (t.obj.shares || 0) + 1;
+      saveData();
+      const targetSocket = phoneToSocket[toPhone];
+      if (targetSocket) sendTo(targetSocket, "receive-direct-message", msg);
+      const payload = broadcastItem(t, id, {}, sharerPhone);
+      return reply({ success: true, delivered: !!targetSocket, shares: t.obj.shares, payload });
+    }
+
+    // "link"
+    t.obj.shares = (t.obj.shares || 0) + 1;
+    saveData();
+    const payload = broadcastItem(t, id, {}, sharerPhone);
+    reply({ success: true, shares: t.obj.shares, payload, link: mediaOut ? mediaOut.src : "" });
+  });
+
+  // ---------- CALL: অডিও থেকে ভিডিওতে সুইচ ----------
+  socket.on("direct-call-upgrade", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) sendTo(targetSocket, "direct-call-upgraded");
+  });
+
+  socket.on("direct-call-reject", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) sendTo(targetSocket, "direct-call-rejected");
+  });
+
+  // ---------- ROOM CALL SIGNALING ----------
+  socket.on("call-user", (data) => {
+    if (!data || !data.roomCode) return;
+    emitRoom(data.roomCode, "incoming-call", data, socket.id);
+  });
+
+  socket.on("accept-call-notify", ({ roomCode }) => {
+    if (!roomCode) return;
+    emitRoom(roomCode, "call-accepted-by-receiver", undefined, socket.id);
+  });
+
+  socket.on("end-call", ({ roomCode }) => {
+    if (!roomCode) return;
+    emitRoom(roomCode, "call-ended", undefined, socket.id);
+  });
+
+  // ---------- DIRECT (FRIEND) CALL SIGNALING ----------
+  // রুম কোড ছাড়াই এক ফ্রেন্ড থেকে আরেক ফ্রেন্ডের কাছে কল পাঠানো হয়
+  socket.on("direct-call-user", (data) => {
+    if (!data || !data.toPhone) return;
+    const targetSocket = phoneToSocket[data.toPhone];
+    if (targetSocket) {
+      sendTo(targetSocket, "direct-incoming-call", data);
+    } else {
+      sendTo(socket.id, "direct-call-unavailable", { toPhone: data.toPhone });
+    }
+  });
+
+  socket.on("direct-call-accept", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) sendTo(targetSocket, "direct-call-accepted");
+  });
+
+  socket.on("direct-call-end", ({ toPhone }) => {
+    const targetSocket = phoneToSocket[toPhone];
+    if (targetSocket) sendTo(targetSocket, "direct-call-ended");
+  });
+
+  // ---------- DISCONNECT CLEANUP ----------
+  socket.on("disconnect", () => {
+    const phone = socketToPhone[socket.id];
+    if (phone && phoneToSocket[phone] === socket.id) {
+      delete phoneToSocket[phone];
+    }
+    delete socketToPhone[socket.id];
+    delete selfPhoneBySocket[socket.id];
+    unbindDeviceSocket(socket);
+    adminSockets.delete(socket.id);
+
+    const roomCode = socketToRoom[socket.id];
+    if (roomCode && roomMembers[roomCode]) {
+      roomMembers[roomCode].delete(socket.id);
+      broadcastRoomMembers(roomCode);
+    }
+    delete socketToRoom[socket.id];
+  });
+});
+
+// ---------- কল-এর জন্য TURN সার্ভারের ক্রেডেনশিয়াল (একাধিক ফ্রি সার্ভিস একসাথে) ----------
+// আলাদা নেটওয়ার্কের দুই ডিভাইসের মধ্যে কল চালাতে TURN সার্ভার লাগে। ক্রেডেনশিয়াল পাবলিক
+// GitHub-এ না রেখে Render-এর Environment-এ রাখা হয়। যতগুলো সার্ভিসের তথ্য দেওয়া থাকবে, সব
+// একসাথে ব্রাউজারে যায় — একটা ফুরিয়ে গেলে বা বন্ধ থাকলে অন্যটা দিয়ে কল চলবে।
+//
+//  ১) Metered (কার্ড ছাড়া ০.৫ GB, কার্ড দিলে ২০ GB):
+//       METERED_APP = অ্যাপের নাম (যেমন ektchatter),  METERED_API_KEY = API Key
+//  ২) Cloudflare (মাসে ১,০০০ GB ফ্রি, কার্ড/PayPal লাগে):
+//       CF_TURN_KEY_ID,  CF_TURN_API_TOKEN
+//  ৩) যেকোনো অন্য সার্ভিস (ExpressTURN, Turnix, Xirsys ইত্যাদি) — ড্যাশবোর্ডের ক্রেডেনশিয়াল দিয়ে:
+//       EXTRA_ICE_SERVERS = [{"urls":"turn:সার্ভার:3478","username":"...","credential":"..."}]
+let iceCache = { at: 0, data: null };
+
+async function fetchIceFromCloudflare(keyId, token) {
+  const r = await fetch(
+    `https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate-ice-servers`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttl: 86400 }),
+    }
+  );
+  if (!r.ok) throw new Error("Cloudflare TURN API status " + r.status);
+  const body = await r.json();
+  return Array.isArray(body.iceServers) ? body.iceServers : body.iceServers ? [body.iceServers] : [];
+}
+
+async function fetchIceFromMetered(appName, apiKey) {
+  const r = await fetch(
+    `https://${appName}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(apiKey)}`
+  );
+  if (!r.ok) throw new Error("Metered TURN API status " + r.status);
+  const body = await r.json();
+  return Array.isArray(body) ? body : [];
+}
+
+function readExtraIceServers() {
+  const raw = process.env.EXTRA_ICE_SERVERS;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  } catch (e) {
+    console.error("EXTRA_ICE_SERVERS সঠিক JSON নয়:", e.message);
+    return [];
+  }
+}
+
+app.get("/api/ice-servers", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    if (iceCache.data && Date.now() - iceCache.at < 60 * 60 * 1000) {
+      return res.json(iceCache.data);
+    }
+
+    const jobs = [];
+    if (typeof fetch === "function") {
+      if (process.env.METERED_APP && process.env.METERED_API_KEY) {
+        jobs.push(["metered", fetchIceFromMetered(process.env.METERED_APP, process.env.METERED_API_KEY)]);
+      }
+      if (process.env.CF_TURN_KEY_ID && process.env.CF_TURN_API_TOKEN) {
+        jobs.push(["cloudflare", fetchIceFromCloudflare(process.env.CF_TURN_KEY_ID, process.env.CF_TURN_API_TOKEN)]);
+      }
+    }
+    const extra = readExtraIceServers();
+    if (extra.length) jobs.push(["extra", Promise.resolve(extra)]);
+
+    if (!jobs.length) return res.json({ iceServers: [], hasTurn: false, providers: [] });
+
+    const results = await Promise.allSettled(jobs.map((j) => j[1]));
+    let list = [];
+    const providers = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled" && Array.isArray(r.value) && r.value.length) {
+        list = list.concat(r.value);
+        providers.push(jobs[i][0]);
+      } else if (r.status === "rejected") {
+        console.error(`ICE provider "${jobs[i][0]}" failed:`, r.reason && r.reason.message);
+      }
+    });
+
+    // পোর্ট 53 ফায়ারফক্সে সমস্যা করে, তাই বাদ দেওয়া হলো
+    list = list
+      .map((s) => {
+        const urls = (Array.isArray(s.urls) ? s.urls : [s.urls]).filter(
+          (u) => u && !/:53(\?|$)/.test(u)
+        );
+        return { ...s, urls };
+      })
+      .filter((s) => s.urls.length);
+
+    const data = { iceServers: list, hasTurn: list.some((s) => s.username), providers };
+    // শুধু সফল হলেই ক্যাশ করা হয়, নইলে পরের রিকোয়েস্টে আবার চেষ্টা হবে
+    if (list.length) iceCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (e) {
+    console.error("ICE server fetch failed:", e.message);
+    res.json({ iceServers: [], hasTurn: false, providers: [] });
+  }
+});
+
+// Fallback: send index.html for any other route (so refreshing on Render works)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+const PORT = process.env.PORT || 3000;
+(async () => {
+  try {
+    await connectMongo();
+  } catch (e) {
+    // MongoDB সেট করা আছে কিন্তু কানেক্ট হয়নি — ফাঁকা ডেটা নিয়ে চালু হলে পরে সব মুছে যেতে পারে, তাই বন্ধ করে দেওয়া হলো
+    console.error("❌ MongoDB connection failed:", e.message);
+    process.exit(1);
+  }
+  try {
+    await loadData();
+  } catch (e) {
+    console.error("Could not load saved data:", e.message);
+    if (mongoCol) process.exit(1); // লোড না হলে সেভ করলে পুরোনো ডেটা ওভাররাইট হয়ে যাবে
+  }
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+})();
