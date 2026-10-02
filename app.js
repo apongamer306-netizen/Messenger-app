@@ -6389,11 +6389,12 @@ window.EktReact = (function () {
     box.innerHTML = list.map((r, i) => `<div class="reel-item" data-rid="${esc(r.id)}" data-owner="${esc(r.ownerPhone)}" data-name="${esc(r.ownerName)}" data-pic="${esc(r.ownerPic)}" data-src="${esc(r.src)}">
       <video src="${esc(r.src)}" ${videoPosterUrl(r.src) ? 'poster="' + videoPosterUrl(r.src) + '"' : ""} loop playsinline muted preload="${i === 0 ? "auto" : "metadata"}"></video>
       <div class="reel-info"><div class="reel-owner" data-reel-owner><img src="${esc(oi(r.ownerPic, 96, true))}" alt=""><b>${esc(r.ownerName)}</b></div>${r.caption ? `<p>${esc(r.caption)}</p>` : ""}</div>
+      <button type="button" class="reel-sound-top" data-reel-sound title="Sound"><i class="fa-solid ${reelMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
       <div class="reel-side">
         <div class="reel-act">${EktReact.btnHtml("reel", r.ownerPhone, r.id, r, "reel")}${EktReact.numHtml("r", "reel", r.id, Object.keys(EktReact.mapOf(r)).length, "Like")}</div>
         <div class="reel-act"><button type="button" class="reel-round" data-reel-comment title="Comment"><i class="fa-regular fa-comment"></i></button>${EktReact.numHtml("c", "reel", r.id, r.commentCount || 0, "Comment")}</div>
         <div class="reel-act"><button type="button" class="reel-round" data-share-btn data-kind="reel" data-owner="${esc(r.ownerPhone)}" data-id="${esc(r.id)}" data-src="${esc(r.src)}" data-cap="${esc((r.caption || "").slice(0, 200))}" title="Share"><i class="fa-solid fa-share"></i></button>${EktReact.numHtml("s", "reel", r.id, r.shares || 0, "Share")}</div>
-        <button type="button" data-reel-sound title="Sound"><i class="fa-solid ${reelMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button><button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
+        <button type="button" data-reel-dl title="Download"><i class="fa-solid fa-download"></i></button><button type="button" data-reel-full title="Full view"><i class="fa-solid fa-expand"></i></button></div>
     </div>`).join("");
     if (reelObserver) reelObserver.disconnect();
     reelObserver = new IntersectionObserver((entries) => {
@@ -6443,12 +6444,11 @@ window.EktReact = (function () {
       <div class="short-shield" data-short-tap></div>
       <div class="short-pause"><i class="fa-solid fa-play"></i></div>
       <div class="reel-info short-info"><div class="reel-owner"><i class="fa-brands fa-youtube short-yt"></i><b>${esc(v.channel || "YouTube")}</b></div>${v.title ? `<p>${esc(v.title)}</p>` : ""}</div>
+      <button type="button" class="reel-sound-top" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
       <div class="reel-side">
         <div class="reel-act"><button type="button" class="reel-round${st.my ? " reacted" : ""}" data-short-like title="Like"><i class="${st.my ? "fa-solid" : "fa-regular"} fa-thumbs-up"></i></button><span class="reel-count" data-short-like-n>${st.likes || "Like"}</span></div>
         <div class="reel-act"><button type="button" class="reel-round" data-short-comment title="Comment"><i class="fa-regular fa-comment"></i></button><span class="reel-count" data-short-cm-n>${st.comments || "Comment"}</span></div>
-        <button type="button" data-short-sound title="Sound"><i class="fa-solid ${shortMuted ? "fa-volume-xmark" : "fa-volume-high"}"></i></button>
         <button type="button" data-short-share title="Share"><i class="fa-solid fa-share"></i></button>
-        <button type="button" data-short-open title="Open in YouTube"><i class="fa-brands fa-youtube"></i></button>
       </div>
     </div>`;
   }
@@ -6560,6 +6560,9 @@ window.EktReact = (function () {
     if (!YT_ID_RE.test(id)) return;
     const f = document.createElement("iframe");
     f.className = "short-frame";
+    f.setAttribute("tabindex", "-1");
+    f.setAttribute("aria-hidden", "true");
+    try { f.inert = true; } catch (er) {}
     f.title = "YouTube Short";
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.referrerPolicy = "strict-origin-when-cross-origin";
@@ -6669,47 +6672,17 @@ window.EktReact = (function () {
     }
   });
 
-  // ---------- স্ক্রিনে ফিট + উপর/নিচ অ্যারো ----------
+  // ---------- স্ক্রিনে ফিট ----------
   const activeReelList = () => (shortsMode ? $("shortsList") : $("reelsList"));
-  function updateReelNav() {
-    const list = activeReelList(), up = $("reelNavUp"), dn = $("reelNavDown");
-    if (!list || !up || !dn) return;
-    up.disabled = list.scrollTop < 8;
-    dn.disabled = !shortsMode && list.scrollTop + list.clientHeight >= list.scrollHeight - 8;
-  }
-  function positionReelNav() {
-    const nav = $("reelNav"), list = activeReelList();
-    if (!nav || !list || !list.offsetHeight) return;
-    // ল্যাপটপে কার্ডের ডানে বাইরে, ফোনে কার্ডের বাম পাশে ভেতরে
-    nav.style.left = (isDesktop() ? list.offsetLeft + list.offsetWidth + 14 : list.offsetLeft + 8) + "px";
-    nav.style.top = Math.max(0, list.offsetTop + list.offsetHeight / 2 - nav.offsetHeight / 2) + "px";
-    updateReelNav();
-  }
   function fitReels() {
     const panel = $("tabReels"), stage = $("reelStage");
     if (!panel || !stage || !panel.classList.contains("active")) return;
     const top = stage.getBoundingClientRect().top + window.scrollY;
-    const h = Math.max(260, Math.min(window.innerHeight - top - 10, 820));
+    const h = Math.max(260, Math.min(window.innerHeight - top - 6, 1000));
     panel.style.setProperty("--rh", Math.floor(h) + "px");
-    positionReelNav();
   }
-  function reelStep(dir) {
-    const list = activeReelList();
-    if (list) list.scrollBy({ top: dir * list.clientHeight, behavior: "smooth" });
-  }
-  $("reelNavUp").addEventListener("click", () => reelStep(-1));
-  $("reelNavDown").addEventListener("click", () => reelStep(1));
-  $("reelsList").addEventListener("scroll", updateReelNav, { passive: true });
-  $("shortsList").addEventListener("scroll", updateReelNav, { passive: true });
   window.addEventListener("resize", fitReels);
   window.addEventListener("orientationchange", () => setTimeout(fitReels, 250));
-  document.addEventListener("keydown", (e) => {
-    if (current !== "Reels" || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-    const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-    e.preventDefault();
-    reelStep(e.key === "ArrowUp" ? -1 : 1);
-  });
   // পোর্ট্রেট ভিডিও হলে কালো দাগ ছাড়া পুরো কার্ড ভরবে
   $("reelsList").addEventListener("loadedmetadata", (e) => {
     const v = e.target;
