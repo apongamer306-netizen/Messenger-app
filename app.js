@@ -4316,8 +4316,10 @@ let isSpeakerOn = true;
 let lastCallInfo = null;   // { mode, phone, name, pic, type } — "Call again" এর জন্য
 // ডিফল্ট সামনের (selfie) ক্যামেরা — মেসেঞ্জার/হোয়াটসঅ্যাপের মতো ভিডিও কল শুরু হলে front camera-ই খুলবে
 let currentFacingMode = "user";
+// ক্যামেরা ৬৪০x৪৮০, সর্বোচ্চ ২৪ ফ্রেমে সীমিত — আগে সীমা ছিল না, ফোন ১০৮০p/৩০fps-এ চালাত, তাই বেশি গরম হতো
+const CALL_VIDEO_LIMITS = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 24 } };
 function videoConstraintFor(wantVideo) {
-  return wantVideo ? { facingMode: currentFacingMode } : false;
+  return wantVideo ? Object.assign({ facingMode: currentFacingMode }, CALL_VIDEO_LIMITS) : false;
 }
 
 function formatCallDuration(ms) {
@@ -4352,6 +4354,75 @@ function setCallStatus(text) {
   callStatusText.style.display = "block";
 }
 
+// ---- কলের সময় ফোন ঠান্ডা রাখা + স্ক্রিন অফে কল না কাটা ----
+let _wakeLock = null, _dimEl = null, _dimTimer = null;
+async function acquireWakeLock() {
+  try {
+    if (!("wakeLock" in navigator) || _wakeLock) return;
+    _wakeLock = await navigator.wakeLock.request("screen");
+    _wakeLock.addEventListener("release", () => { _wakeLock = null; });
+  } catch (e) { _wakeLock = null; }
+}
+function releaseWakeLock() { try { if (_wakeLock) _wakeLock.release(); } catch (e) {} _wakeLock = null; }
+// ভিডিওর বিটরেট ও ফ্রেম সীমা — কম ডেটা = কম এনকোড/ডিকোড = কম গরম
+function applyCallLimits() {
+  try {
+    const pc = currentCall && currentCall.peerConnection;
+    if (!pc) return;
+    pc.getSenders().forEach((sn) => {
+      if (!sn.track || sn.track.kind !== "video") return;
+      const p = sn.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = 500000;
+      p.encodings[0].maxFramerate = 24;
+      sn.setParameters(p).catch(() => {});
+    });
+  } catch (e) {}
+}
+// অডিও কলে কিছুক্ষণ কেউ না ছুঁলে পুরো কালো স্ক্রিন (OLED-এ প্রায় বন্ধ, ফোন ঠান্ডা), ট্যাপ করলে ফেরে — কল চলতেই থাকে
+const CALL_DIM_AFTER_MS = 10000;
+function callDimReset() {
+  clearTimeout(_dimTimer);
+  if (_dimEl) _dimEl.style.display = "none";
+  if (!isCallConnected || (typeof currentCallType !== "undefined" && currentCallType === "video")) return;
+  _dimTimer = setTimeout(() => {
+    if (!isCallConnected) return;
+    if (!_dimEl) {
+      _dimEl = document.createElement("div");
+      _dimEl.style.cssText = "position:fixed;inset:0;z-index:900000;background:#000;color:#444;display:none;align-items:center;justify-content:center;font-size:13px;";
+      _dimEl.textContent = "কল চলছে · ট্যাপ করুন";
+      _dimEl.addEventListener("click", callDimReset);
+      document.body.appendChild(_dimEl);
+    }
+    _dimEl.style.display = "flex";
+  }, CALL_DIM_AFTER_MS);
+}
+function callPowerStart() {
+  acquireWakeLock();
+  setTimeout(applyCallLimits, 1000);
+  setTimeout(applyCallLimits, 4000);
+  callDimReset();
+  try { window.dispatchEvent(new CustomEvent("ekt-call", { detail: { active: true } })); } catch (e) {}
+  try {
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: "EKT কল চলছে" });
+      navigator.mediaSession.playbackState = "playing";
+    }
+  } catch (e) {}
+}
+function callPowerStop() {
+  releaseWakeLock();
+  clearTimeout(_dimTimer);
+  if (_dimEl) _dimEl.style.display = "none";
+  try { if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "none"; } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (!isCallConnected) return;
+  if (document.visibilityState === "visible") acquireWakeLock();
+  try { remoteAudioElement.play().catch(() => {}); } catch (e) {} // স্ক্রিন অফ/ব্যাকগ্রাউন্ডেও অন্যের কথা চালু রাখার চেষ্টা
+});
+document.addEventListener("touchstart", () => { if (isCallConnected && _dimEl && _dimEl.style.display === "none") callDimReset(); }, { passive: true });
+
 // কল কানেক্ট হলে — রিং থামবে, সময় গোনা শুরু হবে
 function markCallConnected() {
   stopRingtone();
@@ -4361,6 +4432,7 @@ function markCallConnected() {
   setCallStatus("Connected");
   acceptCallBtn.style.display = "none";
   startCallTimer();
+  callPowerStart();
   setTimeout(() => { if (isCallConnected) callStatusText.style.display = "none"; }, 1500);
 }
 
@@ -4422,6 +4494,7 @@ function openCallScreen(opts) {
 
 // কল শেষ হওয়ার স্ক্রিন (হোয়াটসঅ্যাপের মতো Message / Call again / Close)
 function showCallEndedScreen() {
+  callPowerStop();
   const duration = callStartedAt ? formatCallDuration(Date.now() - callStartedAt) : null;
   stopCallTimer();
   callModal.classList.remove("connected");
@@ -4522,7 +4595,7 @@ if (switchCameraBtn) {
     const nextFacingMode = currentFacingMode === "user" ? "environment" : "user";
     switchCameraBtn.disabled = true;
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: nextFacingMode } });
+      const newStream = await navigator.mediaDevices.getUserMedia({ video: Object.assign({ facingMode: nextFacingMode }, CALL_VIDEO_LIMITS) });
       const newTrack = newStream.getVideoTracks()[0];
 
       localStream.removeTrack(oldTrack);
@@ -4718,6 +4791,7 @@ socket.on("call-directly-ended", endCallCleanup);
 
 function endCallCleanup() {
   stopRingtone();
+  callPowerStop();
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
@@ -6381,6 +6455,8 @@ window.EktReact = (function () {
     document.querySelectorAll("#shortsList .short-item").forEach((it) => { try { endWatch(it); } catch (er) {} it._active = false; it._pre = false; });
     document.querySelectorAll("#shortsList iframe").forEach((f) => f.remove()); // Shorts-এর চালু প্লেয়ার বন্ধ
   }
+  // কল চলাকালে Shorts/Reels প্লেয়ার বন্ধ — ব্যাকগ্রাউন্ডে ভিডিও ডিকোড হলে ফোন বেশি গরম হয়
+  window.addEventListener("ekt-call", (e) => { if (e.detail && e.detail.active) pauseReels(); });
   function renderReels(list) {
     const box = $("reelsList");
     if (!list.length) {
