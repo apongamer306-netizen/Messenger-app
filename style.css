@@ -3122,3 +3122,20 @@ body.dashboard-active .profile-modal {
 .stg-sheet-btn.danger, .stg-sheet-btn.danger i { color: #ef4444; }
 .stg-dev-card { max-width: 440px; }
 .stg-dev-list { max-height: 55vh; overflow-y: auto; margin-bottom: 10px; }
+
+
+/* ===== প্রোফাইল: উপরে ব্যাক-অ্যারো বার (Facebook-এর মতো) + বাটন উপরে ===== */
+.pm-topbar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 18px 18px 0 0; }
+.pm-back-btn { width: 38px; height: 38px; flex: none; border: none; border-radius: 50%; background: var(--surface-2, rgba(127,127,127,.15)); color: var(--text); font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: transform .15s ease, background .2s ease; }
+.pm-back-btn:hover { background: var(--surface-3, var(--surface-2)); }
+.pm-back-btn:active { transform: scale(.92); }
+.pm-top-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-actions-top { margin: 12px 0 4px; }
+.pm-more-wrap { margin-left: auto; }
+
+
+/* ===== Settings ফর্মে পাসওয়ার্ড দেখার চোখ ===== */
+.ekt-field-box { position: relative; }
+.ekt-field-box input { padding-right: 46px; }
+.ekt-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: none; border-radius: 50%; background: transparent; color: var(--text-2); font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.ekt-eye:hover { color: var(--text); background: var(--surface-2, rgba(127,127,127,.15)); }
