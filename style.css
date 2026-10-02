@@ -3226,8 +3226,7 @@ body.tab-reels { overflow: hidden; }
 .short-item .short-frame.hold { opacity: 0; }
 .short-item .short-frame { transition: opacity .25s ease; }
 
-/* Shorts: YouTube-এর মাঝের প্লে/পজ বাটন ঢাকার জন্য — ঝুঁকির সময়টুকুতে মাঝখানে ছোট গোল অংশ কেটে নিচের থাম্বনেইল দেখানো হয় */
-.short-item .short-frame.nobtn {
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
-  mask-image: radial-gradient(circle at 50% 50%, transparent 0, transparent 52px, #000 53px);
-}
+/* Shorts: লাইকের ওপরে নিজস্ব প্লে/পজ বাটন */
+.short-item .pp-play { display: none; }
+.short-item.paused .pp-play { display: inline; }
+.short-item.paused .pp-pause { display: none; }
