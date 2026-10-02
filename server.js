@@ -424,6 +424,7 @@ function emailTaken(em, exceptPhone) {
 function selfUserPayload(user, password) {
   const copy = { ...user };
   delete copy.loginHistory;
+  delete copy.revoked;
   copy.password = String(password);
   copy.pid = pidOf(user.phone); // নিজের প্রোফাইল লিংক বানাতে
   return copy;
@@ -462,6 +463,7 @@ function recordDevice(user, sock, deviceId, method) {
   const ua = (sock && sock.handshake && sock.handshake.headers && sock.handshake.headers["user-agent"]) || "";
   const id = String(deviceId || "").slice(0, 64) || ("ua_" + idHash(ua).slice(0, 12));
   const now = Date.now();
+  if (method !== "session" && user.revoked) delete user.revoked[id]; // নতুন করে লগইন করলে আবার অনুমতি
   const ip = getClientIp(sock);
   const device = parseDevice(ua);
   let e = user.loginHistory.find((x) => x && x.deviceId === id);
@@ -474,6 +476,31 @@ function recordDevice(user, sock, deviceId, method) {
   user.loginHistory.sort((a, b) => (b.lastLogin || 0) - (a.lastLogin || 0));
   user.loginHistory = user.loginHistory.slice(0, 20);
 }
+// ডিভাইস -> তার চালু সকেটগুলো (রিমোট লগআউটে ওই ডিভাইসকে সাথে সাথে বের করে দিতে)
+const deviceSockets = {};    // "phone|deviceId" -> Set(socket.id)
+const socketDevice = {};     // socket.id -> "phone|deviceId"
+function devKey(phone, did) { return String(phone) + "|" + String(did || "").slice(0, 64); }
+function bindDeviceSocket(socket, phone, did) {
+  const d = String(did || "").slice(0, 64);
+  if (!phone || !d) return;
+  const k = devKey(phone, d);
+  const old = socketDevice[socket.id];
+  if (old && old !== k && deviceSockets[old]) { deviceSockets[old].delete(socket.id); if (!deviceSockets[old].size) delete deviceSockets[old]; }
+  if (!deviceSockets[k]) deviceSockets[k] = new Set();
+  deviceSockets[k].add(socket.id);
+  socketDevice[socket.id] = k;
+}
+function unbindDeviceSocket(socket) {
+  const k = socketDevice[socket.id];
+  if (k && deviceSockets[k]) { deviceSockets[k].delete(socket.id); if (!deviceSockets[k].size) delete deviceSockets[k]; }
+  delete socketDevice[socket.id];
+}
+function isRevokedDevice(phone, did) {
+  const u = users[phone];
+  return !!(u && did && u.revoked && u.revoked[String(did).slice(0, 64)]);
+}
+function devRef(did) { return idHash("dev:" + did).slice(0, 16); }
+
 function touchDevice(phone, deviceId) {
   const u = users[phone];
   if (!u || !deviceId || !Array.isArray(u.loginHistory)) return;
@@ -708,7 +735,7 @@ function scrubWalk(v, key, self, depth) {
   const out = {};
   Object.keys(v).forEach((k) => {
     if (EMAIL_KEY_RE.test(k) && !selfObj) return; // অন্যের ইমেইল কখনোই না
-    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId" || k === "altNum") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
+    if ((k === "pid" || k === "password" || k === "loginHistory" || k === "deviceId" || k === "altNum" || k === "revoked") && !selfObj) return; // রুমে join-এর user অবজেক্টে পাসওয়ার্ডও থাকতে পারে — অন্যকে কখনো না
     const nk = hasOwn(users, k) && k !== self ? pidOf(k) : k; // reacts ইত্যাদি map-এর key
     out[nk] = scrubWalk(v[k], k, self, depth + 1);
   });
@@ -989,6 +1016,9 @@ io.on("connection", (socket) => {
   // ---------- USER / SESSION ----------
   socket.on("set-user-socket", ({ phone, deviceId }) => {
     if (!phone) return;
+    // অন্য ডিভাইস থেকে লগআউট করে দেওয়া ডিভাইস আবার ঢুকতে চাইলে বের করে দেওয়া
+    if (isRevokedDevice(phone, deviceId)) { socket.emit("force-logout"); return; }
+    bindDeviceSocket(socket, phone, deviceId);
     socketToPhone[socket.id] = phone;
     setSelf(socket, phone);
     phoneToSocket[phone] = socket.id;
@@ -1068,7 +1098,7 @@ io.on("connection", (socket) => {
     if (!u || socketToPhone[socket.id] !== phone) return callback({ success: false });
     const did = String(deviceId || "").slice(0, 64);
     const list = (u.loginHistory || []).map((e) => ({
-      device: e.device, ip: e.ip, method: e.method,
+      ref: devRef(e.deviceId), device: e.device, ip: e.ip, method: e.method,
       lastLogin: e.lastLogin, lastSeen: e.lastSeen, firstLogin: e.firstLogin,
       current: !!did && e.deviceId === did,
     }));
@@ -1195,6 +1225,38 @@ io.on("connection", (socket) => {
     delete u.email;
     saveData();
     reply(Object.assign({ success: true }, contactInfo(u)));
+  });
+
+  // অন্য ডিভাইস থেকে লগআউট: পাসওয়ার্ড লাগে। ওই ডিভাইস অনলাইনে থাকলে সাথে সাথে বের হয়ে যায়,
+  // অফলাইনে থাকলে পরের বার অ্যাপ খুললেই বের হবে (আবার লগইন করলে ঠিক হয়ে যায়)।
+  socket.on("logout-device", ({ phone, password, ref }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const bad = pwGate(u, password);
+    if (bad) return reply({ success: false, error: bad });
+    const e = (u.loginHistory || []).find((x) => x && devRef(x.deviceId) === String(ref || ""));
+    if (!e) return reply({ success: false, error: "not_found" });
+    const did = e.deviceId;
+    u.loginHistory = u.loginHistory.filter((x) => x !== e);
+    if (!u.revoked) u.revoked = {};
+    u.revoked[did] = Date.now();
+    const keys = Object.keys(u.revoked);
+    if (keys.length > 50) keys.sort((a, b) => u.revoked[a] - u.revoked[b]).slice(0, keys.length - 50).forEach((k) => delete u.revoked[k]);
+    saveData();
+    const set = deviceSockets[devKey(u.phone, did)];
+    if (set) Array.from(set).forEach((sid) => { io.to(sid).emit("force-logout"); if (phoneToSocket[u.phone] === sid) delete phoneToSocket[u.phone]; });
+    reply({ success: true });
+  });
+
+  // নিজের এই ডিভাইস থেকে লগআউট করলে তালিকা থেকে এই ডিভাইসটা সরানো (নিজের সকেট থেকেই আসতে হবে)
+  socket.on("device-signout", ({ phone, deviceId }, callback) => {
+    const reply = (r) => { if (typeof callback === "function") callback(r); };
+    const u = typeof phone === "string" ? users[phone] : null;
+    const did = String(deviceId || "").slice(0, 64);
+    if (!u || !did || socketDevice[socket.id] !== devKey(u.phone, did)) return reply({ success: false });
+    u.loginHistory = (u.loginHistory || []).filter((x) => x && x.deviceId !== did);
+    saveData();
+    reply({ success: true });
   });
 
   // ---------- রিপোর্ট সিস্টেম ----------
@@ -1490,7 +1552,13 @@ io.on("connection", (socket) => {
       if (typeof callback === "function") callback({ requests: [], friends: [], renamed: true });
       return;
     }
+    if (isRevokedDevice(user.phone, user.deviceId)) {
+      socket.emit("force-logout");
+      if (typeof callback === "function") callback({ requests: [], friends: [], revoked: true });
+      return;
+    }
     const hadAccount = !!(users[user.phone] && users[user.phone].password);
+    bindDeviceSocket(socket, user.phone, user.deviceId);
     mergeClientUser(user);
     socketToPhone[socket.id] = user.phone;
     setSelf(socket, user.phone);
@@ -2384,6 +2452,7 @@ io.on("connection", (socket) => {
     }
     delete socketToPhone[socket.id];
     delete selfPhoneBySocket[socket.id];
+    unbindDeviceSocket(socket);
     adminSockets.delete(socket.id);
 
     const roomCode = socketToRoom[socket.id];
