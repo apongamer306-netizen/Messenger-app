@@ -1012,18 +1012,20 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || "";
 const SHORTS_TOPICS = (process.env.SHORTS_TOPICS
   ? process.env.SHORTS_TOPICS.split(",").map((x) => x.trim()).filter(Boolean)
   : [
-    // মজার ভিডিও — বিশ্বজুড়ে
-    "funny shorts", "funny moments shorts", "try not to laugh shorts", "funny animals shorts", "prank shorts", "comedy skit shorts", "fails compilation shorts",
+    // টপিকের নিয়ম: bn:/hi: = বাংলা/হিন্দি ভিডিও · x: = বিদেশি হলেও চলবে (শুধু গান/ভিজ্যুয়াল, কথা নয়) · বিনা প্রিফিক্স = শুধু বাংলা/হিন্দি/উর্দু/নেপালি অডিও বা গানের ভিডিও
     // হিন্দি মজার
     "hi:hindi comedy shorts", "hi:funny hindi video shorts", "hi:desi comedy shorts", "hi:hindi memes shorts",
     // বাংলা হালকা মজার
     "bn:bangla funny shorts", "bn:bangla comedy shorts", "bn:বাংলা ফানি ভিডিও", "bn:bangla natok funny shorts",
-    // গেমিং
-    "gaming shorts", "gaming funny moments shorts", "free fire shorts", "pubg mobile shorts", "minecraft shorts", "gta funny shorts",
-    // ভাইরাল / টিকটক ধরনের — ডান্স, লিপ-সিঙ্ক, ট্রেন্ড
-    "viral dance shorts", "trending dance reels shorts", "bollywood song dance shorts", "lip sync shorts", "viral trend shorts", "hi:viral reels hindi shorts", "bn:bangla viral dance shorts",
-    // শায়ারি / স্ট্যাটাস
+    // গেমিং (বাংলা/হিন্দি)
+    "bn:bangla gaming shorts", "hi:free fire hindi shorts", "hi:pubg mobile hindi shorts", "hi:gta funny hindi shorts",
+    // ভাইরাল / ডান্স — গান ভিত্তিক
+    "viral dance shorts", "bollywood song dance shorts", "lip sync song shorts", "hi:viral reels hindi shorts", "bn:bangla viral dance shorts",
+    // শায়ারি / স্ট্যাটাস / ইমোশনাল
     "hi:shayari shorts", "hi:love shayari status shorts", "hi:sad shayari shorts", "bn:bangla shayari status shorts", "bn:bangla sad status shorts",
+    "bn:bangla emotional song status shorts", "hi:sad song status shorts", "hi:jealousy love song status shorts",
+    // বিদেশি — শুধু গান/অ্যাকশন/ইমোশন (কথা বলা ভিডিও নয়)
+    "x:chinese sad love song shorts", "x:chinese jealousy love song shorts", "x:mandarin emotional song edit shorts", "x:chinese drama fight scene shorts", "x:chinese drama action edit shorts",
   ]);
 console.log(YOUTUBE_API_KEY ? "▶️ YOUTUBE_API_KEY পাওয়া গেছে — Shorts চালু" : "⚠️ YOUTUBE_API_KEY সেট করা নেই — Shorts বন্ধ");
 let shortsPool = [];       // { id, title, channel }
@@ -1043,6 +1045,21 @@ async function ytJson(url) {
   if (!r.ok) throw new Error((j.error && j.error.message) || "YouTube API status " + r.status);
   return j;
 }
+// ---------- ভাষা ফিল্টার: বিদেশি কথা-বলা ভিডিও বাদ; গান/ভিজ্যুয়াল হলে বিদেশিও চলবে ----------
+const OK_LANGS = new Set(["bn", "hi", "ur", "ne", "as", "or", "pa", "gu", "mr", "ta", "te", "kn", "ml", "si", "sa", "bho", "mai"]);
+const SA_SCRIPT = /[\u0980-\u09FF\u0900-\u097F\u0600-\u06FF\u0A00-\u0A7F\u0B80-\u0BFF]/; // বাংলা/দেবনাগরী/আরবি-উর্দু/গুরমুখী/তামিল
+function shortLangOk(base, sn) {
+  sn = sn || {};
+  const lang = String(sn.defaultAudioLanguage || sn.defaultLanguage || "").toLowerCase().split("-")[0];
+  const music = String(sn.categoryId || "") === "10";
+  const text = (base.title || "") + " " + (base.channel || "");
+  if (base.foreignOk) return music || !lang || !["en", "ja", "ko", "es", "fr", "de", "pt", "ru", "id", "th", "vi", "tr"].includes(lang); // x: টপিক — গান/অ্যাকশন; ইংরেজি-জাপানি ইত্যাদি কথা নয়
+  if (lang && OK_LANGS.has(lang)) return true;
+  if (music) return true;                       // গানের ভিডিও — ভাষা যাই হোক, কথা নয়
+  if (lang) return false;                       // অন্য ভাষার কথা-বলা ভিডিও
+  if (SA_SCRIPT.test(text)) return true;        // ভাষা লেখা নেই কিন্তু বাংলা/হিন্দি হরফে লেখা
+  return base.tl === "bn" || base.tl === "hi" || base.tl === "ur"; // বাংলা/হিন্দি সার্চে পাওয়া, ভাষা অজানা
+}
 function refreshShorts(extraTopics) {
   if (!YOUTUBE_API_KEY) return Promise.resolve();
   if (shortsBusy) return shortsBusy;
@@ -1055,8 +1072,9 @@ function refreshShorts(extraTopics) {
       const picks = extra.concat(SHORTS_TOPICS.slice().sort(() => Math.random() - 0.5)).slice(0, 4);
       const found = new Map();
       for (const topic of picks) {
-        const lm = /^(bn|hi|en|ur|ar):(.*)$/.exec(topic);
-        const lang = lm ? lm[1] : "";
+        const lm = /^(bn|hi|en|ur|ar|x):(.*)$/.exec(topic);
+        const lang = lm && lm[1] !== "x" ? lm[1] : "";
+        const foreignOk = !!(lm && lm[1] === "x");
         const q = lm ? lm[2].trim() : topic;
         const u = new URL("https://www.googleapis.com/youtube/v3/search");
         u.searchParams.set("part", "snippet");
@@ -1073,7 +1091,7 @@ function refreshShorts(extraTopics) {
         (j.items || []).forEach((it) => {
           const id = it && it.id && it.id.videoId;
           if (id && /^[\w-]{11}$/.test(id) && !found.has(id)) {
-            found.set(id, { id, title: String((it.snippet && it.snippet.title) || "").slice(0, 150), channel: String((it.snippet && it.snippet.channelTitle) || "").slice(0, 60) });
+            found.set(id, { id, title: String((it.snippet && it.snippet.title) || "").slice(0, 150), channel: String((it.snippet && it.snippet.channelTitle) || "").slice(0, 60), foreignOk, tl: lang });
           }
         });
       }
@@ -1082,13 +1100,16 @@ function refreshShorts(extraTopics) {
       const good = [];
       for (let i = 0; i < ids.length; i += 50) {
         const u = new URL("https://www.googleapis.com/youtube/v3/videos");
-        u.searchParams.set("part", "contentDetails,status");
+        u.searchParams.set("part", "contentDetails,status,snippet");
         u.searchParams.set("id", ids.slice(i, i + 50).join(","));
         u.searchParams.set("key", YOUTUBE_API_KEY);
         const j = await ytJson(u);
         (j.items || []).forEach((v) => {
           const secs = isoSecs(v.contentDetails && v.contentDetails.duration);
-          if (v.status && v.status.embeddable && v.status.privacyStatus === "public" && secs > 0 && secs <= 65) good.push(found.get(v.id));
+          if (!(v.status && v.status.embeddable && v.status.privacyStatus === "public" && secs > 0 && secs <= 65)) return;
+          const base = found.get(v.id);
+          if (!base || !shortLangOk(base, v.snippet)) return; // ইংরেজি/জাপানি/চাইনিজ ইত্যাদি কথাবলা ভিডিও বাদ
+          good.push({ id: base.id, title: base.title, channel: base.channel });
         });
       }
       const have = new Set(shortsPool.map((x) => x.id));
