@@ -3237,3 +3237,31 @@ body.tab-reels { overflow: hidden; }
 .admin-maint-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .admin-maint-state { font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(34,197,94,.18); color: #22c55e; }
 .admin-maint-state.on { background: rgba(239,68,68,.18); color: #ef4444; }
+
+.maint-admin { margin-top: 26px; }
+.maint-admin-btn { background: transparent; border: 1px solid rgba(255,255,255,.25); color: #fff; border-radius: 10px; padding: 8px 16px; cursor: pointer; font: inherit; }
+.maint-admin-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.maint-admin-form input { padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); background: transparent; color: #fff; font: inherit; }
+.maint-admin-form button { padding: 10px; border-radius: 10px; border: none; background: #f97316; color: #fff; cursor: pointer; font: inherit; }
+#maintAdminErr { color: #f87171; font-size: 13px; min-height: 16px; }
+
+
+/* ===================== LITE: হালকা ও দ্রুত (পুরনো ফোন/ল্যাপটপের জন্য) =====================
+   ভারী জিনিসগুলো বন্ধ: সব blur (backdrop-filter), সারাক্ষণ চলা অ্যানিমেশন, drop-shadow ফিল্টার */
+*, *::before, *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* blur গেলে স্বচ্ছ বার যেন লেখা ঢেকে না ফেলে */
+.navbar, .chat-header, .chat-input-area, .main-tabs { background: var(--surface) !important; }
+/* লোগো: টাইপিং/গ্রেডিয়েন্ট/ছায়ার সারাক্ষণ রিপেইন্ট বন্ধ */
+.logo, .logo-type, .dev-credit-text, .dev-credit-cursor { filter: none !important; }
+.logo-loop-text, .logo-loop-cursor, .dev-credit-cursor { animation: none !important; }
+.logo-loop-cursor, .dev-credit-cursor { display: none !important; }
+/* ছোটখাটো ঝলক/ঘূর্ণি অ্যানিমেশন বন্ধ */
+.media-wrap.loading, .audio-player-card .ap-disc { animation: none !important; }
+.short-item .short-thumb { filter: none !important; }
+/* লম্বা তালিকায় স্ক্রিনের বাইরের অংশ রেন্ডার হবে না */
+.post-card { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.admin-user-row-wrap { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+
+/* Reels/Shorts: নিচের ছায়া ডান কিনারা পর্যন্ত (ডানে হালকা ফালি দেখা যেত) + আপলোড বাটন সবসময় ওপরের কোণায়, আলাদা সারি নেয় না */
+.reel-info { right: 0 !important; padding-right: 70px !important; }
+#tabReels .tp-head { position: absolute; right: 10px; top: 8px; margin: 0; z-index: 5; }
