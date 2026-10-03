@@ -170,6 +170,59 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
+// ================= মেইনটেনেন্স মোড: অ্যাপ সাময়িক বন্ধ =================
+// চালু/বন্ধ: অ্যাডমিন প্যানেল থেকে (Maintenance বক্স), অথবা Render Environment-এ MAINTENANCE=1 (MAINTENANCE_MSG=বার্তা)।
+// অ্যাডমিন নিজে ঢুকতে চাইলে একবার  /admin-bypass?key=<ADMIN_PASSWORD>  খুললেই হবে (ব্রাউজারে কুকি বসে যায়)।
+// ঐচ্ছিক: Render Environment-এ ADMIN_PHONES=01XXXXXXXXX,01YYYYYYYYY দিলে শুধু এই ফোন নম্বরে লগইন করা অ্যাকাউন্টই (পাসওয়ার্ড জানলেও) অ্যাডমিন কাজ করতে পারবে
+const ADMIN_PHONES = String(process.env.ADMIN_PHONES || "").split(",").map((x) => x.trim()).filter(Boolean);
+function isAdminAccount(socket) { return !ADMIN_PHONES.length || ADMIN_PHONES.includes(socketToPhone[socket.id] || ""); }
+const BYPASS_COOKIE = "ekt_admin";
+let _bypassVal = "";
+function bypassValue() { return _bypassVal || (_bypassVal = nodeCrypto.createHash("sha256").update("ekt-bypass:" + ADMIN_PASSWORD).digest("hex").slice(0, 40)); }
+function hasBypass(cookieHeader) {
+  return String(cookieHeader || "").split(";").some((c) => c.trim() === BYPASS_COOKIE + "=" + bypassValue());
+}
+function maintenanceActive() {
+  if (maintenance.on && maintenance.until && Date.now() > maintenance.until) { maintenance = { on: false, msg: "", until: 0 }; try { saveData(); } catch (e) {} }
+  return !!maintenance.on;
+}
+function maintStatus() { return { on: maintenanceActive(), msg: maintenance.msg || "", until: maintenance.until || 0 }; }
+function escHtml(t) { return String(t || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function broadcastMaintenance() {
+  const st = maintStatus();
+  io.sockets.sockets.forEach((sk) => {
+    if (!st.on || !(sk._bypass || adminSockets.has(sk.id))) sk.emit("maintenance", st);
+  });
+}
+setInterval(() => { const was = maintenance.on; if (was && !maintenanceActive()) broadcastMaintenance(); }, 20000);
+
+// আপটাইম-রোবট / Render health check-এর জন্য: মেইনটেনেন্সেও সবসময় 200 দেয়
+app.get(["/healthz", "/health"], (req, res) => res.status(200).type("text/plain").send("ok"));
+app.head(["/healthz", "/health"], (req, res) => res.status(200).end());
+
+app.use((req, res, next) => {
+  if (req.path === "/admin-bypass") {
+    if (String(req.query.key || "") === ADMIN_PASSWORD) {
+      res.setHeader("Set-Cookie", BYPASS_COOKIE + "=" + bypassValue() + "; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax");
+      return res.redirect("/");
+    }
+    return res.status(403).send("Forbidden");
+  }
+  if (!maintenanceActive() || hasBypass(req.headers.cookie)) return next();
+  if (req.path.indexOf("/socket.io") === 0) return next(); // সকেট নিজে আলাদাভাবে আটকানো হয়
+  if (req.path.indexOf("/api/") === 0) return res.status(503).json({ error: "maintenance" });
+  const wantsPage = req.method === "GET" && (req.path === "/" || /\.html?$/i.test(req.path) || String(req.headers.accept || "").indexOf("text/html") !== -1);
+  if (!wantsPage) return next(); // app.js / style.css / ছবি — সমস্যা নেই
+  const until = maintenance.until ? new Date(maintenance.until).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Dhaka" }) : "";
+  res.status(503).set({ "Retry-After": "300", "Cache-Control": "no-store", "Content-Type": "text/html; charset=utf-8" }).send(
+    '<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>সাময়িক বন্ধ</title>' +
+    '<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#0b0b18;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}' +
+    '.c{max-width:420px}.i{font-size:54px}h1{font-size:24px;margin:14px 0 8px}p{opacity:.8;line-height:1.6;margin:6px 0}</style></head><body><div class="c"><div class="i">🛠️</div><h1>অ্যাপ সাময়িকভাবে বন্ধ আছে</h1>' +
+    "<p>" + escHtml(maintenance.msg || "কিছু কাজ চলছে। অনুগ্রহ করে একটু পরে আবার আসুন।") + "</p>" + (until ? "<p>আনুমানিক " + escHtml(until) + " পর্যন্ত</p>" : "") +
+    '</div><script>setTimeout(function(){location.reload()},30000)</script></body></html>'
+  );
+});
+
 // Serve the frontend files (index.html, app.js, style.css) from this same folder
 app.use(express.static(path.join(__dirname)));
 
@@ -344,6 +397,7 @@ setTimeout(() => { try { syncAllMediaLinks(); saveData(); } catch (e) { console.
 let reports = [];            // [ { id, fromPhone, fromName, message, time, status } ]
 let bannedUsers = {};        // phone -> { reason, time }
 let deletedHashes = {};      // sha256(id) -> 1  (শুধু হ্যাশ — মুছে ফেলা অ্যাকাউন্ট যেন পুরোনো ডিভাইস থেকে আবার তৈরি না হয়; আর কোনো তথ্য রাখা হয় না)
+let maintenance = { on: false, msg: "", until: 0, by: "" }; // অ্যাপ সাময়িক বন্ধ (মেইনটেনেন্স মোড)
 let shortsData = {};         // YouTube ভিডিও আইডি -> { t, c, likes:[phone], comments:[...] }  (শুধু যেগুলোতে লাইক/কমেন্ট পড়েছে)
 let shortsPrefs = {};        // phone -> { w:{শব্দ:স্কোর}, ch:{চ্যানেল:স্কোর} }  (কার কী পছন্দ — সাজেশনের জন্য)
 let phoneAliases = {};       // পুরোনো নম্বর -> নতুন নম্বর (নম্বর বদলালে পুরোনো ডিভাইস যেন নকল অ্যাকাউন্ট না বানায়)
@@ -859,6 +913,7 @@ async function loadData() {
   deletedHashes = raw.deletedIds || {};
   phoneAliases = raw.phoneAliases || {};
   shortsData = raw.shortsData || {};
+  maintenance = raw.maintenance || (/^(1|on|true|yes)$/i.test(String(process.env.MAINTENANCE || "")) ? { on: true, msg: String(process.env.MAINTENANCE_MSG || ""), until: 0, by: "env" } : maintenance);
   shortsPrefs = raw.shortsPrefs || {};
   try { rebuildPidMap(); setTimeout(saveData, 0); } catch (e) { console.warn("pid init:", e.message); }
   console.log("Saved data loaded successfully.");
@@ -886,6 +941,7 @@ function buildPayload() {
     phoneAliases,
     shortsData,
     shortsPrefs,
+    maintenance,
   };
 }
 
@@ -1204,6 +1260,21 @@ function shortCleanup(id) {
 }
 
 io.on("connection", (socket) => {
+  socket._bypass = hasBypass(socket.handshake && socket.handshake.headers && socket.handshake.headers.cookie);
+  if (maintenanceActive() && !socket._bypass) socket.emit("maintenance", maintStatus());
+  socket.use((packet, next) => {
+    const ev = String(packet[0] || "");
+    const cb = packet[packet.length - 1];
+    // অ্যাডমিন-ইভেন্ট: ADMIN_PHONES সেট থাকলে শুধু ওই অ্যাকাউন্ট থেকেই চলবে
+    if (ev.indexOf("admin-") === 0 && !isAdminAccount(socket)) {
+      if (typeof cb === "function") { try { cb({ success: false, error: "not_admin" }); } catch (e) {} }
+      return;
+    }
+    // মেইনটেনেন্সে সাধারণ ইউজারের সব ইভেন্ট আটকানো; অ্যাডমিন-ইভেন্ট ও বাইপাস করা অ্যাডমিন চলবে
+    if (!maintenanceActive() || socket._bypass || adminSockets.has(socket.id) || ev.indexOf("admin-") === 0) return next();
+    if (typeof cb === "function") { try { cb({ success: false, maintenance: true, error: "maintenance" }); } catch (e) {} }
+    socket.emit("maintenance", maintStatus());
+  });
   // প্রতিটা ইভেন্টে: ইনকামিং pid → আসল ফোন, আর ack/callback-এর উত্তর থেকে অন্যের নম্বর-ইমেইল সরানো
   socket.use((packet, next) => {
     try {
@@ -1747,6 +1818,19 @@ io.on("connection", (socket) => {
   });
 
   // ---------- অ্যাডমিন প্যানেল ----------
+  socket.on("admin-set-maintenance", ({ password, on, msg, minutes }, callback) => {
+    if (typeof callback !== "function") return;
+    if (password !== ADMIN_PASSWORD) return callback({ success: false });
+    const who = socketToPhone[socket.id] || "";
+    const mins = Math.max(0, Math.min(Number(minutes) || 0, 60 * 24 * 7));
+    maintenance = on ? { on: true, msg: String(msg || "").slice(0, 200), until: mins ? Date.now() + mins * 60000 : 0, by: who } : { on: false, msg: "", until: 0, by: who };
+    console.log("[maintenance]", on ? "ON" : "OFF", "by", who || "(unknown)", mins ? "for " + mins + " min" : "");
+    adminSockets.add(socket.id);
+    saveData();
+    broadcastMaintenance();
+    callback(Object.assign({ success: true }, maintStatus(), { by: (users[who] && users[who].name) || who }));
+  });
+
   socket.on("admin-login", ({ password }, callback) => {
     if (typeof callback !== "function") return;
     if (password === ADMIN_PASSWORD) {
@@ -1776,7 +1860,7 @@ io.on("connection", (socket) => {
       });
       // banned users who were deleted from users map still show? only active users
       purgeExpiredStories();
-      callback({ success: true, users: userList, reports: reports.slice().reverse(), stories: stories.slice().reverse() });
+      callback({ success: true, users: userList, reports: reports.slice().reverse(), stories: stories.slice().reverse(), maintenance: Object.assign(maintStatus(), { by: (users[maintenance.by] && users[maintenance.by].name) || maintenance.by || "" }) });
     } else {
       callback({ success: false });
     }
