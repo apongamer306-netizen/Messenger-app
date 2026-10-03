@@ -1051,13 +1051,26 @@
 
   </main>
 
-  <script defer src="/app.js"></script>
+  <script>
+  // হালকা: JS দিয়ে বসানো সব <img>-এ lazy + async decode — স্ক্রিনের বাইরের ছবি আগে থেকে ডাউনলোড/ডিকোড হবে না
+  (function () {
+    try {
+      var re = /<img\b(?![^>]*\b(?:loading|decoding)=)/gi;
+      var fix = function (h) { return typeof h === "string" && h.indexOf("<img") !== -1 ? h.replace(re, '<img loading="lazy" decoding="async"') : h; };
+      var d = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+      if (d && d.set) Object.defineProperty(Element.prototype, "innerHTML", { get: d.get, set: function (v) { d.set.call(this, fix(v)); }, configurable: true });
+      var ia = Element.prototype.insertAdjacentHTML;
+      Element.prototype.insertAdjacentHTML = function (p, v) { return ia.call(this, p, fix(v)); };
+    } catch (e) {}
+  })();
+</script>
+<script defer src="/app.js"></script>
   <script>
     // পুনর্ব্যবহারযোগ্য টাইপ → কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ।
     // হেডারের "EKT CHATTER" ও "Developed by Eyamin" — দুটো জায়গাতেই এই একই ফাংশন চলে।
     function startTypeEraseLoop(el, text, opts) {
       var o = opts || {};
-      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var reduce = true; // হালকা রাখতে: টাইপিং লুপ বন্ধ, লেখা স্থির (সারাক্ষণ রিপেইন্ট হতো)
       if (reduce) { el.textContent = text; return; }
       var TYPE_MS = o.typeMs || 90, ERASE_MS = o.eraseMs || 45,
           HOLD_MS = o.holdMs || 2000, GAP_MS = o.gapMs || 650,
@@ -1100,7 +1113,14 @@
     }
   </script>
   <div id="maintOverlay" class="maint-overlay" style="display:none">
-    <div class="maint-box"><div class="maint-ic">🛠️</div><h2>অ্যাপ সাময়িকভাবে বন্ধ আছে</h2><p id="maintOverlayMsg"></p><p id="maintOverlayUntil"></p></div>
+    <div class="maint-box"><div class="maint-ic">🛠️</div><h2>অ্যাপ সাময়িকভাবে বন্ধ আছে</h2><p id="maintOverlayMsg"></p><p id="maintOverlayUntil"></p>
+      <div class="maint-admin"><button id="maintAdminBtn" type="button" class="maint-admin-btn">Admin</button>
+        <div id="maintAdminForm" class="maint-admin-form" style="display:none">
+          <input id="maintAdminPhone" type="tel" placeholder="Admin phone" style="display:none">
+          <input id="maintAdminPass" type="password" placeholder="Admin password">
+          <button id="maintAdminGo" type="button">Enter</button>
+          <div id="maintAdminErr"></div>
+        </div></div></div>
   </div>
 </body>
 </html>
