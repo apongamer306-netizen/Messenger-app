@@ -1625,6 +1625,7 @@ socket.on("account-deleted", () => { ektHandleAccountGone("deleted"); });
     st = st || {};
     if (st.on) {
       wasOn = true;
+      var ph = document.getElementById("maintAdminPhone"); if (ph) ph.style.display = st.needPhone ? "" : "none";
       document.getElementById("maintOverlayMsg").textContent = st.msg || "কিছু কাজ চলছে। অনুগ্রহ করে একটু পরে আবার আসুন।";
       var u = document.getElementById("maintOverlayUntil");
       u.textContent = st.until ? "আনুমানিক " + new Date(st.until).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" }) + " পর্যন্ত" : "";
@@ -1635,6 +1636,22 @@ socket.on("account-deleted", () => { ektHandleAccountGone("deleted"); });
       if (wasOn) { wasOn = false; location.reload(); } // বন্ধ থাকার সময় যা মিস হয়েছে তা ঠিকমতো লোড করতে
     }
   });
+})();
+
+(function () {
+  var btn = document.getElementById("maintAdminBtn"), form = document.getElementById("maintAdminForm");
+  if (!btn || !form) return;
+  btn.addEventListener("click", function () { form.style.display = form.style.display === "none" ? "flex" : "none"; });
+  function go() {
+    var err = document.getElementById("maintAdminErr");
+    fetch("/admin-bypass", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+      body: JSON.stringify({ password: document.getElementById("maintAdminPass").value, phone: document.getElementById("maintAdminPhone").value }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j.ok) location.reload(); else err.textContent = j.error === "too_many" ? "অনেকবার ভুল, একটু পরে চেষ্টা করুন" : "ভুল পাসওয়ার্ড/নম্বর"; })
+      .catch(function () { err.textContent = "সমস্যা হয়েছে"; });
+  }
+  document.getElementById("maintAdminGo").addEventListener("click", go);
+  document.getElementById("maintAdminPass").addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
 })();
 
 socket.on("force-logout", async () => {
@@ -5174,11 +5191,11 @@ socket.on("direct-call-rejected", async () => {
       var friendChips = '';
       if (u.friends && u.friends.length) {
         friendChips = '<div class="au-friends-list">' +
-          u.friends.map(function (f) {
+          u.friends.slice(0, 12).map(function (f) {
             return '<div class="au-friend-chip" data-admin-act="view" data-phone="' + esc(f.phone) + '" data-idx="-1" title="' + esc(f.phone) + '">' +
               '<img src="' + esc(f.pic || 'https://via.placeholder.com/28') + '" alt="">' +
               '<span>' + esc(f.name || f.phone) + '</span></div>';
-          }).join('') + '</div>';
+          }).join('') + (u.friends.length > 12 ? '<div class="admin-empty-note" style="padding:6px 0;text-align:left;">+' + (u.friends.length - 12) + ' more</div>' : '') + '</div>';
       } else {
         friendChips = '<div class="admin-empty-note" style="padding:8px 0;text-align:left;">এখনো কোনো ফ্রেন্ড নেই</div>';
       }
@@ -6678,6 +6695,8 @@ window.EktReact = (function () {
   // ---------- Shorts প্লেয়ার: YouTube-এর নিজের বাটন/টাইটেল শুরুর কয়েক সেকেন্ড ভেসে ওঠে ----------
   // তাই ভিডিও আগেই (পরেরটা আগেভাগে) লুকিয়ে চালু করে রাখা হয়; ওই সময় পেরোলে তবেই দেখানো হয় — ফলে ইউজার কোনো বাটন দেখে না।
   const CHROME_HOLD_MS = 2000;
+  // দুর্বল ডিভাইসে (কম RAM/কোর/ডেটা-সেভার) পরের ভিডিও আগেভাগে চালু রাখা হয় না — একটাই প্লেয়ার চলবে
+  const LITE_DEVICE = !!((navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.connection && navigator.connection.saveData));
   const POST_SEEK_HOLD_MS = 0; // রিওয়াইন্ডের পর এতক্ষণ লুকিয়ে রাখা হয় (বাটন পুরোপুরি মিলানোর জন্য)
   function syncPP(item) {
     const ic = item.querySelector("[data-short-pp] i");
@@ -6753,7 +6772,7 @@ window.EktReact = (function () {
     stopShortFrames(item, next);
     buildFrame(item);
     tryReveal(item);
-    if (next) { next._pre = true; buildFrame(next); } // পরেরটা আগেভাগে লুকিয়ে তৈরি
+    if (next && !LITE_DEVICE) { next._pre = true; buildFrame(next); } // পরেরটা আগেভাগে লুকিয়ে তৈরি (শক্তিশালী ডিভাইসে)
   }
   // কতক্ষণ দেখল — সার্ভার এটা দেখে শেখে কে কোন ভিডিও পুরো দেখে, কোনটা স্কিপ করে
   function pauseWatch(item) { const w = item._w; if (w && w.t0) { w.acc += Date.now() - w.t0; w.t0 = 0; } }
@@ -7132,7 +7151,7 @@ window.EktReact = (function () {
     }
   };
   // অন্য ডিভাইসে নতুন পোস্ট/স্টোরি হলে Home রিফ্রেশ
-  setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden) loadFeed(); }, 45000);
+  setInterval(() => { if (current === "Home" && document.body.classList.contains("dashboard-active") && !document.hidden && window.scrollY < 150) loadFeed(); }, 90000); // স্ক্রল করে নিচে থাকলে ফিড রিফ্রেশ করে ঝাঁকুনি দেয় না
 })();
 
 
