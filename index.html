@@ -936,6 +936,13 @@
             <button id="adminCloseBtn" class="admin-close-btn" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
           </div>
 
+          <div class="admin-maint">
+            <div class="admin-maint-row"><b><i class="fa-solid fa-screwdriver-wrench"></i> Maintenance</b><span id="maintState" class="admin-maint-state"></span></div>
+            <input id="maintMsg" type="text" maxlength="200" placeholder="ইউজারদের জন্য বার্তা (ঐচ্ছিক)">
+            <input id="maintMin" type="number" min="0" placeholder="কত মিনিটের জন্য? (খালি = নিজে চালু না করা পর্যন্ত বন্ধ)">
+            <button id="maintToggleBtn" type="button" class="btn btn-primary">অ্যাপ বন্ধ করুন</button>
+          </div>
+
           <div class="admin-tabs">
             <button id="adminTabUsers" class="admin-tab-btn active" type="button">User Data</button>
             <button id="adminTabStories" class="admin-tab-btn" type="button">Stories</button>
@@ -1092,5 +1099,8 @@
       });
     }
   </script>
+  <div id="maintOverlay" class="maint-overlay" style="display:none">
+    <div class="maint-box"><div class="maint-ic">🛠️</div><h2>অ্যাপ সাময়িকভাবে বন্ধ আছে</h2><p id="maintOverlayMsg"></p><p id="maintOverlayUntil"></p></div>
+  </div>
 </body>
 </html>
