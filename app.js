@@ -1616,6 +1616,27 @@ socket.on("account-banned", async (data) => {
 });
 socket.on("account-deleted", () => { ektHandleAccountGone("deleted"); });
 // অন্য ডিভাইস থেকে "Log out" দিলে এই ডিভাইস থেকে বের করে দেওয়া হয়
+// ---- মেইনটেনেন্স ওভারলে (সার্ভার চালু/বন্ধ করলে সাথে সাথে সব খোলা অ্যাপে দেখায়) ----
+(function () {
+  var wasOn = false;
+  socket.on("maintenance", function (st) {
+    var ov = document.getElementById("maintOverlay");
+    if (!ov) return;
+    st = st || {};
+    if (st.on) {
+      wasOn = true;
+      document.getElementById("maintOverlayMsg").textContent = st.msg || "কিছু কাজ চলছে। অনুগ্রহ করে একটু পরে আবার আসুন।";
+      var u = document.getElementById("maintOverlayUntil");
+      u.textContent = st.until ? "আনুমানিক " + new Date(st.until).toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit" }) + " পর্যন্ত" : "";
+      ov.style.display = "flex";
+      try { document.querySelectorAll("video,audio").forEach(function (m) { m.pause(); }); document.querySelectorAll("#shortsList iframe").forEach(function (f) { f.remove(); }); } catch (e) {}
+    } else {
+      ov.style.display = "none";
+      if (wasOn) { wasOn = false; location.reload(); } // বন্ধ থাকার সময় যা মিস হয়েছে তা ঠিকমতো লোড করতে
+    }
+  });
+})();
+
 socket.on("force-logout", async () => {
   if (window.__ektForceOut) return;
   window.__ektForceOut = true;
@@ -5051,10 +5072,37 @@ socket.on("direct-call-rejected", async () => {
           renderAdminUsers(res.users || []);
           renderAdminReports(res.reports || []);
           renderAdminStories(res.stories || []);
+          paintMaint(res.maintenance);
           clearBadge();
         } else {
           showCustomAlert("Access Denied", "ভুল অ্যাডমিন পাসওয়ার্ড!");
         }
+      });
+    });
+  }
+
+  // ---- Maintenance (অ্যাপ সাময়িক বন্ধ/চালু) ----
+  var maintOn = false;
+  function paintMaint(st) {
+    st = st || {};
+    maintOn = !!st.on;
+    var stEl = document.getElementById("maintState"), btn = document.getElementById("maintToggleBtn");
+    if (stEl) { stEl.textContent = maintOn ? "বন্ধ আছে" + (st.by ? " (" + st.by + ")" : "") : "চালু আছে"; stEl.classList.toggle("on", maintOn); }
+    if (btn) { btn.textContent = maintOn ? "অ্যাপ আবার চালু করুন" : "অ্যাপ বন্ধ করুন"; btn.disabled = false; }
+  }
+  var maintBtn = document.getElementById("maintToggleBtn");
+  if (maintBtn) {
+    maintBtn.addEventListener("click", function () {
+      if (!adminSessionPassword) return;
+      var turnOn = !maintOn;
+      if (turnOn && !confirm("সব ইউজারের জন্য অ্যাপ বন্ধ হয়ে যাবে। নিশ্চিত?")) return;
+      maintBtn.disabled = true;
+      socket.emit("admin-set-maintenance", {
+        password: adminSessionPassword, on: turnOn,
+        msg: (document.getElementById("maintMsg") || {}).value || "",
+        minutes: Number((document.getElementById("maintMin") || {}).value) || 0
+      }, function (r) {
+        if (r && r.success) paintMaint(r); else { maintBtn.disabled = false; showCustomAlert("Error", "করা যায়নি"); }
       });
     });
   }
