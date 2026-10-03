@@ -3225,3 +3225,15 @@ body.tab-reels { overflow: hidden; }
 /* Shorts: শুরুর কয়েক সেকেন্ড (YouTube-এর নিজের বাটন/টাইটেল ভেসে থাকার সময়) প্লেয়ার লুকানো, থাম্বনেইল দেখা যায় */
 .short-item .short-frame.hold { opacity: 0; }
 .short-item .short-frame { transition: opacity .25s ease; }
+
+/* মেইনটেনেন্স */
+.maint-overlay { position: fixed; inset: 0; z-index: 2147483000; background: #0b0b18; color: #fff; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+.maint-box { max-width: 420px; }
+.maint-ic { font-size: 54px; }
+.maint-box h2 { font-size: 24px; margin: 14px 0 8px; }
+.maint-box p { opacity: .8; line-height: 1.6; margin: 6px 0; }
+.admin-maint { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0 0 12px; border-radius: 14px; background: var(--surface-2, rgba(255,255,255,.06)); }
+.admin-maint input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: inherit; font: inherit; }
+.admin-maint-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.admin-maint-state { font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: rgba(34,197,94,.18); color: #22c55e; }
+.admin-maint-state.on { background: rgba(239,68,68,.18); color: #ef4444; }
