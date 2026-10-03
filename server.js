@@ -186,7 +186,7 @@ function maintenanceActive() {
   if (maintenance.on && maintenance.until && Date.now() > maintenance.until) { maintenance = { on: false, msg: "", until: 0 }; try { saveData(); } catch (e) {} }
   return !!maintenance.on;
 }
-function maintStatus() { return { on: maintenanceActive(), msg: maintenance.msg || "", until: maintenance.until || 0 }; }
+function maintStatus() { return { on: maintenanceActive(), msg: maintenance.msg || "", until: maintenance.until || 0, needPhone: ADMIN_PHONES.length > 0 }; }
 function escHtml(t) { return String(t || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function broadcastMaintenance() {
   const st = maintStatus();
@@ -200,12 +200,25 @@ setInterval(() => { const was = maintenance.on; if (was && !maintenanceActive())
 app.get(["/healthz", "/health"], (req, res) => res.status(200).type("text/plain").send("ok"));
 app.head(["/healthz", "/health"], (req, res) => res.status(200).end());
 
+const bypassTries = {};
 app.use((req, res, next) => {
   if (req.path === "/admin-bypass") {
-    if (String(req.query.key || "") === ADMIN_PASSWORD) {
-      res.setHeader("Set-Cookie", BYPASS_COOKIE + "=" + bypassValue() + "; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax");
-      return res.redirect("/");
+    const ip = String((req.headers["x-forwarded-for"] || req.ip || "")).split(",")[0].trim();
+    const isHttps = String(req.headers["x-forwarded-proto"] || "").indexOf("https") === 0;
+    const grant = () => res.setHeader("Set-Cookie", BYPASS_COOKIE + "=" + bypassValue() + "; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax" + (isHttps ? "; Secure" : ""));
+    // ভুল পাসওয়ার্ড বারবার দিয়ে অনুমান ঠেকাতে: একই আইপি থেকে ১০ মিনিটে সর্বোচ্চ ৮ বার
+    const rl = bypassTries[ip] && Date.now() - bypassTries[ip].t < 600000 ? bypassTries[ip] : (bypassTries[ip] = { n: 0, t: Date.now() });
+    if (rl.n >= 8) return res.status(429).json({ ok: false, error: "too_many" });
+    const passOk = (p) => { const a = nodeCrypto.createHash("sha256").update(String(p || "")).digest(), b = nodeCrypto.createHash("sha256").update(ADMIN_PASSWORD).digest(); return nodeCrypto.timingSafeEqual(a, b); };
+    if (req.method === "POST") {
+      const body = req.body || {};
+      const phoneOk = !ADMIN_PHONES.length || ADMIN_PHONES.includes(String(body.phone || "").trim());
+      if (passOk(body.password) && phoneOk) { rl.n = 0; grant(); return res.json({ ok: true }); }
+      rl.n++;
+      return res.status(403).json({ ok: false, error: "denied" });
     }
+    if (!ADMIN_PHONES.length && passOk(req.query.key)) { rl.n = 0; grant(); return res.redirect("/"); } // ADMIN_PHONES দেওয়া থাকলে লিংক বন্ধ — শুধু ফর্ম (নম্বর+পাসওয়ার্ড)
+    rl.n++;
     return res.status(403).send("Forbidden");
   }
   if (!maintenanceActive() || hasBypass(req.headers.cookie)) return next();
@@ -219,11 +232,64 @@ app.use((req, res, next) => {
     '<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#0b0b18;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}' +
     '.c{max-width:420px}.i{font-size:54px}h1{font-size:24px;margin:14px 0 8px}p{opacity:.8;line-height:1.6;margin:6px 0}</style></head><body><div class="c"><div class="i">🛠️</div><h1>অ্যাপ সাময়িকভাবে বন্ধ আছে</h1>' +
     "<p>" + escHtml(maintenance.msg || "কিছু কাজ চলছে। অনুগ্রহ করে একটু পরে আবার আসুন।") + "</p>" + (until ? "<p>আনুমানিক " + escHtml(until) + " পর্যন্ত</p>" : "") +
-    '</div><script>setTimeout(function(){location.reload()},30000)</script></body></html>'
+    '<div style="margin-top:26px"><button id="ab" style="background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:8px 16px;cursor:pointer;font:inherit">Admin</button>' +
+    '<div id="af" style="display:none;margin-top:12px;flex-direction:column;gap:8px">' +
+    (ADMIN_PHONES.length ? '<input id="ap" type="tel" placeholder="Admin phone" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;font:inherit">' : '') +
+    '<input id="aw" type="password" placeholder="Admin password" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;font:inherit">' +
+    '<button id="ag" style="padding:10px;border-radius:10px;border:none;background:#f97316;color:#fff;cursor:pointer;font:inherit">Enter</button><div id="ae" style="color:#f87171;font-size:13px;min-height:16px"></div></div></div>' +
+    '</div><script>var auto=setTimeout(function(){location.reload()},30000);' +
+    'document.getElementById("ab").onclick=function(){clearTimeout(auto);var f=document.getElementById("af");f.style.display=f.style.display==="flex"?"none":"flex"};' +
+    'function go(){var p=document.getElementById("ap");fetch("/admin-bypass",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({password:document.getElementById("aw").value,phone:p?p.value:""})}).then(function(r){return r.json()}).then(function(j){if(j.ok)location.reload();else document.getElementById("ae").textContent=j.error==="too_many"?"অনেকবার ভুল, একটু পরে চেষ্টা করুন":"ভুল পাসওয়ার্ড/নম্বর"}).catch(function(){document.getElementById("ae").textContent="সমস্যা হয়েছে"})}' +
+    'document.getElementById("ag").onclick=go;document.getElementById("aw").onkeydown=function(e){if(e.key==="Enter")go()};</script></body></html>'
   );
 });
 
 // Serve the frontend files (index.html, app.js, style.css) from this same folder
+// ================= দ্রুত লোড: gzip/brotli + ক্যাশ, আর সংবেদনশীল ফাইল ব্লক =================
+const zlib = require("zlib");
+// server.js / package.json / ডেটা ফাইল যেন ডাউনলোড করা না যায়
+app.use((req, res, next) => {
+  if (/^\/(server\.js|package(-lock)?\.json|app-data\.json|\.env.*|\.git.*|node_modules|data)(\/|$)/i.test(req.path)) return res.status(404).end();
+  next();
+});
+const FAST_FILES = {
+  "/": ["index.html", "text/html; charset=utf-8"],
+  "/index.html": ["index.html", "text/html; charset=utf-8"],
+  "/app.js": ["app.js", "application/javascript; charset=utf-8"],
+  "/style.css": ["style.css", "text/css; charset=utf-8"],
+};
+const fastCache = {};
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  const def = FAST_FILES[req.path];
+  if (!def) return next();
+  try {
+    const file = path.join(__dirname, def[0]);
+    const st = fs.statSync(file);
+    let e = fastCache[def[0]];
+    if (!e || e.mtime !== st.mtimeMs) {
+      const raw = fs.readFileSync(file);
+      e = fastCache[def[0]] = {
+        mtime: st.mtimeMs, raw,
+        br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } }),
+        gz: zlib.gzipSync(raw, { level: 9 }),
+        etag: '"' + nodeCrypto.createHash("sha1").update(raw).digest("hex").slice(0, 20) + '"',
+      };
+    }
+    res.setHeader("ETag", e.etag);
+    res.setHeader("Cache-Control", "no-cache"); // প্রতিবার যাচাই করবে, বদলায়নি হলে 304 (ডাউনলোড ছাড়া)
+    res.setHeader("Vary", "Accept-Encoding");
+    res.setHeader("Content-Type", def[1]);
+    if (req.headers["if-none-match"] === e.etag) return res.status(304).end();
+    const ae = String(req.headers["accept-encoding"] || "");
+    let body = e.raw;
+    if (/\bbr\b/.test(ae)) { res.setHeader("Content-Encoding", "br"); body = e.br; }
+    else if (/\bgzip\b/.test(ae)) { res.setHeader("Content-Encoding", "gzip"); body = e.gz; }
+    res.setHeader("Content-Length", body.length);
+    return res.end(req.method === "HEAD" ? undefined : body);
+  } catch (err) { return next(); }
+});
+
 app.use(express.static(path.join(__dirname)));
 
 // ================= DATA STORE (now saved to disk) =================
