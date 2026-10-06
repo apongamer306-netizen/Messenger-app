@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.ektchatter",
+        "sha256_cert_fingerprints": ["87:84:0F:79:BD:24:9D:52:E5:62:CB:71:AD:21:96:22:89:F7:6A:2C:74:9D:3F:41:EF:61:D7:0F:57:48:BA:DE"]
+      }
+    }]
