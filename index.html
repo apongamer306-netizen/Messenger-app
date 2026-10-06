@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>EKT CHATTER</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%236366f1'/%3E%3Cstop%20offset='0.5'%20stop-color='%237c5cff'/%3E%3Cstop%20offset='1'%20stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3CradialGradient%20id='core'%20cx='32%25'%20cy='28%25'%20r='70%25'%3E%3Cstop%20offset='0'%20stop-color='%23ddd6fe'/%3E%3Cstop%20offset='0.45'%20stop-color='%236366f1'/%3E%3Cstop%20offset='1'%20stop-color='%231e1b4b'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect%20width='64'%20height='64'%20rx='16'%20fill='url(%23g)'/%3E%3Ccircle%20cx='32'%20cy='32'%20r='22'%20fill='url(%23core)'/%3E%3Cpath%20d='M18%2032.5L46%2018l-10%2028-6.5-8.5L18%2032.5zm12.2%206.2l4.3%205.6L41.5%2024.5%2030.2%2038.7z'%20fill='white'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='.55' stop-color='%239333ea'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M49 14L13 31l14 6z' fill='%23fff'/%3E%3Cpath d='M49 14L27 37l5 13z' fill='%23dfe4ff'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=Poppins:ital,wght@1,400;1,500;1,600;1,700&family=Pacifico&display=swap" media="print" onload="this.media='all'">
@@ -64,81 +64,22 @@
       .sp-inner{ transform:scale(1.35); }
     }
 
-    /* ---- Multi-ring energy atom ---- */
+    /* ---- Desk scene: table + lamp + paper plane + books ---- */
     .sp-energy{
       position:relative;
-      width:clamp(140px, 38vw, 180px);
-      height:clamp(140px, 38vw, 180px);
-      margin-bottom:clamp(18px, 4vw, 28px);
-      animation:spEnergyIn .9s cubic-bezier(.16,1.2,.3,1) both;
+      width:clamp(200px, 56vw, 250px);
+      aspect-ratio:240/190;
+      margin:0 0 clamp(16px, 4vw, 24px);
+      animation:spEnergyIn .7s ease both;
     }
-    .sp-energy::before{
-      content:""; position:absolute; left:50%; top:50%; width:60%; height:60%; margin:-30% 0 0 -30%;
-      border-radius:50%;
-      background:radial-gradient(circle, rgba(129,140,248,.55), rgba(99,102,241,0) 68%);
-      animation:spGlow 2.4s ease-in-out infinite;
-      will-change:transform, opacity;
-    }
-    @keyframes spGlow{
-      0%,100%{ opacity:.55; transform:scale(.88); }
-      50%{ opacity:1; transform:scale(1.12); }
-    }
-    @keyframes spEnergyIn{
-      from{ opacity:0; transform:scale(.4) rotateX(40deg); }
-      to{ opacity:1; transform:none; }
-    }
-    .sp-core{
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:clamp(48px, 13vw, 58px); height:clamp(48px, 13vw, 58px);
-      border-radius:50%;
-      background:radial-gradient(circle at 32% 28%, #ddd6fe, #6366f1 45%, #1e1b4b);
-      box-shadow:0 0 20px rgba(99,102,241,.8), inset 0 -8px 14px rgba(0,0,0,.35), inset 0 3px 8px rgba(255,255,255,.18);
-      display:flex; align-items:center; justify-content:center;
-      z-index:5;
-    }
-    .sp-core svg{ width:clamp(20px, 5.6vw, 25px); height:clamp(20px, 5.6vw, 25px); fill:#fff; transform:rotate(-24deg) translate(1px,0); }
-
-    .sp-ring{
-      position:absolute; left:50%; top:50%;
-      border-radius:50%;
-      border:1.5px solid transparent;
-      pointer-events:none;
-      will-change:transform;
-    }
-    .sp-ring .sp-ball{
-      position:absolute; width:7px; height:7px; border-radius:50%;
-      top:-3.5px; left:50%; margin-left:-3.5px;
-      box-shadow:0 0 6px currentColor;
-    }
-    .sp-ring.r1{
-      width:42%; height:42%; margin:0; transform:translate(-50%,-50%) rotateX(72deg);
-      border-top-color:#22d3ee; border-right-color:rgba(34,211,238,.3);
-      animation:spR1 2.8s linear infinite;
-    }
-    .sp-ring.r1 .sp-ball{ background:#22d3ee; color:#22d3ee; width:6px; height:6px; }
-    .sp-ring.r2{
-      width:55%; height:55%; transform:translate(-50%,-50%) rotateX(68deg) rotateZ(40deg);
-      border-bottom-color:#e879f9; border-left-color:rgba(232,121,249,.3);
-      animation:spR2 3.6s linear infinite;
-    }
-    .sp-ring.r2 .sp-ball{ background:#e879f9; color:#e879f9; }
-    .sp-ring.r3{
-      width:68%; height:68%; transform:translate(-50%,-50%) rotateX(65deg) rotateZ(-55deg);
-      border-top-color:#60a5fa; border-right-color:rgba(96,165,250,.25);
-      animation:spR3 4.4s linear infinite;
-    }
-    .sp-ring.r3 .sp-ball{ background:#60a5fa; color:#60a5fa; }
-    .sp-ring.r4{
-      width:80%; height:80%; transform:translate(-50%,-50%) rotateX(70deg) rotateZ(90deg);
-      border-bottom-color:#a78bfa; border-left-color:rgba(167,139,250,.25);
-      animation:spR4 5.2s linear infinite; opacity:.9;
-    }
-    .sp-ring.r4 .sp-ball{ background:#a78bfa; color:#a78bfa; width:6px; height:6px; }
-
-    @keyframes spR1{ to{ transform:translate(-50%,-50%) rotateX(72deg) rotate(360deg); } }
-    @keyframes spR2{ to{ transform:translate(-50%,-50%) rotateX(68deg) rotateZ(40deg) rotate(-360deg); } }
-    @keyframes spR3{ to{ transform:translate(-50%,-50%) rotateX(65deg) rotateZ(-55deg) rotate(360deg); } }
-    @keyframes spR4{ to{ transform:translate(-50%,-50%) rotateX(70deg) rotateZ(90deg) rotate(-360deg); } }
+    .sp-energy svg{ width:100%; height:100%; display:block; overflow:visible; }
+    @keyframes spEnergyIn{ from{ opacity:0; } to{ opacity:1; } }
+    .sp-light{ animation:spLamp 3.2s ease-in-out infinite; will-change:opacity; }
+    @keyframes spLamp{ 0%,100%{ opacity:.82; } 50%{ opacity:1; } }
+    .sp-plane{ animation:spBob 3.6s ease-in-out infinite; will-change:transform; }
+    @keyframes spBob{ 50%{ transform:translateY(-3px); } }
+    /* উপরে নাম, মাঝে দৃশ্য, নিচে % */
+    .sp-title{ order:1; } .sp-tagline{ order:2; } .sp-energy{ order:3; } .sp-circle{ order:4; }
 
     /* ---- Title: one line, responsive ---- */
     .sp-title{
@@ -270,15 +211,13 @@
     @keyframes spBlink{ 50%{ opacity:0; } }
 
     /* ---- লো-এন্ড ডিভাইসের জন্য আরও হালকা মোড (JS নিজে বুঝে চালু করে) ---- */
-    .sp-lite .sp-ring.r3, .sp-lite .sp-ring.r4{ display:none; }
-    .sp-lite .sp-energy::before{ animation:none; opacity:.8; }
+    .sp-lite .sp-plane{ animation:none; }
+    .sp-lite .sp-light{ animation:none; opacity:.9; }
     .sp-lite .sp-energy{ animation-duration:.4s; }
     .sp-lite .sp-title{ text-shadow:none; }
     .sp-lite .sp-title span{ animation-duration:.01ms !important; animation-delay:0s !important; }
     .sp-lite .sp-tagline.show{ animation-duration:.3s; }
     .sp-lite .sp-circle{ box-shadow:none; }
-    .sp-lite .sp-core{ box-shadow:0 0 12px rgba(99,102,241,.7), inset 0 -6px 10px rgba(0,0,0,.3); }
-    .sp-lite .sp-ball{ box-shadow:none !important; }
     @media (prefers-reduced-motion: reduce){
       #splashScreen *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; }
     }
@@ -289,11 +228,59 @@
   <div id="splashScreen">
     <div class="sp-inner">
       <div class="sp-energy">
-        <div class="sp-ring r1"><span class="sp-ball"></span></div>
-        <div class="sp-ring r2"><span class="sp-ball"></span></div>
-        <div class="sp-ring r3"><span class="sp-ball"></span></div>
-        <div class="sp-ring r4"><span class="sp-ball"></span></div>
-        <div class="sp-core"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></div>
+        <svg viewBox="0 0 240 190" aria-hidden="true">
+          <defs>
+            <linearGradient id="spCone" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffe9a8" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#ffd27a" stop-opacity=".06"/>
+            </linearGradient>
+            <radialGradient id="spPool" cx=".5" cy=".5" r=".5">
+              <stop offset="0" stop-color="#ffe3a0" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#ffe3a0" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="spBulb" cx=".5" cy=".5" r=".5">
+              <stop offset="0" stop-color="#fff6d0"/>
+              <stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="spWood" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#6b4a33"/><stop offset="1" stop-color="#2a1b12"/>
+            </linearGradient>
+            <linearGradient id="spShade" x1="0" x2="1">
+              <stop offset="0" stop-color="#4338ca"/><stop offset="1" stop-color="#7c3aed"/>
+            </linearGradient>
+          </defs>
+          <!-- টেবিল -->
+          <path d="M6 148 H234 L226 160 H14Z" fill="url(#spWood)"/>
+          <rect x="14" y="160" width="212" height="6" fill="#1b110b" opacity=".7"/>
+          <!-- আলোর শঙ্কু ও টেবিলে আলোর বৃত্ত -->
+          <g class="sp-light">
+            <polygon points="50,52 86,52 196,148 36,148" fill="url(#spCone)"/>
+            <ellipse cx="118" cy="148" rx="82" ry="9" fill="url(#spPool)"/>
+          </g>
+          <!-- ল্যাম্প -->
+          <ellipse cx="30" cy="147" rx="16" ry="3.5" fill="#1f2937"/>
+          <rect x="28.5" y="72" width="3" height="75" fill="#374151"/>
+          <path d="M30 74 L62 36" stroke="#374151" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <polygon points="54,28 78,28 90,52 42,52" fill="url(#spShade)"/>
+          <ellipse cx="66" cy="53" rx="14" ry="5" fill="url(#spBulb)" class="sp-light"/>
+          <!-- বই (ডানে) -->
+          <rect x="188" y="134" width="40" height="13" rx="1.5" fill="#0e7490"/>
+          <rect x="188" y="136" width="40" height="1.5" fill="#67e8f9" opacity=".5"/>
+          <rect x="192" y="122" width="34" height="12" rx="1.5" fill="#be185d"/>
+          <rect x="192" y="124" width="34" height="1.5" fill="#f9a8d4" opacity=".5"/>
+          <rect x="186" y="111" width="36" height="11" rx="1.5" fill="#a16207"/>
+          <rect x="186" y="113" width="36" height="1.5" fill="#fde68a" opacity=".5"/>
+          <!-- বই (বামে, হেলানো) -->
+          <rect x="62" y="136" width="10" height="12" rx="1" fill="#4f46e5"/>
+          <rect x="73" y="138" width="9" height="10" rx="1" fill="#15803d"/>
+          <!-- কাগজের প্লেন -->
+          <ellipse cx="136" cy="147" rx="34" ry="3.5" fill="#000" opacity=".35"/>
+          <g class="sp-plane">
+            <polygon points="176,106 104,122 136,130" fill="#ffffff"/>
+            <polygon points="176,106 136,130 124,110" fill="#c9d2fb"/>
+            <polygon points="136,130 104,122 126,144" fill="#8fa0e8"/>
+          </g>
+        </svg>
       </div>
 
       <h1 class="sp-title" id="splashTitle" aria-label="EKT CHATTER"></h1>
