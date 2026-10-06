@@ -290,6 +290,11 @@ app.use((req, res, next) => {
   } catch (err) { return next(); }
 });
 
+// Android অ্যাপ (TWA) যাচাইয়ের জন্য — URL বার লুকাতে লাগে
+app.get("/.well-known/assetlinks.json", (req, res) => {
+  res.type("application/json").sendFile(path.join(__dirname, "assetlinks.json"));
+});
+
 app.use(express.static(path.join(__dirname)));
 
 // ================= DATA STORE (now saved to disk) =================
