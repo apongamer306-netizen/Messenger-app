@@ -6441,15 +6441,13 @@ window.EktReact = (function () {
       : `<div class="tp-empty" style="grid-column:1/-1"><i class="fa-solid fa-user-group"></i><p>এখনো কোনো বন্ধু নেই। উপরে সার্চ করে ফ্রেন্ড রিকোয়েস্ট পাঠান।</p></div>`;
     renderSuggest();
   }
-  function loadSuggest() {
-    const m = me(); if (!m) return;
-    socket.emit("suggest-users", { phone: m.phone }, (list) => { suggestCache = list || []; renderSuggest(); });
-  }
+  // সার্চ না করা পর্যন্ত কাউকে দেখানো হবে না — "People you may know" বন্ধ
+  function loadSuggest() { /* আর সাজেশন লোড করা হয় না */ }
   function renderSuggest() {
-    const box = $("tfSuggest");
-    box.innerHTML = suggestCache.length
-      ? suggestCache.map((u) => personCard(u, `<button class="tp-btn tp-btn-primary" data-add type="button"><i class="fa-solid fa-user-plus"></i> Add friend</button>`)).join("")
-      : `<div class="tp-empty" style="grid-column:1/-1"><p>এই মুহূর্তে কোনো সাজেশন নেই।</p></div>`;
+    suggestCache = [];
+    const box = $("tfSuggest"), title = $("tfSuggestTitle");
+    if (box) { box.innerHTML = ""; box.style.display = "none"; }
+    if (title) title.style.display = "none";
   }
 
   function friendsClick(e) {
