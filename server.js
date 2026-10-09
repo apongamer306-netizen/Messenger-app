@@ -2152,9 +2152,12 @@ io.on("connection", (socket) => {
         const phone = (u.phone || "").toLowerCase();
         const qCompact = q.replace(/[\s-]/g, "");
         // নাম দিয়ে আংশিক সার্চ চলবে; নম্বর/ইমেইল শুধু হুবহু মিললে (আংশিক মিলিয়ে নম্বর খুঁজে বের করা যাবে না)
-        return name.includes(q) || phone === q || phone === qCompact || (!!u.email && u.email === q);
+        // প্রাইভেসি: নাম আংশিক নয়, পুরো নাম হুবহু (বড়/ছোট হাতের ফারাক ও বাড়তি স্পেস বাদে) মিললে তবেই দেখাবে
+        const nameNorm = name.replace(/\s+/g, " ").trim();
+        const qNorm = q.replace(/\s+/g, " ").trim();
+        return (!!nameNorm && nameNorm === qNorm) || phone === q || phone === qCompact || (!!u.email && u.email === q);
       })
-      .slice(0, 25)
+      .slice(0, 10)
       .map((u) => ({
         ...publicUser(u.phone),
         isFriend: myFriends.has(u.phone),
