@@ -210,6 +210,21 @@
     .sp-credit-cursor.on{ opacity:1; }
     @keyframes spBlink{ 50%{ opacity:0; } }
 
+
+    /* ---- ল্যাম্পের সুইচ: শুরুতে অন্ধকার, দড়ি টানলে আলো জ্বলে ---- */
+    #splashScreen::before{ transition:opacity .6s ease; }
+    #splashScreen.sp-off::before{ opacity:0; }
+    .sp-dim{ fill:#02040a; opacity:0; pointer-events:none; }
+    #splashScreen.sp-off .sp-dim{ opacity:.88; }
+    #splashScreen.sp-on .sp-dim{ animation:spSwitchOn .55s linear both; }
+    @keyframes spSwitchOn{ 0%{opacity:.88;} 18%{opacity:.45;} 30%{opacity:.8;} 55%{opacity:.15;} 100%{opacity:0;} }
+    #splashScreen.sp-off .sp-light{ animation:none; opacity:0; }
+    .sp-cord-line{ transform-origin:50px 52px; }
+    #splashScreen.sp-pull .sp-cord-line{ animation:spPullLine .5s ease-out both; }
+    #splashScreen.sp-pull .sp-cord-bead{ animation:spPullBead .5s ease-out both; }
+    @keyframes spPullLine{ 0%{transform:scaleY(1);} 35%{transform:scaleY(1.4);} 60%{transform:scaleY(.94);} 100%{transform:scaleY(1);} }
+    @keyframes spPullBead{ 0%{transform:translateY(0);} 35%{transform:translateY(16px);} 60%{transform:translateY(-2px);} 100%{transform:translateY(0);} }
+
     /* ---- লো-এন্ড ডিভাইসের জন্য আরও হালকা মোড (JS নিজে বুঝে চালু করে) ---- */
     .sp-lite .sp-plane{ animation:none; }
     .sp-lite .sp-light{ animation:none; opacity:.9; }
@@ -225,7 +240,7 @@
 </head>
 <body class="dark-theme">
 
-  <div id="splashScreen">
+  <div id="splashScreen" class="sp-off">
     <div class="sp-inner">
       <div class="sp-energy">
         <svg viewBox="0 0 240 190" aria-hidden="true">
@@ -280,6 +295,10 @@
             <polygon points="176,106 136,130 124,110" fill="#c9d2fb"/>
             <polygon points="136,130 104,122 126,144" fill="#8fa0e8"/>
           </g>
+          <!-- অন্ধকারের স্তর + ল্যাম্পের সুইচ-দড়ি -->
+          <rect class="sp-dim" x="-60" y="-40" width="360" height="260"/>
+          <line class="sp-cord-line" x1="50" y1="52" x2="50" y2="92" stroke="#cbd5e1" stroke-width="1.6" stroke-linecap="round"/>
+          <circle class="sp-cord-bead" cx="50" cy="95" r="3.4" fill="#fbbf24"/>
         </svg>
       </div>
 
@@ -392,6 +411,15 @@
         }
       } catch (e) {}
 
+      // ল্যাম্পের সুইচ: দড়ি টানা → আলো জ্বলা → তারপর বাকি সব দেখা যায়
+      var LAMP_PULL_MS = 500, LAMP_ON_MS = 700;
+      function lampOn() {
+        if (!spEl) return;
+        spEl.classList.remove("sp-off");
+        spEl.classList.add("sp-on");
+      }
+      setTimeout(lampOn, 3000); // সেফটি: কোনো কারণে আটকে গেলেও যেন অন্ধকারে না থাকে
+
       function realHide() {
         if (splashDone) return;
         splashDone = true;
@@ -442,6 +470,12 @@
           hideScheduled = true;
           setTimeout(window.hideSplashScreen, 200);
         }
+      }
+
+      if (isResumeSession || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) lampOn();
+      else {
+        setTimeout(function () { if (spEl) spEl.classList.add("sp-pull"); }, LAMP_PULL_MS);
+        setTimeout(lampOn, LAMP_ON_MS);
       }
 
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -500,7 +534,7 @@
         if (tagEl) tagEl.classList.add("show");
         if (circleEl) circleEl.classList.add("show");
         setTimeout(function () { titleDone = true; tryFinish(); }, 280 + name.length * 60 + 450);
-      }, 700);
+      }, 1000);
 
       /* Circular % fill 0→100 */
       var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -575,7 +609,7 @@
           }
         }
         typeNext();
-      }, 1200);
+      }, 1500);
 
       setTimeout(function () {
         titleDone = creditDone = chargeDone = true;
