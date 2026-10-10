@@ -3265,3 +3265,8 @@ body.tab-reels { overflow: hidden; }
 /* Reels/Shorts: নিচের ছায়া ডান কিনারা পর্যন্ত (ডানে হালকা ফালি দেখা যেত) + আপলোড বাটন সবসময় ওপরের কোণায়, আলাদা সারি নেয় না */
 .reel-info { right: 0 !important; padding-right: 70px !important; }
 #tabReels .tp-head { position: absolute; right: 10px; top: 8px; margin: 0; z-index: 5; }
+
+/* ===== Install official app popup ===== */
+.install-app-card { text-align: center; max-width: 380px; }
+.install-app-icon { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff; background: linear-gradient(135deg,#6366f1,#9333ea,#ec4899); }
+.install-app-hint { font-size: 12.5px; opacity: .7; margin-top: 6px; line-height: 1.5; }
