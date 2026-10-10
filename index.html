@@ -776,7 +776,7 @@
           <button type="button" class="menu-row" data-go="openReportBtn"><i style="background:#f43f5e" class="fa-solid fa-flag"></i><span>Report</span></button>
           <button type="button" class="menu-row" data-go="setPinBtn"><i style="background:#0284c7" class="fa-solid fa-key"></i><span>Security PIN</span></button>
           <button type="button" class="menu-row" data-go="removePinBtn"><i style="background:#64748b" class="fa-solid fa-lock-open"></i><span>Remove Security PIN</span></button>
-          <button type="button" id="installAppMenuRow" class="menu-row"><i style="background:linear-gradient(135deg,#6366f1,#ec4899)" class="fa-solid fa-mobile-screen-button"></i><span>Install our official app</span></button>
+          <button type="button" id="installAppMenuRow" class="menu-row"><i style="background:linear-gradient(135deg,#4f8cff,#7c5cff)" class="fa-solid fa-mobile-screen-button"></i><span>Install our official app</span></button>
           <button type="button" class="menu-row menu-row-danger" data-go="logoutBtn"><i style="background:#dc2626" class="fa-solid fa-power-off"></i><span>Logout</span></button>
         </div>
       </section>
@@ -878,14 +878,25 @@
     <!-- ===== অফিশিয়াল অ্যাপ ইনস্টল পপআপ ===== -->
     <div id="installAppOverlay" class="call-modal" style="display: none; z-index: 99999;">
       <div class="card-screen install-app-card">
-        <div class="install-app-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
-        <h2>Install our official app</h2>
-        <p class="report-modal-sub">EKT Chatter-এর অফিশিয়াল Android অ্যাপটি ডাউনলোড করে ইনস্টল করতে চান?</p>
-        <p id="installAppHint" class="install-app-hint">ডাউনলোড শেষে ফাইলটি খুলে "Install" চাপুন। প্রয়োজনে ফোনের সেটিংসে "Install unknown apps" চালু করতে হতে পারে।</p>
-        <div style="display:flex; flex-direction:column; gap:10px; width:100%; margin-top:14px;">
-          <button id="installAppConfirmBtn" class="btn btn-primary"><i class="fa-solid fa-download"></i> Confirm &amp; Install</button>
-          <button id="installAppCancelBtn" class="btn btn-secondary">Cancel</button>
+        <div class="install-app-logo">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs><linearGradient id="iaG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset=".55" stop-color="#9333ea"/><stop offset="1" stop-color="#ec4899"/></linearGradient></defs>
+            <rect width="64" height="64" rx="14" fill="url(#iaG)"/>
+            <path d="M49 14L13 31l14 6z" fill="#fff"/><path d="M49 14L27 37l5 13z" fill="#dfe4ff"/>
+          </svg>
         </div>
+        <h2>Install EKT Chatter</h2>
+        <p class="install-app-sub">আমাদের অফিশিয়াল অ্যাপ ইনস্টল করুন</p>
+        <ul class="install-app-feats">
+          <li><i class="fa-solid fa-bolt"></i><span>আরও দ্রুত ও স্মুথ পারফরম্যান্স</span></li>
+          <li><i class="fa-solid fa-expand"></i><span>ফুল-স্ক্রিন, ব্রাউজার ছাড়াই</span></li>
+          <li><i class="fa-solid fa-house"></i><span>হোম স্ক্রিন থেকে এক ট্যাপে ওপেন</span></li>
+        </ul>
+        <div class="install-app-actions">
+          <button id="installAppConfirmBtn" class="btn btn-primary"><i class="fa-solid fa-download"></i> Install</button>
+          <button id="installAppCancelBtn" class="btn btn-secondary">Not now</button>
+        </div>
+        <p id="installAppHint" class="install-app-hint">ডাউনলোড হলে ফাইলটি খুলে "Install" চাপুন। দরকার হলে ফোনের সেটিংসে "Install unknown apps" চালু করুন।</p>
       </div>
     </div>
 
