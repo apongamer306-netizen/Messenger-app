@@ -3525,3 +3525,15 @@ body .post-action-btn:active { transform: scale(.92); }
   box-shadow: var(--dn-in);
 }
 .dev-credit .dev-credit-type { top: var(--bx-py); }
+
+
+/* =====================================================================
+   উপরের নেভ বার: কোনো রঙের গ্লো/বাতি-আলো নেই — অ্যাক্টিভ আইকনের নিচে শুধু একটা দাগ
+   ===================================================================== */
+.main-tabs, body .main-tabs { box-shadow: none; }
+body .mt-btn:hover { box-shadow: none; transform: none; background: transparent; }
+body .mt-btn:active { box-shadow: none; transform: none; }
+body .mt-btn.active { background: transparent; box-shadow: none; }
+body .mt-btn.active i { background: transparent; box-shadow: none; animation: none; }
+body .mt-btn:hover i { background: transparent; box-shadow: none; }
+body .mt-btn.active::after { transform: scaleX(1); }
