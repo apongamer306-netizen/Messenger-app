@@ -3278,3 +3278,135 @@ body.tab-reels { overflow: hidden; }
 .install-app-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .install-app-actions .btn i { margin-right: 6px; }
 .install-app-hint { font-size: 11.5px; color: var(--text-3) !important; margin-top: 12px; line-height: 1.5; }
+
+
+/* =====================================================================
+   NEUMORPHISM (soft UI) — শুধু লগইন / সাইন আপ / Welcome (PIN) স্ক্রিনের জন্য
+   ব্যাকগ্রাউন্ড, হেডার (EKT CHATTER), "Developed by Eyamin" — কিছুই বদলানো হয়নি।
+   এখানে শুধু কার্ড, ইনপুট, বাটন, লিংক আর তাদের অ্যানিমেশন বদলানো হয়েছে।
+   ===================================================================== */
+#authScreen, #masterKeyScreen {
+  --nm-base: #121a2b;
+  --nm-light: rgba(255, 255, 255, 0.055);
+  --nm-dark: rgba(0, 0, 0, 0.55);
+  --nm-accent: #4f8cff;
+}
+body.light-theme #authScreen, body.light-theme #masterKeyScreen {
+  --nm-base: #eceff4;
+  --nm-light: #ffffff;
+  --nm-dark: rgba(163, 177, 198, 0.65);
+  --nm-accent: #1877f2;
+}
+
+/* কার্ড — উঁচু হয়ে ভেসে থাকার মতো */
+#authScreen.card-screen, #masterKeyScreen.card-screen {
+  background: var(--nm-base);
+  border: none;
+  border-radius: 30px;
+  box-shadow: 14px 14px 30px var(--nm-dark), -10px -10px 26px var(--nm-light);
+  transform-style: preserve-3d;
+}
+#authScreen.card-screen::before, #masterKeyScreen.card-screen::before { display: none; }
+
+/* আইকন — নরম উঁচু বৃত্ত */
+#authScreen .auth-icon, #masterKeyScreen .auth-icon {
+  background: var(--nm-base);
+  color: var(--nm-accent);
+  border-radius: 50%;
+  width: 64px; height: 64px;
+  box-shadow: 6px 6px 14px var(--nm-dark), -5px -5px 12px var(--nm-light);
+}
+
+/* ইনপুট — ভেতরে বসা (inset) + ফোকাসে নিচে নীল লাইন */
+#authScreen .input-wrapper input, #masterKeyScreen .input-wrapper input {
+  border: none;
+  border-radius: 16px;
+  background-color: var(--nm-base);
+  background-image: linear-gradient(var(--nm-accent), var(--nm-accent));
+  background-repeat: no-repeat;
+  background-position: center calc(100% - 1px);
+  background-size: 0% 2px;
+  box-shadow: inset 5px 5px 11px var(--nm-dark), inset -5px -5px 11px var(--nm-light);
+  transition: background-size .35s ease, box-shadow .25s ease;
+}
+#authScreen .input-wrapper input:focus, #masterKeyScreen .input-wrapper input:focus {
+  background-color: var(--nm-base);
+  background-size: 78% 2px;
+  box-shadow: inset 6px 6px 13px var(--nm-dark), inset -6px -6px 13px var(--nm-light);
+}
+#authScreen .toggle-eye, #masterKeyScreen .toggle-eye { transition: color .2s, transform .2s; }
+#authScreen .toggle-eye:active, #masterKeyScreen .toggle-eye:active { transform: translateY(-50%) scale(.82); }
+
+/* Phone / Email সুইচ */
+#authScreen .auth-id-switch {
+  background: var(--nm-base);
+  box-shadow: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+  border-radius: 16px;
+}
+#authScreen .auth-id-switch button { border-radius: 12px; transition: all .25s ease; }
+#authScreen .auth-id-switch button.active {
+  background: var(--nm-base);
+  color: var(--nm-accent);
+  box-shadow: 4px 4px 9px var(--nm-dark), -3px -3px 8px var(--nm-light);
+}
+
+/* মূল বাটন — উঁচু, চাপলে ভেতরে ঢোকে, ক্লিকে নীল লোডিং বার ভরে যায় */
+#authScreen .btn-primary, #masterKeyScreen .btn-primary {
+  position: relative;
+  overflow: hidden;
+  background: var(--nm-base);
+  color: var(--nm-accent);
+  border-radius: 16px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  box-shadow: 6px 6px 14px var(--nm-dark), -5px -5px 12px var(--nm-light);
+  transition: box-shadow .2s ease, transform .2s ease, color .2s ease;
+}
+#authScreen .btn-primary:hover, #masterKeyScreen .btn-primary:hover { filter: none; transform: translateY(-2px); }
+#authScreen .btn-primary:active, #masterKeyScreen .btn-primary:active {
+  transform: scale(.97);
+  box-shadow: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+}
+#authScreen .btn-primary::after, #masterKeyScreen .btn-primary::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 100%; width: 0;
+  background: linear-gradient(90deg, #4f8cff, #7c5cff);
+  opacity: 0; z-index: 0; pointer-events: none;
+}
+#authScreen .btn-primary.nm-loading, #masterKeyScreen .btn-primary.nm-loading {
+  color: #fff;
+  box-shadow: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+}
+#authScreen .btn-primary.nm-loading::after, #masterKeyScreen .btn-primary.nm-loading::after {
+  opacity: 1; animation: nmFill .9s cubic-bezier(.4, 0, .2, 1) forwards;
+  z-index: -1;
+}
+#authScreen .btn-primary, #masterKeyScreen .btn-primary { isolation: isolate; }
+@keyframes nmFill { from { width: 0; } to { width: 100%; } }
+
+/* "Sign Up" / "Login" / "Create Password" লিংক — ছোট উঁচু পিল বাটন */
+#authScreen .auth-toggle-text a, #masterKeyScreen .auth-toggle-text a {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--nm-base);
+  color: var(--nm-accent);
+  text-decoration: none;
+  box-shadow: 4px 4px 9px var(--nm-dark), -3px -3px 8px var(--nm-light);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+#authScreen .auth-toggle-text a:hover, #masterKeyScreen .auth-toggle-text a:hover { text-decoration: none; transform: translateY(-1px); }
+#authScreen .auth-toggle-text a:active, #masterKeyScreen .auth-toggle-text a:active {
+  transform: scale(.94);
+  box-shadow: inset 3px 3px 7px var(--nm-dark), inset -3px -3px 7px var(--nm-light);
+}
+
+/* Login ↔ Sign Up কার্ড ফ্লিপ অ্যানিমেশন */
+#authScreen.nm-flip-out, #masterKeyScreen.nm-flip-out { animation: nmFlipOut .22s ease-in forwards; }
+#authScreen.nm-flip-in,  #masterKeyScreen.nm-flip-in  { animation: nmFlipIn .3s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes nmFlipOut { to { transform: perspective(900px) rotateY(88deg) scale(.96); opacity: .15; } }
+@keyframes nmFlipIn  { from { transform: perspective(900px) rotateY(-88deg) scale(.96); opacity: .15; } to { transform: perspective(900px) rotateY(0) scale(1); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #authScreen *, #masterKeyScreen *, #authScreen, #masterKeyScreen { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
