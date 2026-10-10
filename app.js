@@ -7657,3 +7657,34 @@ window.EktReact = (function () {
   if (btn) btn.addEventListener("click", () => { const dd = $("dashDropdownMenu"); if (dd) dd.classList.remove("open"); openSettings(); });
   window.openSettings = openSettings;
 })();
+
+
+// ===== Install our official app (Menu -> popup -> APK download) =====
+(function () {
+  var APK_URL = "/EKT-Chatter.apk";
+  var row = document.getElementById("installAppMenuRow");
+  var overlay = document.getElementById("installAppOverlay");
+  var okBtn = document.getElementById("installAppConfirmBtn");
+  var cancelBtn = document.getElementById("installAppCancelBtn");
+  if (!row || !overlay || !okBtn || !cancelBtn) return;
+
+  // অ্যাপের ভেতরে (TWA/standalone) থাকলে অপশনটা দরকার নেই, তাই লুকিয়ে দিই
+  var inApp = (document.referrer || "").indexOf("android-app://") === 0 ||
+    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+    window.navigator.standalone === true;
+  if (inApp) { row.style.display = "none"; return; }
+
+  function close() { overlay.style.display = "none"; }
+  row.addEventListener("click", function () { overlay.style.display = "flex"; });
+  cancelBtn.addEventListener("click", close);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+  okBtn.addEventListener("click", function () {
+    var a = document.createElement("a");
+    a.href = APK_URL;
+    a.download = "EKT-Chatter.apk";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    close();
+  });
+})();
