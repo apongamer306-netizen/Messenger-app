@@ -1078,6 +1078,40 @@
   })();
 </script>
 <script defer src="/app.js"></script>
+  <!-- ===== Neumorphism অ্যানিমেশন: বাটনে লোডিং বার + Login↔Sign Up কার্ড ফ্লিপ (app.js-এর লজিক অপরিবর্তিত) ===== -->
+  <script>
+    (function () {
+      var replaying = false;
+      document.addEventListener("click", function (e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        // ১) বাটনে ক্লিক করলে নীল লোডিং বার ভরে যায়
+        var btn = t.closest("#authScreen .btn-primary, #masterKeyScreen .btn-primary");
+        if (btn) {
+          btn.classList.remove("nm-loading");
+          void btn.offsetWidth;
+          btn.classList.add("nm-loading");
+          setTimeout(function () { btn.classList.remove("nm-loading"); }, 1000);
+          return;
+        }
+        // ২) Sign Up / Login / Create Password লিংকে ক্লিক করলে কার্ড ফ্লিপ করে তারপর কনটেন্ট বদলায়
+        var link = t.closest("#authToggleLink, #masterToggleLink");
+        if (!link || replaying) return;
+        var card = link.closest(".card-screen");
+        if (!card) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        card.classList.remove("nm-flip-in");
+        card.classList.add("nm-flip-out");
+        setTimeout(function () {
+          replaying = true; link.click(); replaying = false;
+          card.classList.remove("nm-flip-out");
+          card.classList.add("nm-flip-in");
+          setTimeout(function () { card.classList.remove("nm-flip-in"); }, 350);
+        }, 220);
+      }, true);
+    })();
+  </script>
+
   <script>
     // পুনর্ব্যবহারযোগ্য টাইপ → কিছুক্ষণ থামা → মোছা → বিরতি → আবার টাইপ — লুপ।
     // হেডারের "EKT CHATTER" ও "Developed by Eyamin" — দুটো জায়গাতেই এই একই ফাংশন চলে।
