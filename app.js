@@ -7674,17 +7674,41 @@ window.EktReact = (function () {
     window.navigator.standalone === true;
   if (inApp) { row.style.display = "none"; return; }
 
+  // Chrome-এর PWA ইনস্টল প্রম্পট ধরে রাখি (থাকলে APK-এর বদলে এটাই চালাবো)
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+  window.addEventListener("appinstalled", function () {
+    deferredPrompt = null;
+    row.style.display = "none";
+  });
+
   function close() { overlay.style.display = "none"; }
-  row.addEventListener("click", function () { overlay.style.display = "flex"; });
-  cancelBtn.addEventListener("click", close);
-  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-  okBtn.addEventListener("click", function () {
+  function downloadApk() {
     var a = document.createElement("a");
     a.href = APK_URL;
     a.download = "EKT-Chatter.apk";
     document.body.appendChild(a);
     a.click();
     a.remove();
+  }
+  row.addEventListener("click", function () { overlay.style.display = "flex"; });
+  cancelBtn.addEventListener("click", close);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+  okBtn.addEventListener("click", function () {
     close();
+    if (deferredPrompt) {
+      var dp = deferredPrompt;
+      deferredPrompt = null;
+      dp.prompt();
+      dp.userChoice.then(function (r) {
+        if (r && r.outcome !== "accepted") downloadApk();
+      }).catch(downloadApk);
+    } else {
+      downloadApk();
+    }
   });
 })();
+  
