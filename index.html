@@ -776,6 +776,7 @@
           <button type="button" class="menu-row" data-go="openReportBtn"><i style="background:#f43f5e" class="fa-solid fa-flag"></i><span>Report</span></button>
           <button type="button" class="menu-row" data-go="setPinBtn"><i style="background:#0284c7" class="fa-solid fa-key"></i><span>Security PIN</span></button>
           <button type="button" class="menu-row" data-go="removePinBtn"><i style="background:#64748b" class="fa-solid fa-lock-open"></i><span>Remove Security PIN</span></button>
+          <button type="button" id="installAppMenuRow" class="menu-row"><i style="background:linear-gradient(135deg,#6366f1,#ec4899)" class="fa-solid fa-mobile-screen-button"></i><span>Install our official app</span></button>
           <button type="button" class="menu-row menu-row-danger" data-go="logoutBtn"><i style="background:#dc2626" class="fa-solid fa-power-off"></i><span>Logout</span></button>
         </div>
       </section>
@@ -871,6 +872,20 @@
           </button>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ===== অফিশিয়াল অ্যাপ ইনস্টল পপআপ ===== -->
+    <div id="installAppOverlay" class="call-modal" style="display: none; z-index: 99999;">
+      <div class="card-screen install-app-card">
+        <div class="install-app-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+        <h2>Install our official app</h2>
+        <p class="report-modal-sub">EKT Chatter-এর অফিশিয়াল Android অ্যাপটি ডাউনলোড করে ইনস্টল করতে চান?</p>
+        <p id="installAppHint" class="install-app-hint">ডাউনলোড শেষে ফাইলটি খুলে "Install" চাপুন। প্রয়োজনে ফোনের সেটিংসে "Install unknown apps" চালু করতে হতে পারে।</p>
+        <div style="display:flex; flex-direction:column; gap:10px; width:100%; margin-top:14px;">
+          <button id="installAppConfirmBtn" class="btn btn-primary"><i class="fa-solid fa-download"></i> Confirm &amp; Install</button>
+          <button id="installAppCancelBtn" class="btn btn-secondary">Cancel</button>
+        </div>
       </div>
     </div>
 
