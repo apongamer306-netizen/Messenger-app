@@ -3267,6 +3267,14 @@ body.tab-reels { overflow: hidden; }
 #tabReels .tp-head { position: absolute; right: 10px; top: 8px; margin: 0; z-index: 5; }
 
 /* ===== Install official app popup ===== */
-.install-app-card { text-align: center; max-width: 380px; }
-.install-app-icon { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff; background: linear-gradient(135deg,#6366f1,#9333ea,#ec4899); }
-.install-app-hint { font-size: 12.5px; opacity: .7; margin-top: 6px; line-height: 1.5; }
+.install-app-card { max-width: 360px; margin: auto; padding: 30px 22px 20px; text-align: center; }
+.install-app-logo { width: 76px; height: 76px; margin: 0 auto 14px; border-radius: 22px; overflow: hidden; box-shadow: 0 14px 32px rgba(124, 92, 255, 0.45); }
+.install-app-logo svg { width: 100%; height: 100%; display: block; }
+.install-app-card h2 { font-size: 21px; margin-bottom: 4px; }
+.install-app-sub { font-size: 13px; margin-bottom: 16px; }
+.install-app-feats { list-style: none; margin: 0 0 18px; padding: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.install-app-feats li { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text); }
+.install-app-feats li i { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 10px; background: var(--brand-grad); color: #fff; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.install-app-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.install-app-actions .btn i { margin-right: 6px; }
+.install-app-hint { font-size: 11.5px; color: var(--text-3) !important; margin-top: 12px; line-height: 1.5; }
