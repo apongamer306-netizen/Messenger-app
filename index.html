@@ -232,6 +232,23 @@
     @keyframes spPullLine{ 0%{transform:scaleY(1);} 35%{transform:scaleY(1.45);} 60%{transform:scaleY(.95);} 100%{transform:scaleY(1);} }
     @keyframes spPullBead{ 0%{transform:translateY(0);} 35%{transform:translateY(21px);} 60%{transform:translateY(-2px);} 100%{transform:translateY(0);} }
 
+    .sp-cord-hit{ cursor:pointer; touch-action:none; }
+    .sp-cord-line, .sp-cord-bead{ transition:transform .18s ease; }
+    .sp-dragging .sp-cord-line, .sp-dragging .sp-cord-bead{ transition:none; }
+    .sp-hint{
+      position:absolute; left:50%; top:100%; margin-top:8px; transform:translateX(-50%);
+      white-space:nowrap; font-family:"Hind Siliguri","Poppins",sans-serif; font-size:13px; letter-spacing:.02em;
+      color:rgba(165,180,252,.75); pointer-events:none; opacity:0;
+      animation:spHintIn .5s ease .6s forwards, spHintPulse 1.6s ease-in-out 1.1s infinite;
+      transition:opacity .25s ease;
+    }
+    #splashScreen:not(.sp-wait) .sp-hint{ animation:none; opacity:0; }
+    @keyframes spHintIn{ to{ opacity:1; } }
+    @keyframes spHintPulse{ 50%{ opacity:.45; } }
+    #splashScreen.sp-wait .sp-cord-bead{ animation:spBeadHint 1.5s ease-in-out infinite; }
+    @keyframes spBeadHint{ 50%{ transform:translateY(5px); } }
+    #splashScreen.sp-pull .sp-cord-bead, #splashScreen.sp-pull .sp-cord-line{ transition:none; }
+
     /* ---- লো-এন্ড ডিভাইসের জন্য আরও হালকা মোড (JS নিজে বুঝে চালু করে) ---- */
     .sp-lite .sp-plane{ animation:none; }
     .sp-lite .sp-light{ animation:none; opacity:.9; }
@@ -247,7 +264,7 @@
 </head>
 <body class="dark-theme">
 
-  <div id="splashScreen" class="sp-off">
+  <div id="splashScreen" class="sp-off sp-wait">
     <div class="sp-inner">
       <div class="sp-energy">
         <svg viewBox="0 0 200 230" aria-hidden="true">
@@ -286,7 +303,9 @@
           <!-- সুইচের দড়ি -->
           <line class="sp-cord-line" x1="70" y1="104" x2="70" y2="150" stroke="#cbd5e1" stroke-width="2.4" stroke-linecap="round"/>
           <circle class="sp-cord-bead" cx="70" cy="153" r="4.2" fill="#e5e7eb"/>
+          <rect class="sp-cord-hit" x="50" y="100" width="40" height="76" fill="transparent"/>
         </svg>
+        <span class="sp-hint" id="spHint">দড়িটা টেনে দাও ↓</span>
       </div>
 
       <h1 class="sp-title" id="splashTitle" aria-label="EKT CHATTER"></h1>
@@ -398,18 +417,77 @@
         }
       } catch (e) {}
 
-      // ল্যাম্পের সুইচ: দড়ি টানা → আলো জ্বলা → তারপর বাকি সব দেখা যায়
-      var LAMP_PULL_MS = 500, LAMP_ON_MS = 700;
+      // ল্যাম্পের সুইচ: ইউজার নিজে দড়ি না টানা পর্যন্ত সব অন্ধকার থাকে।
+      // টান দিলে আলো জ্বলে → তারপর নাম, % লোডিং ও ক্রেডিট দেখা যায় → 100% হলে অ্যাপ।
+      var reducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      var introMode = !isResumeSession && !reducedMotion;
+      var lampLit = false;
       try {
         var lampCols = ["#7fa87f", "#d9776a", "#8b86d9", "#5fa8c9"];
         if (spEl) spEl.style.setProperty("--lamp", lampCols[Math.floor(Math.random() * lampCols.length)]);
       } catch (e) {}
       function lampOn() {
-        if (!spEl) return;
+        if (!spEl || lampLit) return;
+        lampLit = true;
         spEl.classList.remove("sp-off");
+        spEl.classList.remove("sp-wait");
         spEl.classList.add("sp-on");
+        if (introMode) {
+          // লোডিং-এর গণনা আলো জ্বলার মুহূর্ত থেকে শুরু, যাতে % পুরোটা চোখে পড়ে
+          splashStartTs = Date.now();
+          shownPct = 0; stageTs = performance.now();
+          startTitle(); startCredit();
+        }
+        if (hideRequested) goFinish();
       }
-      setTimeout(lampOn, 3000); // সেফটি: কোনো কারণে আটকে গেলেও যেন অন্ধকারে না থাকে
+      (function setupCord() {
+        var hit = spEl && spEl.querySelector(".sp-cord-hit");
+        var line = spEl && spEl.querySelector(".sp-cord-line");
+        var bead = spEl && spEl.querySelector(".sp-cord-bead");
+        var svg = spEl && spEl.querySelector(".sp-energy svg");
+        if (!hit || !line || !bead || !svg) { return; }
+        var startY = 0, dy = 0, dragging = false, pulled = false;
+        function setDrag(v) {
+          dy = v;
+          bead.style.transform = "translateY(" + v + "px)";
+          line.style.transform = "scaleY(" + (1 + v / 46) + ")";
+        }
+        function clearDrag() { bead.style.transform = ""; line.style.transform = ""; }
+        function doPull() {
+          if (pulled) return;
+          pulled = true;
+          clearDrag();
+          spEl.classList.remove("sp-wait");
+          spEl.classList.add("sp-pull");
+          setTimeout(lampOn, 180);
+        }
+        hit.addEventListener("pointerdown", function (e) {
+          if (pulled) return;
+          dragging = true; startY = e.clientY; dy = 0;
+          spEl.classList.remove("sp-wait");
+          spEl.classList.add("sp-dragging");
+          bead.style.animation = "none";
+          try { hit.setPointerCapture(e.pointerId); } catch (er) {}
+          e.preventDefault();
+        });
+        hit.addEventListener("pointermove", function (e) {
+          if (!dragging || pulled) return;
+          var k = 200 / (svg.getBoundingClientRect().width || 200);
+          var v = Math.max(0, Math.min(26, (e.clientY - startY) * k));
+          setDrag(v);
+          if (v >= 18) { dragging = false; spEl.classList.remove("sp-dragging"); bead.style.animation = ""; doPull(); }
+        });
+        function release() {
+          if (!dragging || pulled) return;
+          dragging = false;
+          spEl.classList.remove("sp-dragging");
+          bead.style.animation = "";
+          if (dy < 4) { doPull(); }      // শুধু ট্যাপ করলেও কাজ করবে
+          else { clearDrag(); spEl.classList.add("sp-wait"); }  // অর্ধেক টেনে ছেড়ে দিলে ফিরে যায়
+        }
+        hit.addEventListener("pointerup", release);
+        hit.addEventListener("pointercancel", release);
+      })();
 
       function realHide() {
         if (splashDone) return;
@@ -447,7 +525,7 @@
       // পুরো দেখানোর জন্য ন্যূনতম সময় অপেক্ষা করা হয়, তারপর % মসৃণভাবে 100 হয়ে সরে।
       var MIN_BRANDING_MS = 5000;
       function goFinish() {
-        if (splashDone) return;
+        if (splashDone || !lampLit) return;
         if (noTick || isResumeSession) { realHide(); return; }
         var elapsed = Date.now() - splashStartTs;
         var wait = Math.max(180, MIN_BRANDING_MS - elapsed);
@@ -463,11 +541,8 @@
         }
       }
 
-      if (isResumeSession || (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) lampOn();
-      else {
-        setTimeout(function () { if (spEl) spEl.classList.add("sp-pull"); }, LAMP_PULL_MS);
-        setTimeout(lampOn, LAMP_ON_MS);
-      }
+      // রিলোড বা reduced-motion হলে অন্ধকার ইন্ট্রো নেই — সরাসরি আলো জ্বলা অবস্থা
+      if (!introMode) lampOn();
 
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         if (titleEl) { titleEl.textContent = "EKT CHATTER"; titleEl.classList.add("show"); }
@@ -496,8 +571,8 @@
         return;
       }
 
-      /* Title letters — delayed after atom */
-      setTimeout(function () {
+      /* Title letters — আলো জ্বলার পর */
+      function startTitle() { setTimeout(function () {
         if (!titleEl) { titleDone = true; tryFinish(); return; }
                 var name = "EKT CHATTER";
         titleEl.textContent = "";
@@ -525,7 +600,7 @@
         if (tagEl) tagEl.classList.add("show");
         if (circleEl) circleEl.classList.add("show");
         setTimeout(function () { titleDone = true; tryFinish(); }, 280 + name.length * 60 + 450);
-      }, 1000);
+      }, 250); }
 
       /* Circular % fill 0→100 */
       var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -583,7 +658,7 @@
       /* Typewriter credit */
       var credit = "Developed by Eyamin";
       var ci = 0;
-      setTimeout(function () {
+      function startCredit() { setTimeout(function () {
         if (cursorEl) cursorEl.classList.add("on");
         function typeNext() {
           if (splashDone) return;
@@ -600,7 +675,7 @@
           }
         }
         typeNext();
-      }, 1500);
+      }, 700); }
 
       setTimeout(function () {
         titleDone = creditDone = chargeDone = true;
